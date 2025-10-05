@@ -6,7 +6,7 @@ const API_URL =
 // API client for authenticated requests
 export const api = axios.create({
   baseURL: API_URL,
-  timeout: 10000,
+  timeout: 30000, // Increased timeout for Render free tier
   withCredentials: true, // Enable cookies
   headers: {
     "Content-Type": "application/json",
@@ -16,7 +16,7 @@ export const api = axios.create({
 // API client for public requests (no auth required)
 export const publicApi = axios.create({
   baseURL: API_URL,
-  timeout: 10000,
+  timeout: 30000, // Increased timeout for Render free tier
   headers: {
     "Content-Type": "application/json",
   },
