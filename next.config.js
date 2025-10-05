@@ -10,6 +10,7 @@ const nextConfig = {
       "mymenus-storage.nyc3.digitaloceanspaces.com",
       "images.unsplash.com",
       "res.cloudinary.com",
+      "mymenus-backend.onrender.com",
       // Add your S3-compatible storage domains here
     ],
   },

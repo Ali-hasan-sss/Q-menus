@@ -48,7 +48,7 @@ export default function AdminLayout({
 
         {/* Footer */}
         <Footer className="mt-auto" />
-      </div>
+    </div>
     </AdminNotificationProvider>
   );
 }
