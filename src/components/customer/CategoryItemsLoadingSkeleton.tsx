@@ -71,9 +71,8 @@ export function CategoryItemsLoadingSkeleton({
 
       <div className="max-w-7xl pt-[100px] mx-auto px-4 sm:px-6 lg:px-8 pb-24">
         {/* Category Title Skeleton */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-5">
           <Skeleton height={32} width={256} className="mx-auto mb-4" />
-          <Skeleton height={16} width={192} className="mx-auto" />
         </div>
 
         {/* Items Grid Skeleton - 8 items in 2 columns */}

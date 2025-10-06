@@ -99,7 +99,7 @@ export function MenuItem({
   ) => {
     let itemPrice =
       typeof item.price === "string" ? parseFloat(item.price) : item.price;
-    if (item.discount && item.discount > 0) {
+    if (typeof item.discount === "number" && item.discount > 0) {
       itemPrice = itemPrice * (1 - item.discount / 100);
     }
 
@@ -150,7 +150,7 @@ export function MenuItem({
 
   if (!item.isAvailable) {
     return (
-      <Card className="opacity-50 relative">
+      <Card className="opacity-50 !p-0  relative">
         <div className="relative">
           {/* Image */}
           <div className="w-full h-48 relative overflow-hidden rounded-t-lg">
@@ -196,7 +196,7 @@ export function MenuItem({
 
   return (
     <Card
-      className={`relative p-0 overflow-hidden hover:shadow-lg transition-shadow duration-200 cursor-pointer ${theme?.borderRadius || "rounded-lg"}`}
+      className={`relative !p-0 overflow-hidden hover:shadow-lg transition-shadow duration-200 cursor-pointer ${theme?.borderRadius || "rounded-lg"}`}
       style={{
         backgroundColor: hexToRgba(
           theme?.primaryColor || "#f97316",
@@ -240,7 +240,7 @@ export function MenuItem({
       </button>
 
       {/* Discount badge */}
-      {item.discount && item.discount > 0 && (
+      {typeof item.discount === "number" && item.discount > 0 && (
         <div className="absolute top-3 right-12 z-10 bg-orange-500 text-white text-xs px-2 py-1 rounded-md font-medium">
           {item.discount}% off
         </div>
@@ -293,7 +293,7 @@ export function MenuItem({
                 color: hexToRgba(theme?.textColor || "#1f2937", opacity.text),
               }}
             >
-              {item.discount && item.discount > 0
+              {typeof item.discount === "number" && item.discount > 0
                 ? formatCurrencyWithLanguage(
                     (typeof item.price === "string"
                       ? parseFloat(item.price)
@@ -310,7 +310,7 @@ export function MenuItem({
                     language
                   )}
             </span>
-            {item.discount && item.discount > 0 && (
+            {typeof item.discount === "number" && item.discount > 0 && (
               <span className="text-xs text-gray-500 line-through">
                 {formatCurrencyWithLanguage(
                   typeof item.price === "string"
@@ -420,7 +420,7 @@ export function MenuItem({
                     color: theme?.primaryColor || "var(--theme-primary)",
                   }}
                 >
-                  {item.discount && item.discount > 0
+                  {typeof item.discount === "number" && item.discount > 0
                     ? formatCurrencyWithLanguage(
                         (typeof item.price === "string"
                           ? parseFloat(item.price)
@@ -437,7 +437,7 @@ export function MenuItem({
                         language
                       )}
                 </span>
-                {item.discount && item.discount > 0 && (
+                {typeof item.discount === "number" && item.discount > 0 && (
                   <span className="text-sm text-gray-500 line-through">
                     {formatCurrencyWithLanguage(
                       typeof item.price === "string"

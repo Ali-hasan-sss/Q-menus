@@ -33,7 +33,7 @@ export function Card({
     <div
       className={cn(
         "bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700",
-        paddingClasses[padding],
+        //  paddingClasses[padding],
         shadowClasses[shadow],
         hover &&
           "hover:shadow-md dark:hover:shadow-lg transition-shadow duration-200",
