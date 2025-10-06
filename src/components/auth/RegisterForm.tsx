@@ -50,6 +50,9 @@ export default function RegisterForm() {
   const { showToast } = useToast();
   const { loginWithToken } = useAuth();
   const [showEmailVerification, setShowEmailVerification] = useState(false);
+  const skipEmailVerification =
+    typeof window !== "undefined" &&
+    process.env.NEXT_PUBLIC_SKIP_EMAIL_VERIFICATION === "true";
   const [userEmail, setUserEmail] = useState("");
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
@@ -190,7 +193,7 @@ export default function RegisterForm() {
       if (response.data.success) {
         const { token, user, requiresEmailVerification } = response.data.data;
 
-        if (requiresEmailVerification) {
+        if (requiresEmailVerification && !skipEmailVerification) {
           // Show email verification modal
           setUserEmail(user.email);
           setShowEmailVerification(true);

@@ -16,9 +16,12 @@ const nextConfig = {
   },
   env: {
     NEXT_PUBLIC_API_URL:
-      process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000",
+      process.env.NEXT_PUBLIC_API_URL || "https://qmenus-backend.onrender.com",
     NEXT_PUBLIC_SOCKET_URL:
-      process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:5000",
+      process.env.NEXT_PUBLIC_SOCKET_URL ||
+      "https://qmenus-backend.onrender.com",
+    NEXT_PUBLIC_SKIP_EMAIL_VERIFICATION:
+      process.env.NEXT_PUBLIC_SKIP_EMAIL_VERIFICATION || "false",
   },
   // Rewrites removed - using Next.js API routes for upload
   // async rewrites() {
