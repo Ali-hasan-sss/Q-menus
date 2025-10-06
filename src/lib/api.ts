@@ -1,8 +1,11 @@
 import axios from "axios";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL
-  ? `${process.env.NEXT_PUBLIC_API_URL}/api`
-  : "http://localhost:5000/api";
+const USE_PROXY = process.env.NEXT_PUBLIC_PROXY_API === "true";
+const API_URL = USE_PROXY
+  ? "/api"
+  : process.env.NEXT_PUBLIC_API_URL
+    ? `${process.env.NEXT_PUBLIC_API_URL}/api`
+    : "http://localhost:5000/api";
 
 // API client for authenticated requests
 export const api = axios.create({
