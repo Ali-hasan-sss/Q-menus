@@ -22,16 +22,19 @@ const nextConfig = {
       "https://qmenus-backend.onrender.com",
     NEXT_PUBLIC_SKIP_EMAIL_VERIFICATION:
       process.env.NEXT_PUBLIC_SKIP_EMAIL_VERIFICATION || "false",
+    NEXT_PUBLIC_PROXY_API: process.env.NEXT_PUBLIC_PROXY_API || "false",
   },
-  // Rewrites removed - using Next.js API routes for upload
-  // async rewrites() {
-  //   return [
-  //     {
-  //       source: "/api/:path*",
-  //       destination: "http://localhost:5000/api/:path*",
-  //     },
-  //   ];
-  // },
+  async rewrites() {
+    const backend = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+    const useProxy = process.env.NEXT_PUBLIC_PROXY_API === "true";
+    if (!useProxy) return [];
+    return [
+      {
+        source: "/api/:path*",
+        destination: `${backend}/api/:path*`,
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;
