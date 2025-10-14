@@ -100,6 +100,7 @@ export const endpoints = {
     updateCategory: (id: string) => `/menu/categories/${id}`,
     toggleCategory: (id: string) => `/menu/categories/${id}/toggle`,
     deleteCategory: (id: string) => `/menu/categories/${id}`,
+    resetAllCategories: "/menu/categories/reset/all",
     items: (categoryId: string) => `/menu/categories/${categoryId}/items`,
     createItem: (categoryId: string) => `/menu/categories/${categoryId}/items`,
     updateItem: (id: string) => `/menu/items/${id}`,
@@ -135,6 +136,13 @@ export const endpoints = {
     image: "/upload/image",
     images: "/upload/images",
     deleteImage: "/upload/image",
+  },
+
+  // Excel Import
+  excelImport: {
+    template: (lang: string) => `/excel-import/template?lang=${lang}`,
+    import: "/excel-import/import",
+    history: "/excel-import/history",
   },
 
   // Admin
@@ -173,6 +181,8 @@ export const endpoints = {
       `/public/menu/${restaurantId}/categories`,
     categoryItems: (restaurantId: string, categoryId: string) =>
       `/public/menu/${restaurantId}/categories/${categoryId}/items`,
+    searchMenu: (restaurantId: string, query: string) =>
+      `/public/menu/${restaurantId}/search?q=${encodeURIComponent(query)}`,
     restaurant: (restaurantId: string) => `/public/restaurant/${restaurantId}`,
     health: "/public/health",
   },

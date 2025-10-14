@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Cairo } from "next/font/google";
+import { Inter, Cairo, Poppins } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import { Toaster } from "react-hot-toast";
@@ -12,6 +12,12 @@ const inter = Inter({
 const cairo = Cairo({
   subsets: ["arabic", "latin"],
   variable: "--font-cairo",
+});
+
+const poppins = Poppins({
+  subsets: ["latin"],
+  weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
+  variable: "--font-poppins",
 });
 
 export const metadata: Metadata = {
@@ -151,7 +157,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${inter.variable} ${cairo.variable} font-sans antialiased`}
+        className={`${inter.variable} ${cairo.variable} ${poppins.variable} font-sans antialiased`}
         suppressHydrationWarning
       >
         <Providers>

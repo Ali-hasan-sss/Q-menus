@@ -167,7 +167,8 @@ export function ItemFormModal({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title} size="lg">
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="max-h-[70vh] overflow-y-auto pr-2">
+        <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -425,7 +426,8 @@ export function ItemFormModal({
                 : t("common.add")}
           </Button>
         </div>
-      </form>
+        </form>
+      </div>
     </Modal>
   );
 }

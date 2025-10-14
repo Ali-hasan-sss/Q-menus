@@ -22,6 +22,8 @@ interface AdminNotificationsDropdownProps {
   onMarkAllAsRead: () => void;
   onDeleteNotification: (notificationId: string) => void;
   isRTL: boolean;
+  browserNotificationsEnabled?: boolean;
+  requestNotificationPermission?: () => void;
 }
 
 export default function AdminNotificationsDropdown({
@@ -34,6 +36,8 @@ export default function AdminNotificationsDropdown({
   onMarkAllAsRead,
   onDeleteNotification,
   isRTL,
+  browserNotificationsEnabled,
+  requestNotificationPermission,
 }: AdminNotificationsDropdownProps) {
   const router = useRouter();
 
@@ -42,24 +46,55 @@ export default function AdminNotificationsDropdown({
   return (
     <div
       onClick={(e) => e.stopPropagation()}
-      className={`fixed inset-x-0 top-16 sm:absolute sm:top-auto sm:inset-auto sm:mt-2 sm:w-96 mx-4 sm:mx-0 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-600 z-50 ${
-        isRTL ? "sm:left-0" : "sm:right-0"
+      className={`absolute mt-2 w-[calc(100vw-2rem)] sm:w-96 max-w-md bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-600 z-50 ${
+        isRTL
+          ? "right-0 sm:left-0 sm:right-auto"
+          : "left-0 sm:right-0 sm:left-auto"
       }`}
     >
       <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex justify-between items-center mb-3">
+        <div className="flex justify-between items-start gap-3 mb-3">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
             {isRTL ? "الإشعارات" : "Notifications"}
           </h3>
           {unreadCount > 0 && (
             <button
               onClick={onMarkAllAsRead}
-              className="text-xs text-primary-600 hover:text-primary-700 dark:text-primary-400"
+              className="text-xs text-primary-600 hover:text-primary-700 dark:text-primary-400 whitespace-nowrap"
             >
               {isRTL ? "تحديد الكل كمقروء" : "Mark all as read"}
             </button>
           )}
         </div>
+
+        {/* Browser Notification Toggle */}
+        {requestNotificationPermission && !browserNotificationsEnabled && (
+          <button
+            onClick={requestNotificationPermission}
+            className="w-full px-3 py-2 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-md hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
+          >
+            {isRTL ? "تفعيل إشعارات المتصفح" : "Enable Browser Notifications"}
+          </button>
+        )}
+
+        {browserNotificationsEnabled && (
+          <div className="flex items-center justify-center text-xs text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 py-2 px-3 rounded-md">
+            <svg
+              className={`w-4 h-4 ${isRTL ? "ml-1" : "mr-1"}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            {isRTL ? "إشعارات المتصفح مفعلة" : "Browser Notifications Enabled"}
+          </div>
+        )}
       </div>
 
       <div className="max-h-96 overflow-y-auto">

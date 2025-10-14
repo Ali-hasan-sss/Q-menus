@@ -254,35 +254,33 @@ export default function RegisterForm() {
 
   return (
     <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <Card className="mt-8  w-full max-w-lg">
+      <Card className="mt-8 p-6 w-full max-w-lg bg-white dark:bg-gray-800 shadow-xl">
         <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold ">
-            {isRTL ? "إنشاء حساب جديد" : "Create New Account"}
+          <h2 className="mt-4 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
+            {isRTL ? "أنشئ حساب مطعمك" : "Create your restaurant account"}
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
+          <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-300">
             {isRTL ? "الخطوة" : "Step"} {currentStep} {isRTL ? "من" : "of"} 3
           </p>
         </div>
 
         {/* Progress Bar */}
-        <div className="w-full bg-gray-200 rounded-full h-2">
+        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
           <div
-            className="bg-primary-600 h-2 rounded-full transition-all duration-300"
+            className="bg-tm-blue h-2 rounded-full transition-all duration-300"
             style={{ width: `${(currentStep / 3) * 100}%` }}
           />
         </div>
 
         <div className="mt-8 space-y-6">
-          {error && <ErrorMessage message={error} />}
-
           {/* Step 1: Personal Information */}
           {currentStep === 1 && (
             <div className="space-y-4">
-              <h3 className="text-lg font-medium ">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">
                 {isRTL ? "البيانات الشخصية" : "Personal Information"}
               </h3>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Input
                     label={isRTL ? "الاسم الأول" : "First Name"}
@@ -376,55 +374,60 @@ export default function RegisterForm() {
           {/* Step 2: Restaurant Information */}
           {currentStep === 2 && (
             <div className="space-y-4">
-              <h3 className="text-lg font-medium ">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">
                 {isRTL ? "معلومات المطعم" : "Restaurant Information"}
               </h3>
 
-              <div>
-                <Input
-                  label={
-                    isRTL ? "اسم المطعم (عربي)" : "Restaurant Name (Arabic)"
-                  }
-                  value={formData.restaurantNameAr}
-                  onChange={(e) =>
-                    handleInputChange("restaurantNameAr", e.target.value)
-                  }
-                  className={
-                    fieldErrors.restaurantNameAr ? "border-red-500" : ""
-                  }
-                  required
-                />
-                {fieldErrors.restaurantNameAr && (
-                  <p className="mt-1 text-sm text-red-600">
-                    {fieldErrors.restaurantNameAr}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <Input
-                  label={
-                    isRTL ? "اسم المطعم (إنجليزي)" : "Restaurant Name (English)"
-                  }
-                  value={formData.restaurantName}
-                  onChange={(e) =>
-                    handleInputChange("restaurantName", e.target.value)
-                  }
-                  className={fieldErrors.restaurantName ? "border-red-500" : ""}
-                  required
-                />
-                {fieldErrors.restaurantName && (
-                  <p className="mt-1 text-sm text-red-600">
-                    {fieldErrors.restaurantName}
-                  </p>
-                )}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Input
+                    label={
+                      isRTL ? "اسم المطعم (عربي)" : "Restaurant Name (Arabic)"
+                    }
+                    value={formData.restaurantNameAr}
+                    onChange={(e) =>
+                      handleInputChange("restaurantNameAr", e.target.value)
+                    }
+                    className={
+                      fieldErrors.restaurantNameAr ? "border-red-500" : ""
+                    }
+                    required
+                  />
+                  {fieldErrors.restaurantNameAr && (
+                    <p className="mt-1 text-sm text-red-600">
+                      {fieldErrors.restaurantNameAr}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Input
+                    label={
+                      isRTL
+                        ? "اسم المطعم (إنجليزي)"
+                        : "Restaurant Name (English)"
+                    }
+                    value={formData.restaurantName}
+                    onChange={(e) =>
+                      handleInputChange("restaurantName", e.target.value)
+                    }
+                    className={
+                      fieldErrors.restaurantName ? "border-red-500" : ""
+                    }
+                    required
+                  />
+                  {fieldErrors.restaurantName && (
+                    <p className="mt-1 text-sm text-red-600">
+                      {fieldErrors.restaurantName}
+                    </p>
+                  )}
+                </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   {isRTL
-                    ? "وصف المطعم (عربي)"
-                    : "Restaurant Description (Arabic)"}
+                    ? "وصف المطعم (اختياري) — عربي"
+                    : "Restaurant Description (Optional) — Arabic"}
                 </label>
                 <textarea
                   value={formData.restaurantDescriptionAr}
@@ -453,8 +456,8 @@ export default function RegisterForm() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   {isRTL
-                    ? "وصف المطعم (إنجليزي)"
-                    : "Restaurant Description (English)"}
+                    ? "وصف المطعم (اختياري) — إنجليزي"
+                    : "Restaurant Description (Optional) — English"}
                 </label>
                 <textarea
                   value={formData.restaurantDescription}
@@ -504,11 +507,12 @@ export default function RegisterForm() {
           )}
 
           {/* Navigation Buttons */}
-          <div className="flex justify-between">
+          <div className="flex justify-between z-50">
             <Button
               type="button"
               variant="secondary"
               onClick={handlePrevious}
+              className="z-50"
               disabled={currentStep === 1}
             >
               {isRTL ? "السابق" : "Previous"}
@@ -517,6 +521,7 @@ export default function RegisterForm() {
             {currentStep < 3 ? (
               <Button
                 type="button"
+                className="bg-tm-blue hover:bg-tm-orange text-white"
                 onClick={handleNext}
                 disabled={
                   (currentStep === 1 && !isStep1Valid) ||
@@ -528,6 +533,7 @@ export default function RegisterForm() {
             ) : (
               <Button
                 type="button"
+                className="bg-tm-blue hover:bg-tm-orange text-white"
                 onClick={handleSubmit}
                 disabled={!isFormValid || loading}
               >
@@ -543,12 +549,12 @@ export default function RegisterForm() {
           </div>
         </div>
 
-        <div className="text-center">
-          <p className="text-sm text-gray-600">
+        <div className="text-center mt-4">
+          <p className="text-sm text-gray-600 dark:text-gray-300">
             {isRTL ? "لديك حساب بالفعل؟" : "Already have an account?"}{" "}
             <a
               href="/auth/login"
-              className="font-medium text-primary-600 hover:text-primary-500"
+              className="font-medium text-tm-blue hover:text-tm-orange"
             >
               {isRTL ? "تسجيل الدخول" : "Sign in"}
             </a>

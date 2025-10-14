@@ -68,8 +68,8 @@ const translations = {
 
     // Menu
     "menu.title": "إدارة القائمة",
-    "menu.categories": "الفئات",
-    "menu.theme": "تصميم القائمة",
+    "menu.categories": "الفئات والأصناف",
+    "menu.theme": "تخصيص شكل القائمة",
     "menu.items": "الأصناف",
     "menu.addCategory": "إضافة فئة",
     "menu.addItem": "إضافة صنف",

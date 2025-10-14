@@ -91,12 +91,20 @@ interface MenuContextType {
   updateCategory: (id: string, data: UpdateCategoryData) => Promise<Category>;
   deleteCategory: (id: string) => Promise<void>;
   toggleCategoryStatus: (id: string) => Promise<void>;
+  resetAllCategories: () => Promise<void>;
   createItem: (data: CreateItemData) => Promise<MenuItem>;
   updateItem: (id: string, data: UpdateItemData) => Promise<MenuItem>;
   deleteItem: (id: string) => Promise<void>;
   toggleItemStatus: (id: string) => Promise<void>;
   updateMenuName: (name: string, nameAr?: string) => Promise<void>;
   refreshData: () => Promise<void>;
+
+  // Excel Import Actions
+  downloadExcelTemplate: (lang: string) => Promise<Blob>;
+  importExcelFile: (file: File) => Promise<{
+    categoriesCreated: number;
+    itemsCreated: number;
+  }>;
 
   // QR Code Actions
   fetchQRCodes: () => Promise<void>;
@@ -414,6 +422,25 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Reset all categories and items
+  const resetAllCategories = useCallback(async (): Promise<void> => {
+    try {
+      setError(null);
+      setLoading(true);
+      await api.delete("/menu/categories/reset/all");
+      // Clear all categories and items from state
+      setCategories([]);
+      setItems([]);
+    } catch (error: any) {
+      const errorMessage =
+        error.response?.data?.message || "Failed to reset menu";
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   // Update menu name
   const updateMenuName = useCallback(
     async (name: string, nameAr?: string): Promise<void> => {
@@ -641,6 +668,40 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
     };
   }, [refreshData]);
 
+  // Excel Import Functions
+  const downloadExcelTemplate = async (lang: string): Promise<Blob> => {
+    try {
+      const response = await api.get(`/excel-import/template?lang=${lang}`, {
+        responseType: "blob",
+      });
+      return response.data;
+    } catch (error: any) {
+      throw error;
+    }
+  };
+
+  const importExcelFile = async (
+    file: File
+  ): Promise<{ categoriesCreated: number; itemsCreated: number }> => {
+    try {
+      const formData = new FormData();
+      formData.append("excelFile", file);
+
+      const response = await api.post("/excel-import/import", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      // Refresh categories and items after successful import
+      await fetchCategories();
+
+      return response.data.summary;
+    } catch (error: any) {
+      throw error;
+    }
+  };
+
   const value = {
     // State
     menu,
@@ -661,12 +722,17 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
     updateCategory,
     deleteCategory,
     toggleCategoryStatus,
+    resetAllCategories,
     createItem,
     updateItem,
     deleteItem,
     toggleItemStatus,
     updateMenuName,
     refreshData,
+
+    // Excel Import Actions
+    downloadExcelTemplate,
+    importExcelFile,
 
     // QR Code Actions
     fetchQRCodes,

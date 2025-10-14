@@ -15,7 +15,7 @@ import { CategoryReorderModal } from "@/components/dashboard/CategoryReorderModa
 import { ItemReorderModal } from "@/components/dashboard/ItemReorderModal";
 import { ItemFormModal } from "@/components/dashboard/ItemFormModal";
 import { ThemeEditor } from "@/components/dashboard/ThemeEditor";
-import Navbar from "@/components/dashboard/Navbar";
+import { ExcelImportButton } from "@/components/dashboard/ExcelImportButton";
 
 interface Category {
   id: string;
@@ -73,6 +73,7 @@ export default function MenuPage() {
     fetchCategoryItems,
     fetchItems,
     refreshData,
+    resetAllCategories,
   } = useMenu();
   const { showConfirm } = useConfirmDialog();
   const { showToast } = useToast();
@@ -336,6 +337,34 @@ export default function MenuPage() {
     }
   };
 
+  const handleResetAll = async () => {
+    showConfirm({
+      title: isRTL ? "إعادة تعيين القائمة" : "Reset Menu",
+      message: isRTL
+        ? "هل أنت متأكد من حذف جميع الفئات والعناصر؟ هذا الإجراء لا يمكن التراجع عنه."
+        : "Are you sure you want to delete all categories and items? This action cannot be undone.",
+      confirmText: isRTL ? "حذف الكل" : "Delete All",
+      cancelText: isRTL ? "إلغاء" : "Cancel",
+      confirmVariant: "danger",
+      onConfirm: async () => {
+        try {
+          await resetAllCategories();
+          setSelectedCategory(null);
+          showToast(
+            isRTL ? "تم إعادة تعيين القائمة بنجاح" : "Menu reset successfully",
+            "success"
+          );
+        } catch (error: any) {
+          showToast(
+            error.response?.data?.message ||
+              (isRTL ? "حدث خطأ أثناء إعادة التعيين" : "Error resetting menu"),
+            "error"
+          );
+        }
+      },
+    });
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -380,7 +409,7 @@ export default function MenuPage() {
       <div className="max-w-7xl md:py-10 mx-auto py-2 sm:px-6 lg:px-8 pb-20 mb-4 sm:pb-6">
         <div className="px-4 sm:px-0">
           {/* Header */}
-          <div className="flex justify-between items-center mb-4 md:mb-8">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 md:mb-8">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
                 {isRTL ? "إدارة القائمة" : t("menu.title") || "Menu Management"}
@@ -391,6 +420,9 @@ export default function MenuPage() {
                   : t("menu.subtitle") ||
                     "Manage your restaurant menu categories and items"}
               </p>
+            </div>
+            <div className="flex-shrink-0">
+              <ExcelImportButton onImportSuccess={refreshData} />
             </div>
           </div>
 
@@ -416,6 +448,7 @@ export default function MenuPage() {
                   onToggleCategoryStatus={toggleCategoryStatus}
                   onCreateCategory={() => setShowCategoryModal(true)}
                   onReorderCategories={handleReorderCategories}
+                  onResetAll={handleResetAll}
                 />
               ) : (
                 <ItemList

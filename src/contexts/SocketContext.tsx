@@ -143,8 +143,27 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Initialize socket connection
-    const socketUrl =
-      process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:5000";
+    // Use the same host as the current page but with port 5000 for backend
+    const getSocketUrl = () => {
+      if (process.env.NEXT_PUBLIC_SOCKET_URL) {
+        return process.env.NEXT_PUBLIC_SOCKET_URL;
+      }
+
+      // If running on localhost, use localhost
+      if (
+        window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1"
+      ) {
+        return "http://localhost:5000";
+      }
+
+      // Otherwise use the same hostname with port 5000
+      return `http://${window.location.hostname}:5000`;
+    };
+
+    const socketUrl = getSocketUrl();
+    console.log("Connecting to Socket.IO:", socketUrl);
+
     const newSocket = io(socketUrl, {
       autoConnect: false,
       transports: ["websocket", "polling"],

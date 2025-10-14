@@ -78,6 +78,12 @@ export default function AdminNavbar() {
       href: "/admin/invoices",
       icon: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
     },
+    {
+      name: "Gallery",
+      nameAr: "المعرض",
+      href: "/admin/gallery",
+      icon: "M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z",
+    },
   ];
 
   // Close dropdowns when clicking outside
@@ -195,62 +201,19 @@ export default function AdminNavbar() {
                 )}
               </button>
 
-              {isNotificationsOpen && (
-                <div className="absolute right-0 mt-2 w-96 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
-                  <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                        {isRTL ? "الإشعارات" : "Notifications"}
-                      </h3>
-
-                      {/* Browser Notification Toggle */}
-                      {!browserNotificationsEnabled && (
-                        <button
-                          onClick={requestNotificationPermission}
-                          className="px-3 py-1 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-md hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
-                        >
-                          {isRTL
-                            ? "تفعيل إشعارات المتصفح"
-                            : "Enable Browser Notifications"}
-                        </button>
-                      )}
-
-                      {browserNotificationsEnabled && (
-                        <div className="flex items-center text-xs text-green-600 dark:text-green-400">
-                          <svg
-                            className="w-4 h-4 mr-1"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                            />
-                          </svg>
-                          {isRTL
-                            ? "إشعارات المتصفح مفعلة"
-                            : "Browser Notifications Enabled"}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <AdminNotificationsDropdown
-                    isOpen={isNotificationsOpen}
-                    onClose={() => setIsNotificationsOpen(false)}
-                    notifications={notifications}
-                    notificationsLoading={notificationsLoading}
-                    unreadCount={unreadCount}
-                    onMarkAsRead={markAsRead}
-                    onMarkAllAsRead={markAllAsRead}
-                    onDeleteNotification={deleteNotification}
-                    isRTL={isRTL}
-                  />
-                </div>
-              )}
+              <AdminNotificationsDropdown
+                isOpen={isNotificationsOpen}
+                onClose={() => setIsNotificationsOpen(false)}
+                notifications={notifications}
+                notificationsLoading={notificationsLoading}
+                unreadCount={unreadCount}
+                onMarkAsRead={markAsRead}
+                onMarkAllAsRead={markAllAsRead}
+                onDeleteNotification={deleteNotification}
+                isRTL={isRTL}
+                browserNotificationsEnabled={browserNotificationsEnabled}
+                requestNotificationPermission={requestNotificationPermission}
+              />
             </div>
 
             {/* User Menu */}

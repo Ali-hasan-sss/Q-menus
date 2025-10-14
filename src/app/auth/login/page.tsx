@@ -115,16 +115,30 @@ export default function LoginPage() {
     <>
       {" "}
       <Header />
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-100 dark:bg-gradient-to-br dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 -mt-24 md:-mt-28 pt-24 md:pt-28 relative overflow-hidden py-12 px-4 sm:px-6 lg:px-8">
+        {/* Decorative bubbles */}
+        <div className="absolute -top-10 -left-10 w-40 h-40 opacity-10 dark:opacity-5">
+          <div className="w-full h-full bg-gradient-to-br from-blue-500 to-orange-500 rounded-full"></div>
+        </div>
+        <div className="absolute -bottom-10 -right-10 w-56 h-56 opacity-10 dark:opacity-5">
+          <div className="w-full h-full bg-gradient-to-tr from-orange-500 to-blue-500 rounded-full"></div>
+        </div>
         <div className="max-w-md w-full space-y-8">
           {/* Header */}
 
           {/* Login Form */}
-          <Card className="mt-8  w-full max-w-lg">
+          <Card className="mt-8 p-6 w-full max-w-lg bg-white dark:bg-gray-800 shadow-xl">
             <div>
-              <h2 className="my-6 text-center text-3xl font-extrabold ">
-                {isRTL ? "سجل الدخول الى حسابك" : "Login to your account"}
+              <h2 className="my-4 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
+                {isRTL
+                  ? "سجّل الدخول إلى حساب مطعمك"
+                  : "Sign in to your restaurant account"}
               </h2>
+              <p className="text-center text-sm text-gray-600 dark:text-gray-300">
+                {isRTL
+                  ? "QMenus مخصّصة للمطاعم والكافيهات"
+                  : "QMenus is built for restaurants and cafes"}
+              </p>
             </div>
             <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
               <div>
@@ -194,7 +208,11 @@ export default function LoginPage() {
               </div>
 
               <div>
-                <Button type="submit" className="w-full" disabled={isLoading}>
+                <Button
+                  type="submit"
+                  className="w-full bg-tm-blue hover:bg-tm-orange text-white"
+                  disabled={isLoading}
+                >
                   {isLoading ? t("common.loading") : t("auth.login")}
                 </Button>
               </div>
@@ -205,7 +223,7 @@ export default function LoginPage() {
                 </span>
                 <Link
                   href="/auth/register"
-                  className="font-medium text-primary-600 hover:text-primary-500"
+                  className="font-medium text-tm-blue hover:text-tm-orange"
                 >
                   {t("auth.register")}
                 </Link>

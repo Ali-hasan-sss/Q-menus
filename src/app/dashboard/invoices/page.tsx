@@ -6,7 +6,6 @@ import { useToast } from "@/components/ui/Toast";
 import { api } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import Navbar from "@/components/dashboard/Navbar";
 
 interface Invoice {
   id: string;
@@ -140,7 +139,6 @@ export default function InvoicesPage() {
 
   return (
     <div>
-      <Navbar />
       <div className="px-4 py-6">
         {/* Header */}
         <div className="mb-6">

@@ -13,10 +13,10 @@ import { FloatingOrderSummary } from "@/components/customer/FloatingOrderSummary
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { MenuLoadingSkeleton } from "@/components/customer/MenuLoadingSkeleton";
-import { CategoryItemsLoadingSkeleton } from "@/components/customer/CategoryItemsLoadingSkeleton";
 import QRScanner from "@/components/customer/QRScanner";
 import toast from "react-hot-toast";
 import { hexToRgba } from "@/lib/helper";
+import { DEFAULT_THEME, mergeWithDefaultTheme } from "@/lib/defaultTheme";
 
 interface MenuItem {
   id: string;
@@ -161,6 +161,10 @@ export default function CustomerMenuPage() {
   const [existingOrderId, setExistingOrderId] = useState<string | null>(
     addToOrderParam
   );
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<MenuItem[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showSearchResults, setShowSearchResults] = useState(false);
 
   // LocalStorage key for this restaurant's order
   const orderStorageKey = `order_${restaurantId}_${tableNumber || "delivery"}`;
@@ -174,35 +178,15 @@ export default function CustomerMenuPage() {
     accent: 1, // 100% opacity
   });
 
-  // Background overlay opacity state (load from theme or default to 0.5)
-  const [backgroundOverlayOpacity, setBackgroundOverlayOpacity] = useState(0.5);
-
-  // Default theme for all restaurants
-  const defaultTheme = {
-    primaryColor: "#f58114",
-    secondaryColor: "#2797dd",
-    backgroundColor: "#ffe59e",
-    textColor: "#000000",
-    accentColor: "#e2ee44",
-    primaryColorOpacity: 0.5,
-    secondaryColorOpacity: 1,
-    backgroundColorOpacity: 0.7,
-    textColorOpacity: 1,
-    accentColorOpacity: 1,
-    backgroundOverlayOpacity: 0.1,
-    backgroundPosition: "center",
-    backgroundRepeat: "no-repeat",
-    backgroundSize: "cover",
-    backgroundImage:
-      "https://res.cloudinary.com/dnojeu5cs/image/upload/v1759501200/mymenus-images/uvimvqchjpshc45ighmx.jpg",
-    customBackgroundImage:
-      "https://res.cloudinary.com/dnojeu5cs/image/upload/v1759501200/mymenus-images/uvimvqchjpshc45ighmx.jpg",
-  };
+  // Background overlay opacity state (load from theme or default)
+  const [backgroundOverlayOpacity, setBackgroundOverlayOpacity] = useState(
+    DEFAULT_THEME.backgroundOverlayOpacity
+  );
 
   // Function to update CSS custom properties with restaurant theme
   const updateThemeVariables = (theme: MenuTheme | null) => {
     const root = document.documentElement;
-    const activeTheme = theme || defaultTheme;
+    const activeTheme = mergeWithDefaultTheme(theme);
 
     // Update CSS custom properties
     root.style.setProperty("--theme-primary", activeTheme.primaryColor);
@@ -441,25 +425,25 @@ export default function CustomerMenuPage() {
       const { restaurant, categories, menuTheme } = response.data.data;
 
       setRestaurant(restaurant);
-      setMenuTheme(menuTheme);
 
-      // Use default theme if no custom theme exists
-      const activeTheme = menuTheme || defaultTheme;
+      // Merge custom theme with default theme
+      const mergedTheme = mergeWithDefaultTheme(menuTheme);
+      setMenuTheme(mergedTheme);
 
-      // Load color opacity from theme (use default values if not provided)
+      // Load color opacity from merged theme
       setColorOpacity({
-        primary: activeTheme.primaryColorOpacity || 0.6,
-        secondary: activeTheme.secondaryColorOpacity || 1,
-        background: activeTheme.backgroundColorOpacity || 1,
-        text: activeTheme.textColorOpacity || 1,
-        accent: activeTheme.accentColorOpacity || 1,
+        primary: mergedTheme.primaryColorOpacity,
+        secondary: mergedTheme.secondaryColorOpacity,
+        background: mergedTheme.backgroundColorOpacity,
+        text: mergedTheme.textColorOpacity,
+        accent: mergedTheme.accentColorOpacity,
       });
 
-      // Load background overlay opacity from theme
-      setBackgroundOverlayOpacity(activeTheme.backgroundOverlayOpacity || 0.5);
+      // Load background overlay opacity from merged theme
+      setBackgroundOverlayOpacity(mergedTheme.backgroundOverlayOpacity);
 
-      // Update CSS custom properties with restaurant theme (or default)
-      updateThemeVariables(menuTheme);
+      // Update CSS custom properties with merged theme
+      updateThemeVariables(mergedTheme);
 
       // Convert categories to menus format for compatibility (without items)
       setMenus([
@@ -515,6 +499,46 @@ export default function CustomerMenuPage() {
       setLoadingItems(false);
     }
   };
+
+  // Search menu items
+  const searchMenuItems = async (query: string) => {
+    if (!query || query.trim().length === 0) {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      return;
+    }
+
+    try {
+      setIsSearching(true);
+      const response = await publicApi.get(
+        endpoints.public.searchMenu(restaurantId, query)
+      );
+
+      if (response.data.success) {
+        setSearchResults(response.data.data.items);
+        setShowSearchResults(true);
+      }
+    } catch (error: any) {
+      console.error("Search error:", error);
+      toast.error(isRTL ? "خطأ في البحث" : "Search error");
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Handle search input change with debounce
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      if (searchQuery.trim().length > 0) {
+        searchMenuItems(searchQuery);
+      } else {
+        setSearchResults([]);
+        setShowSearchResults(false);
+      }
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery]);
 
   const addItemToOrder = (
     menuItem: MenuItem,
@@ -870,23 +894,23 @@ export default function CustomerMenuPage() {
         className="min-h-screen relative"
         style={{
           backgroundColor: hexToRgba(
-            menuTheme?.backgroundColor || defaultTheme.backgroundColor,
+            menuTheme?.backgroundColor || DEFAULT_THEME.backgroundColor,
             colorOpacity.background
           ),
           backgroundImage: menuTheme?.backgroundImage
             ? `url(${menuTheme.backgroundImage})`
-            : undefined,
+            : `url(${DEFAULT_THEME.backgroundImage})`,
           backgroundPosition:
-            menuTheme?.backgroundPosition || defaultTheme.backgroundPosition,
+            menuTheme?.backgroundPosition || DEFAULT_THEME.backgroundPosition,
           backgroundSize:
-            menuTheme?.backgroundSize || defaultTheme.backgroundSize,
+            menuTheme?.backgroundSize || DEFAULT_THEME.backgroundSize,
           backgroundRepeat:
-            menuTheme?.backgroundRepeat || defaultTheme.backgroundRepeat,
+            menuTheme?.backgroundRepeat || DEFAULT_THEME.backgroundRepeat,
           color: hexToRgba(
-            menuTheme?.textColor || defaultTheme.textColor,
+            menuTheme?.textColor || DEFAULT_THEME.textColor,
             colorOpacity.text
           ),
-          fontFamily: menuTheme?.fontFamily || "Inter, sans-serif",
+          fontFamily: menuTheme?.fontFamily || DEFAULT_THEME.fontFamily,
         }}
         onLoad={() => {
           console.log("Main page div loaded with colorOpacity:", colorOpacity);
@@ -901,6 +925,7 @@ export default function CustomerMenuPage() {
               backgroundColor: `rgba(0, 0, 0, ${backgroundOverlayOpacity})`,
               transform: "translateZ(0)", // Force hardware acceleration
               backfaceVisibility: "hidden",
+              height: "200vh",
             }}
           />
         )}
@@ -933,17 +958,142 @@ export default function CustomerMenuPage() {
             {/* Categories View */}
             {!selectedCategory && (
               <div className="animate-fadeIn">
-                <h2
-                  className="text-2xl  font-bold mb-6 text-center"
-                  style={{
-                    color: hexToRgba(
-                      menuTheme?.textColor || "#1f2937",
-                      colorOpacity.text
-                    ),
-                  }}
-                >
-                  {isRTL ? "اختر وجبتك اللذيذة" : "Choose your delicious Meal"}
-                </h2>
+                {/* Search Bar */}
+                <div className="mb-6 max-w-2xl mx-auto">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder={
+                        isRTL ? "ابحث عن وجبتك..." : "Search for your meal..."
+                      }
+                      className="w-full px-4 py-3 ltr:pr-12 rtl:pl-12 rounded-lg border focus:outline-none focus:ring-2 transition-all"
+                      style={{
+                        backgroundColor: hexToRgba(
+                          menuTheme?.backgroundColor || "#ffffff",
+                          0.9
+                        ),
+                        borderColor: hexToRgba(
+                          menuTheme?.secondaryColor || "#e5e7eb",
+                          colorOpacity.secondary
+                        ),
+                        color: hexToRgba(
+                          menuTheme?.textColor || "#1f2937",
+                          colorOpacity.text
+                        ),
+                      }}
+                    />
+                    <div
+                      className={`absolute top-1/2 -translate-y-1/2 ${isRTL ? "left-4" : "right-4"} ${searchQuery.trim().length > 0 ? "ltr:right-4 rtl:left-4" : ""}`}
+                    >
+                      {isSearching ? (
+                        <div
+                          className="animate-spin rounded-full h-5 w-5 border-b-2"
+                          style={{
+                            borderColor: menuTheme?.primaryColor || "#f6b23c",
+                          }}
+                        ></div>
+                      ) : searchQuery.trim().length > 0 ? (
+                        <button
+                          onClick={() => setSearchQuery("")}
+                          className="hover:opacity-70 mt-2 transition-opacity"
+                          aria-label={isRTL ? "مسح البحث" : "Clear search"}
+                        >
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            style={{
+                              color: menuTheme?.secondaryColor || "#6b7280",
+                            }}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
+                        </button>
+                      ) : (
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                          style={{
+                            color: menuTheme?.secondaryColor || "#6b7280",
+                          }}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                          />
+                        </svg>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Search Results */}
+                {showSearchResults && searchResults.length > 0 && (
+                  <div className="mb-8">
+                    <h3
+                      className="text-lg font-semibold mb-4"
+                      style={{
+                        color: hexToRgba(
+                          menuTheme?.textColor || "#1f2937",
+                          colorOpacity.text
+                        ),
+                      }}
+                    >
+                      {isRTL
+                        ? `نتائج البحث (${searchResults.length})`
+                        : `Search Results (${searchResults.length})`}
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+                      {searchResults.map((item) => (
+                        <MenuItem
+                          key={item.id}
+                          item={item}
+                          onAddToOrder={addItemToOrder}
+                          onItemClick={handleItemClick}
+                          isRTL={isRTL}
+                          theme={menuTheme || undefined}
+                          colorOpacity={colorOpacity}
+                        />
+                      ))}
+                    </div>
+                    <div
+                      className="border-t-2 pt-6 mb-6"
+                      style={{
+                        borderColor: hexToRgba(
+                          menuTheme?.secondaryColor || "#e5e7eb",
+                          0.3
+                        ),
+                      }}
+                    ></div>
+                  </div>
+                )}
+
+                {/* Categories Title */}
+                {showSearchResults && searchResults.length > 0 && (
+                  <h3
+                    className="text-lg font-semibold mb-4 text-center"
+                    style={{
+                      color: hexToRgba(
+                        menuTheme?.textColor || "#1f2937",
+                        colorOpacity.text
+                      ),
+                    }}
+                  >
+                    {isRTL ? "أو اختر من الفئات" : "Or choose from categories"}
+                  </h3>
+                )}
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                   {menus.map((menu) =>
@@ -1078,12 +1228,7 @@ export default function CustomerMenuPage() {
                   return null;
                 })()}
                 {loadingItems ? (
-                  <CategoryItemsLoadingSkeleton
-                    menuTheme={menuTheme}
-                    categoryName={
-                      selectedCategory?.name || selectedCategory?.nameAr
-                    }
-                  />
+                  <MenuLoadingSkeleton menuTheme={menuTheme} />
                 ) : selectedCategory.items &&
                   selectedCategory.items.length > 0 ? (
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">

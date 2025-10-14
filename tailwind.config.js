@@ -42,10 +42,15 @@ module.exports = {
         "theme-background": "var(--theme-background)",
         "theme-text": "var(--theme-text)",
         "theme-accent": "var(--theme-accent)",
+        // TemplateMo Colors
+        "tm-blue": "#03a4ed",
+        "tm-orange": "#ff695f",
+        "tm-gray": "#2a2a2a",
       },
       fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
+        sans: ["Poppins", "Inter", "system-ui", "sans-serif"],
         arabic: ["Cairo", "Arial", "sans-serif"],
+        poppins: ["Poppins", "sans-serif"],
       },
       animation: {
         "fade-in": "fadeIn 0.5s ease-in-out",

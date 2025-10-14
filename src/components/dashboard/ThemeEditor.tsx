@@ -9,7 +9,7 @@ const sliderStyles = `
     height: 16px;
     width: 16px;
     border-radius: 50%;
-    background: #3b82f6;
+    background: #f6b23c;
     cursor: pointer;
     border: 2px solid #ffffff;
     box-shadow: 0 2px 4px rgba(0,0,0,0.2);
@@ -18,7 +18,7 @@ const sliderStyles = `
     height: 16px;
     width: 16px;
     border-radius: 50%;
-    background: #3b82f6;
+    background: #f6b23c;
     cursor: pointer;
     border: 2px solid #ffffff;
     box-shadow: 0 2px 4px rgba(0,0,0,0.2);
@@ -37,6 +37,8 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/ui/Toast";
 import { ImageUpload } from "@/components/ui/ImageUpload";
+import { DEFAULT_THEME, mergeWithDefaultTheme } from "@/lib/defaultTheme";
+import { hexToRgba } from "@/lib/helper";
 
 interface MenuTheme {
   id: string;
@@ -141,40 +143,6 @@ export function ThemeEditor({ onThemeChange }: ThemeEditorProps) {
     }
   }, [backgroundOverlayOpacity]);
 
-  // Function to convert hex to rgba with opacity
-  const hexToRgba = (hex: string, opacity: number): string => {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    if (result) {
-      const r = parseInt(result[1], 16);
-      const g = parseInt(result[2], 16);
-      const b = parseInt(result[3], 16);
-      return `rgba(${r}, ${g}, ${b}, ${opacity})`;
-    }
-    return hex;
-  };
-
-  // Default theme for preview consistency
-  const defaultTheme = {
-    primaryColor: "#f58114",
-    secondaryColor: "#2797dd",
-    backgroundColor: "#ffe59e",
-    textColor: "#000000",
-    accentColor: "#e2ee44",
-    primaryColorOpacity: 0.5,
-    secondaryColorOpacity: 1,
-    backgroundColorOpacity: 0.7,
-    textColorOpacity: 1,
-    accentColorOpacity: 1,
-    backgroundOverlayOpacity: 0.1,
-    backgroundPosition: "center",
-    backgroundRepeat: "no-repeat",
-    backgroundSize: "cover",
-    backgroundImage:
-      "https://res.cloudinary.com/dnojeu5cs/image/upload/v1759501200/mymenus-images/uvimvqchjpshc45ighmx.jpg",
-    customBackgroundImage:
-      "https://res.cloudinary.com/dnojeu5cs/image/upload/v1759501200/mymenus-images/uvimvqchjpshc45ighmx.jpg",
-  };
-
   // Mock menu data for preview
   const mockMenuData = {
     categories: [
@@ -214,29 +182,38 @@ export function ThemeEditor({ onThemeChange }: ThemeEditorProps) {
       const response = await api.get("/menu-theme");
       if (response.data.success) {
         const themeData = response.data.data.theme;
-        setTheme(themeData);
-        setPreviewTheme(themeData);
 
-        // Load color opacity from theme
+        // Merge with default theme
+        const mergedTheme = mergeWithDefaultTheme(themeData);
+
+        setTheme(mergedTheme);
+        setPreviewTheme(mergedTheme);
+
+        // Load color opacity from merged theme
         setColorOpacity({
-          primary: themeData.primaryColorOpacity || 1,
-          secondary: themeData.secondaryColorOpacity || 1,
-          background: themeData.backgroundColorOpacity || 1,
-          text: themeData.textColorOpacity || 1,
-          accent: themeData.accentColorOpacity || 1,
+          primary: mergedTheme.primaryColorOpacity,
+          secondary: mergedTheme.secondaryColorOpacity,
+          background: mergedTheme.backgroundColorOpacity,
+          text: mergedTheme.textColorOpacity,
+          accent: mergedTheme.accentColorOpacity,
         });
 
-        // Load background overlay opacity from theme
-        setBackgroundOverlayOpacity(themeData.backgroundOverlayOpacity || 0.5);
+        // Load background overlay opacity from merged theme
+        setBackgroundOverlayOpacity(mergedTheme.backgroundOverlayOpacity);
 
-        // Load custom background image from theme
-        setCustomBackgroundImage(themeData.customBackgroundImage || null);
+        // Load custom background image from merged theme
+        setCustomBackgroundImage(mergedTheme.customBackgroundImage || null);
 
-        // Update CSS custom properties with loaded theme
-        updateThemeVariables(themeData);
+        // Update CSS custom properties with merged theme
+        updateThemeVariables(mergedTheme);
       }
     } catch (error) {
       console.error("Error loading theme:", error);
+      // If error loading theme, use default theme
+      const mergedTheme = mergeWithDefaultTheme(null);
+      setTheme(mergedTheme);
+      setPreviewTheme(mergedTheme);
+      setCustomBackgroundImage(mergedTheme.customBackgroundImage || null);
     } finally {
       setLoading(false);
     }
@@ -251,24 +228,33 @@ export function ThemeEditor({ onThemeChange }: ThemeEditorProps) {
   };
 
   // Use default theme if no custom theme exists
-  const activePreviewTheme = previewTheme || defaultTheme;
+  const activePreviewTheme = previewTheme || DEFAULT_THEME;
 
   // Function to update CSS custom properties with restaurant theme
   const updateThemeVariables = (theme: MenuTheme) => {
     const root = document.documentElement;
 
     // Update CSS custom properties
-    root.style.setProperty("--theme-primary", theme.primaryColor || "#f97316");
+    root.style.setProperty(
+      "--theme-primary",
+      theme.primaryColor || DEFAULT_THEME.primaryColor
+    );
     root.style.setProperty(
       "--theme-secondary",
-      theme.secondaryColor || "#ea580c"
+      theme.secondaryColor || DEFAULT_THEME.secondaryColor
     );
     root.style.setProperty(
       "--theme-background",
-      theme.backgroundColor || "#ffffff"
+      theme.backgroundColor || DEFAULT_THEME.backgroundColor
     );
-    root.style.setProperty("--theme-text", theme.textColor || "#1f2937");
-    root.style.setProperty("--theme-accent", theme.accentColor || "#ef4444");
+    root.style.setProperty(
+      "--theme-text",
+      theme.textColor || DEFAULT_THEME.textColor
+    );
+    root.style.setProperty(
+      "--theme-accent",
+      theme.accentColor || DEFAULT_THEME.accentColor
+    );
   };
 
   const handleUpdateTheme = async () => {
@@ -706,23 +692,64 @@ export function ThemeEditor({ onThemeChange }: ThemeEditorProps) {
 
                   {/* Categories View */}
                   <div className="p-4">
-                    <h2
-                      className="text-lg font-bold text-center mb-4"
-                      style={{
-                        color: hexToRgba(
-                          activePreviewTheme.textColor,
-                          colorOpacity.text
-                        ),
-                      }}
-                    >
-                      {isRTL ? "اختر وجبتك اللذيذة" : "Choose your Meal"}
-                    </h2>
+                    {/* Search Bar Preview */}
+                    <div className="mb-4">
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder={
+                            isRTL
+                              ? "ابحث عن وجبتك..."
+                              : "Search for your meal..."
+                          }
+                          className="w-full px-3 py-2 text-xs ltr:pr-10 rtl:pl-10 rounded-lg border focus:outline-none focus:ring-1 transition-all"
+                          style={{
+                            backgroundColor: hexToRgba(
+                              activePreviewTheme.backgroundColor,
+                              0.9
+                            ),
+                            borderColor: hexToRgba(
+                              activePreviewTheme.secondaryColor,
+                              colorOpacity.secondary
+                            ),
+                            color: hexToRgba(
+                              activePreviewTheme.textColor,
+                              colorOpacity.text
+                            ),
+                          }}
+                          disabled
+                        />
+                        <div
+                          className={`absolute top-1/2 -translate-y-1/2 ${isRTL ? "left-3" : "right-3"}`}
+                        >
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            style={{
+                              color: hexToRgba(
+                                activePreviewTheme.secondaryColor,
+                                colorOpacity.secondary
+                              ),
+                            }}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                            />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
 
                     <div className="grid grid-cols-2 gap-3">
                       {mockMenuData.categories.map((category) => (
                         <div
                           key={category.id}
-                          className={`shadow-sm border cursor-pointer hover:shadow-md transition-shadow`}
+                          className={`shadow-sm border cursor-pointer hover:shadow-md transition-shadow rounded-lg p-4`}
                           style={{
                             backgroundColor: hexToRgba(
                               activePreviewTheme.primaryColor,
@@ -801,7 +828,7 @@ export function ThemeEditor({ onThemeChange }: ThemeEditorProps) {
                         {mockMenuData.categories[0].items.map((item) => (
                           <div
                             key={item.id}
-                            className={`shadow-sm border overflow-hidden hover:shadow-md transition-shadow rounded-sm `}
+                            className={`shadow-sm border overflow-hidden hover:shadow-md transition-shadow rounded-lg`}
                             style={{
                               backgroundColor: hexToRgba(
                                 activePreviewTheme.primaryColor,
