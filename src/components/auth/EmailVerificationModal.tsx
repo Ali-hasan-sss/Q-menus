@@ -28,6 +28,13 @@ export function EmailVerificationModal({
   const [resending, setResending] = useState(false);
 
   const handleVerify = async () => {
+    if (!email) {
+      showToast(
+        isRTL ? "البريد الإلكتروني مفقود" : "Email is missing",
+        "error"
+      );
+      return;
+    }
     if (!verificationCode || verificationCode.length !== 6) {
       showToast(
         isRTL
@@ -69,6 +76,13 @@ export function EmailVerificationModal({
   };
 
   const handleResendCode = async () => {
+    if (!email) {
+      showToast(
+        isRTL ? "البريد الإلكتروني مفقود" : "Email is missing",
+        "error"
+      );
+      return;
+    }
     try {
       setResending(true);
       const response = await api.post("/auth/resend-verification", {

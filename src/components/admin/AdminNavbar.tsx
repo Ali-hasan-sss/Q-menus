@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/Button";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import AdminNotificationsDropdown from "./AdminNotificationsDropdown";
 import { Logo } from "@/components/ui/Logo";
+import { LanguageToggle } from "../ui/LanguageToggle";
 
 interface AdminNotification {
   id: string;
@@ -164,10 +165,10 @@ export default function AdminNavbar() {
           </div>
 
           {/* Right side - Theme Toggle, Notifications and User Menu */}
-          <div className="flex items-center space-x-4 rtl:space-x-reverse">
+          <div className="flex items-center gap-4 ">
             {/* Theme Toggle */}
             <ThemeToggle />
-
+            <LanguageToggle />
             {/* Notifications */}
             <div className="relative notifications-dropdown">
               <button

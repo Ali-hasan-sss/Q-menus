@@ -15,6 +15,7 @@ import { OrderStatus } from "@/components/customer/OrderStatus";
 import { RestaurantHeader } from "@/components/customer/RestaurantHeader";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
+import WaiterRequestButton from "@/components/customer/WaiterRequestButton";
 import toast from "react-hot-toast";
 import { hexToRgba } from "@/lib/helper";
 
@@ -98,6 +99,7 @@ interface Order {
   id: string;
   orderType: string;
   tableNumber?: string;
+  qrCodeId?: string;
   status: string;
   totalPrice: number | string;
   currency: string;
@@ -135,7 +137,7 @@ export default function OrderPage() {
   const { orderId } = params as { orderId: string };
 
   const { language, t, isRTL } = useLanguage();
-  const { joinRestaurant, emitCreateOrder } = useCustomerSocket();
+  const { joinRestaurant, joinTable, emitCreateOrder } = useCustomerSocket();
 
   const [order, setOrder] = useState<Order | null>(null);
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
@@ -282,11 +284,15 @@ export default function OrderPage() {
       if (updatedOrder.id === orderId) {
         console.log("Updating order status to:", updatedOrder.status);
 
-        // Play notification sound for status updates only if not updated by restaurant
-        if (updatedBy !== "restaurant") {
-          playCustomerNotification(updatedOrder.status);
-        } else {
-          console.log("Order updated by restaurant - no sound notification");
+        // Play notification sound for all updates (restaurant AND customer)
+        playCustomerNotification(updatedOrder.status);
+
+        // Show toast for customer updates (when adding items)
+        if (updatedBy === "customer") {
+          toast.success(isRTL ? "تم تحديث الطلب" : "Order updated", {
+            icon: "➕",
+            duration: 2000,
+          });
         }
 
         // If order is cancelled or completed, redirect to QR scanner
@@ -328,6 +334,34 @@ export default function OrderPage() {
       );
     };
   }, [orderId]);
+
+  // Join restaurant and table rooms for real-time updates
+  useEffect(() => {
+    console.log("🔍 Order data for socket joining:", {
+      restaurantId: order?.restaurant?.id,
+      qrCodeId: order?.qrCodeId,
+      orderType: order?.orderType,
+      hasQrCodeId: !!order?.qrCodeId,
+    });
+
+    if (order?.restaurant?.id) {
+      console.log("🔔 Joining restaurant room:", order.restaurant.id);
+      // Join restaurant room to receive order updates
+      joinRestaurant(order.restaurant.id);
+
+      // For dine-in orders, also join table room to receive updates
+      if (order.qrCodeId) {
+        console.log("🔔 Joining table room:", order.qrCodeId);
+        joinTable(order.qrCodeId);
+      } else {
+        console.warn("⚠️ qrCodeId is missing! Order details:", {
+          orderId: order?.id,
+          orderType: order?.orderType,
+          tableNumber: order?.tableNumber,
+        });
+      }
+    }
+  }, [order?.restaurant?.id, order?.qrCodeId, joinRestaurant, joinTable]);
 
   const loadOrderData = async () => {
     try {
@@ -586,7 +620,7 @@ export default function OrderPage() {
                     {isRTL ? "إجمالي الطلب" : "Total Amount"}
                   </p>
                   <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                    ${Number(order.totalPrice).toFixed(2)} {order.currency}
+                    {Number(order.totalPrice).toFixed(2)} {order.currency}
                   </p>
                 </div>
 
@@ -683,6 +717,21 @@ export default function OrderPage() {
           </button>
         </div>
       )}
+
+      {/* Floating Waiter Request Button (only for active orders and dine-in) */}
+      {order.status !== "COMPLETED" &&
+        order.status !== "CANCELLED" &&
+        order.orderType === "DINE_IN" && (
+          <div className="fixed bottom-6 left-6 z-50">
+            <WaiterRequestButton
+              restaurantId={order.restaurant?.id || ""}
+              tableNumber={order.tableNumber || undefined}
+              orderType="DINE_IN"
+              menuTheme={menuTheme}
+              className="shadow-lg"
+            />
+          </div>
+        )}
     </div>
   );
 }

@@ -362,10 +362,12 @@ export default function OrdersPage() {
     // Listen for socket events
     socket.on("new_order", handleNewOrder);
     socket.on("order_updated", handleOrderUpdate);
+    socket.on("order_status_update", handleOrderUpdate);
 
     return () => {
       socket.off("new_order", handleNewOrder);
       socket.off("order_updated", handleOrderUpdate);
+      socket.off("order_status_update", handleOrderUpdate);
     };
   }, [socket]);
 

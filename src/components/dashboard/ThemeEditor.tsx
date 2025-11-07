@@ -607,7 +607,7 @@ export function ThemeEditor({ onThemeChange }: ThemeEditorProps) {
         {/* Center Preview */}
         <div className="lg:col-span-4 flex justify-center">
           <div className="bg-gray-100 dark:bg-gray-800 rounded-2xl p-4">
-            <div className="w-80 h-[500px] relative">
+            <div className="w-80 h-[600px] relative">
               {/* Mobile Frame */}
               <div
                 className="w-full h-full rounded-2xl overflow-hidden relative"

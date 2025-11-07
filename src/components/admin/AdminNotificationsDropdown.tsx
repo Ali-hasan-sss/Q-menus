@@ -47,9 +47,7 @@ export default function AdminNotificationsDropdown({
     <div
       onClick={(e) => e.stopPropagation()}
       className={`absolute mt-2 w-[calc(100vw-2rem)] sm:w-96 max-w-md bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-600 z-50 ${
-        isRTL
-          ? "right-0 sm:left-0 sm:right-auto"
-          : "left-0 sm:right-0 sm:left-auto"
+        isRTL ? "left-0" : "right-0"
       }`}
     >
       <div className="p-4 border-b border-gray-200 dark:border-gray-700">

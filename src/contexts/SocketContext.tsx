@@ -141,9 +141,41 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Function to play notification sound for waiter requests
+  const playWaiterRequestSound = () => {
+    if (isSoundMutedRef.current) return;
+    try {
+      const audioContext = new (window.AudioContext ||
+        (window as any).webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      // Distinct sound for waiter requests - bell-like sound
+      oscillator.frequency.setValueAtTime(1200, audioContext.currentTime);
+      oscillator.frequency.setValueAtTime(1000, audioContext.currentTime + 0.1);
+      oscillator.frequency.setValueAtTime(1200, audioContext.currentTime + 0.2);
+      oscillator.frequency.setValueAtTime(1000, audioContext.currentTime + 0.3);
+      oscillator.frequency.setValueAtTime(1200, audioContext.currentTime + 0.4);
+
+      gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(
+        0.01,
+        audioContext.currentTime + 0.5
+      );
+
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.5);
+    } catch (error) {
+      console.log("Could not play waiter request sound:", error);
+    }
+  };
+
   useEffect(() => {
     // Initialize socket connection
-    // Use the same host as the current page but with port 5000 for backend
+    // Use Socket Service on port 5001
     const getSocketUrl = () => {
       if (process.env.NEXT_PUBLIC_SOCKET_URL) {
         return process.env.NEXT_PUBLIC_SOCKET_URL;
@@ -154,11 +186,11 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
         window.location.hostname === "localhost" ||
         window.location.hostname === "127.0.0.1"
       ) {
-        return "http://localhost:5000";
+        return "http://localhost:5001";
       }
 
-      // Otherwise use the same hostname with port 5000
-      return `http://${window.location.hostname}:5000`;
+      // Otherwise use the same hostname with port 5001
+      return `http://${window.location.hostname}:5001`;
     };
 
     const socketUrl = getSocketUrl();
@@ -239,9 +271,36 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 
     newSocket.on("order_status_update", (data) => {
       console.log("Order status update:", data);
+
+      // Mirror behavior of order_updated for sounds and counters
+      if (data.order && data.order.id && data.order.status) {
+        const status = data.order.status;
+        if (
+          status !== "CANCELLED" &&
+          status !== "COMPLETED" &&
+          data.updatedBy !== "restaurant"
+        ) {
+          setUpdatedOrdersCount((prev) => prev + 1);
+          playOrderUpdateSound();
+        }
+      }
+
+      // Dispatch both events so existing listeners react
       window.dispatchEvent(
         new CustomEvent("orderStatusUpdate", { detail: data })
       );
+      window.dispatchEvent(new CustomEvent("orderUpdated", { detail: data }));
+    });
+
+    // Waiter request event handler
+    newSocket.on("waiter_request", (data) => {
+      console.log("Waiter request received:", data);
+
+      // Play notification sound for waiter requests
+      playWaiterRequestSound();
+
+      // Dispatch custom event for components to listen
+      window.dispatchEvent(new CustomEvent("waiterRequest", { detail: data }));
     });
 
     // Error handlers

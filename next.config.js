@@ -1,5 +1,39 @@
+let withPWA;
+try {
+  withPWA = require('next-pwa')({
+    dest: 'public',
+    disable: process.env.NODE_ENV === 'development',
+    register: true,
+    skipWaiting: true,
+    fallbacks: {
+      document: '/offline.html',
+    },
+    runtimeCaching: [
+      {
+        urlPattern: /^https?:.*\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/i,
+        handler: 'CacheFirst',
+        options: {
+          cacheName: 'images-cache',
+          expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 30 },
+        },
+      },
+      {
+        urlPattern: /^https?:\/\/.*\/(?:api)\/.*$/i,
+        handler: 'NetworkFirst',
+        options: {
+          cacheName: 'api-cache',
+          networkTimeoutSeconds: 10,
+          expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 },
+        },
+      },
+    ],
+  });
+} catch (_) {
+  withPWA = (cfg) => cfg; // Fallback: run without PWA if next-pwa is not installed
+}
+
 /** @type {import('next').NextConfig} */
-const nextConfig = {
+const baseConfig = {
   experimental: {
     appDir: true,
   },
@@ -37,4 +71,4 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+module.exports = withPWA(baseConfig);

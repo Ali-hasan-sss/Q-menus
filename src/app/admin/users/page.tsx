@@ -320,6 +320,9 @@ export default function UsersPage() {
 
   // Get all restaurants from all users
   const allRestaurants = users.flatMap((u) => u.restaurants || []);
+  const filteredRestaurants = selectedUser
+    ? selectedUser.restaurants || []
+    : allRestaurants;
 
   return (
     <div className="min-h-screen ">
@@ -762,6 +765,35 @@ export default function UsersPage() {
                         </Button>
                       )}
 
+                      {/* Add Subscription (per user) */}
+                      {user.restaurants && user.restaurants.length > 0 && (
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            setSelectedUser(user);
+                            setSelectedRestaurant("");
+                            setSelectedPlan("");
+                            setShowAddSubscriptionModal(true);
+                          }}
+                          className={`flex items-center w-full sm:w-auto ${isRTL ? "flex-row-reverse" : "flex-row"}`}
+                        >
+                          <svg
+                            className={`w-4 h-4 ${isRTL ? "ml-1" : "mr-1"}`}
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                            />
+                          </svg>
+                          {isRTL ? "إضافة اشتراك" : "Add Subscription"}
+                        </Button>
+                      )}
+
                       {/* Delete Button */}
                       {user.id !== currentUser?.id && (
                         <Button
@@ -1161,7 +1193,7 @@ export default function UsersPage() {
                     <option value="">
                       {isRTL ? "-- اختر مطعم --" : "-- Select Restaurant --"}
                     </option>
-                    {allRestaurants.map((restaurant) => (
+                    {filteredRestaurants.map((restaurant) => (
                       <option key={restaurant.id} value={restaurant.id}>
                         {isRTL && restaurant.nameAr
                           ? restaurant.nameAr
@@ -1208,6 +1240,7 @@ export default function UsersPage() {
                   variant="secondary"
                   onClick={() => {
                     setShowAddSubscriptionModal(false);
+                    setSelectedUser(null);
                     setSelectedRestaurant("");
                     setSelectedPlan("");
                   }}

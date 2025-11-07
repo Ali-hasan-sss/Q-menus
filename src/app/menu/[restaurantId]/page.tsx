@@ -14,6 +14,7 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { MenuLoadingSkeleton } from "@/components/customer/MenuLoadingSkeleton";
 import QRScanner from "@/components/customer/QRScanner";
+import WaiterRequestButton from "@/components/customer/WaiterRequestButton";
 import toast from "react-hot-toast";
 import { hexToRgba } from "@/lib/helper";
 import { DEFAULT_THEME, mergeWithDefaultTheme } from "@/lib/defaultTheme";
@@ -392,6 +393,17 @@ export default function CustomerMenuPage() {
       }
     };
 
+    // Listen for order creation errors
+    const handleOrderError = (event: any) => {
+      const { message } = event.detail || {};
+      console.error("Order creation error:", message);
+
+      setIsOrdering(false);
+      setPendingOrder(null);
+
+      toast.error(message || "Failed to create order");
+    };
+
     window.addEventListener(
       "orderStatusUpdate",
       handleOrderStatusUpdate as EventListener
@@ -400,6 +412,7 @@ export default function CustomerMenuPage() {
       "orderCreated",
       handleOrderCreated as EventListener
     );
+    window.addEventListener("order_error", handleOrderError as EventListener);
 
     return () => {
       window.removeEventListener(
@@ -409,6 +422,10 @@ export default function CustomerMenuPage() {
       window.removeEventListener(
         "orderCreated",
         handleOrderCreated as EventListener
+      );
+      window.removeEventListener(
+        "order_error",
+        handleOrderError as EventListener
       );
     };
   }, [orderId, pendingOrder, tableNumber]);
@@ -955,6 +972,26 @@ export default function CustomerMenuPage() {
                 </button>
               </div>
             )}
+
+            {/* Waiter Request Button - Categories View */}
+            {isAuthorizedAccess && tableNumber !== "DELIVERY" && (
+              <div
+                className={`fixed z-40 ${
+                  orderItems.length > 0
+                    ? "bottom-20 left-1/2 transform -translate-x-1/2"
+                    : "bottom-6 left-1/2 transform -translate-x-1/2"
+                }`}
+              >
+                <WaiterRequestButton
+                  restaurantId={restaurantId}
+                  tableNumber={tableNumber || undefined}
+                  orderType="DINE_IN"
+                  menuTheme={menuTheme}
+                  className="shadow-lg"
+                />
+              </div>
+            )}
+
             {/* Categories View */}
             {!selectedCategory && (
               <div className="animate-fadeIn">
@@ -968,7 +1005,7 @@ export default function CustomerMenuPage() {
                       placeholder={
                         isRTL ? "ابحث عن وجبتك..." : "Search for your meal..."
                       }
-                      className="w-full px-4 py-3 ltr:pr-12 rtl:pl-12 rounded-lg border focus:outline-none focus:ring-2 transition-all"
+                      className="w-full text-black px-4 py-3 ltr:pr-12 rtl:pl-12 rounded-lg border focus:outline-none focus:ring-2 transition-all"
                       style={{
                         backgroundColor: hexToRgba(
                           menuTheme?.backgroundColor || "#ffffff",
@@ -977,10 +1014,6 @@ export default function CustomerMenuPage() {
                         borderColor: hexToRgba(
                           menuTheme?.secondaryColor || "#e5e7eb",
                           colorOpacity.secondary
-                        ),
-                        color: hexToRgba(
-                          menuTheme?.textColor || "#1f2937",
-                          colorOpacity.text
                         ),
                       }}
                     />
@@ -1179,6 +1212,27 @@ export default function CustomerMenuPage() {
                 </div>
               </div>
             )}
+
+            {/* Waiter Request Button - Items View */}
+            {isAuthorizedAccess &&
+              tableNumber !== "DELIVERY" &&
+              selectedCategory && (
+                <div
+                  className={`fixed z-40 ${
+                    orderItems.length > 0
+                      ? "bottom-20 left-1/2 transform -translate-x-1/2"
+                      : "bottom-6 left-1/2 transform -translate-x-1/2"
+                  }`}
+                >
+                  <WaiterRequestButton
+                    restaurantId={restaurantId}
+                    tableNumber={tableNumber || undefined}
+                    orderType="DINE_IN"
+                    menuTheme={menuTheme}
+                    className="shadow-lg"
+                  />
+                </div>
+              )}
 
             {/* Items View */}
             {selectedCategory && (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -50,6 +50,7 @@ export default function RegisterForm() {
   const { showToast } = useToast();
   const { loginWithToken } = useAuth();
   const [showEmailVerification, setShowEmailVerification] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
   const skipEmailVerification =
     typeof window !== "undefined" &&
     process.env.NEXT_PUBLIC_SKIP_EMAIL_VERIFICATION === "true";
@@ -60,6 +61,7 @@ export default function RegisterForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Partial<FormData>>({});
+  const restaurantNameArRef = useRef<HTMLDivElement | null>(null);
 
   const handleInputChange = (field: keyof FormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -145,7 +147,7 @@ export default function RegisterForm() {
     return Object.keys(errors).length === 0;
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     let isValid = false;
 
     if (currentStep === 1) {
@@ -154,7 +156,49 @@ export default function RegisterForm() {
       isValid = validateStep2();
     }
 
-    if (isValid && currentStep < 3) {
+    if (!isValid) return;
+
+    // Before leaving step 1, enforce email verification
+    if (currentStep === 1 && !emailVerified) {
+      // Require a valid email before sending verification
+      if (
+        !formData.email ||
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)
+      ) {
+        showToast(
+          isRTL
+            ? "يرجى إدخال بريد إلكتروني صالح"
+            : "Please enter a valid email address",
+          "error"
+        );
+        setFieldErrors((prev) => ({
+          ...prev,
+          email: isRTL ? "البريد الإلكتروني غير صحيح" : "Invalid email address",
+        }));
+        return;
+      }
+      try {
+        await api.post("/auth/resend-verification", {
+          email: formData.email,
+        });
+        setUserEmail(formData.email);
+        setShowEmailVerification(true);
+        showToast(
+          isRTL
+            ? "تم إرسال رمز التحقق إلى بريدك الإلكتروني"
+            : "Verification code sent to your email",
+          "success"
+        );
+      } catch (err) {
+        showToast(
+          isRTL ? "تعذر إرسال رمز التحقق" : "Failed to send verification code",
+          "error"
+        );
+      }
+      return;
+    }
+
+    if (currentStep < 3) {
       setCurrentStep((prev) => prev + 1);
       setError("");
     }
@@ -178,6 +222,16 @@ export default function RegisterForm() {
         isRTL
           ? "يرجى تصحيح الأخطاء قبل المتابعة"
           : "Please fix errors before proceeding",
+        "error"
+      );
+      return;
+    }
+
+    if (!emailVerified) {
+      showToast(
+        isRTL
+          ? "يرجى التحقق من البريد الإلكتروني قبل إنشاء الحساب"
+          : "Please verify your email before creating the account",
         "error"
       );
       return;
@@ -230,16 +284,35 @@ export default function RegisterForm() {
 
   const handleEmailVerified = async () => {
     setShowEmailVerification(false);
+    setEmailVerified(true);
     showToast(
       isRTL
         ? "تم التحقق من البريد الإلكتروني بنجاح! يمكنك الآن تسجيل الدخول"
         : "Email verified successfully! You can now log in",
       "success"
     );
-
-    // Redirect to login page
-    router.push("/auth/login");
+    // Move to next step and focus restaurant name
+    setCurrentStep(2);
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   };
+
+  // Focus restaurant name (Arabic) when entering step 2
+  useEffect(() => {
+    if (currentStep === 2) {
+      if (typeof window !== "undefined") {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+      const inputEl = document.querySelector(
+        "input[label='" +
+          (isRTL ? "اسم المطعم (عربي)" : "Restaurant Name (Arabic)") +
+          "']"
+      ) as HTMLInputElement | null;
+      // Fallback: focus first input in step 2
+      if (inputEl && inputEl.focus) inputEl.focus();
+    }
+  }, [currentStep, isRTL]);
 
   const isStep1Valid =
     formData.firstName &&
@@ -388,6 +461,7 @@ export default function RegisterForm() {
                     onChange={(e) =>
                       handleInputChange("restaurantNameAr", e.target.value)
                     }
+                    autoFocus={currentStep === 2}
                     className={
                       fieldErrors.restaurantNameAr ? "border-red-500" : ""
                     }
@@ -566,7 +640,7 @@ export default function RegisterForm() {
       <EmailVerificationModal
         isOpen={showEmailVerification}
         onClose={() => setShowEmailVerification(false)}
-        email={userEmail}
+        email={userEmail || formData.email}
         onVerified={handleEmailVerified}
       />
     </div>

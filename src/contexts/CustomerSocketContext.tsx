@@ -11,6 +11,7 @@ interface CustomerSocketContextType {
   leaveRestaurant: () => void;
   leaveTable: () => void;
   emitCreateOrder: (data: CreateOrderData) => void;
+  emitWaiterRequest: (data: WaiterRequestData) => void;
 }
 
 interface CreateOrderData {
@@ -29,6 +30,12 @@ interface CreateOrderData {
   notes?: string;
 }
 
+interface WaiterRequestData {
+  restaurantId: string;
+  tableNumber?: string;
+  orderType: "DINE_IN" | "DELIVERY";
+}
+
 const CustomerSocketContext = createContext<
   CustomerSocketContextType | undefined
 >(undefined);
@@ -44,7 +51,7 @@ export function CustomerSocketProvider({
   useEffect(() => {
     // Initialize socket connection for customers (no auth required)
     const socketUrl =
-      process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:5000";
+      process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:5001";
     const newSocket = io(socketUrl, {
       autoConnect: false,
     });
@@ -71,25 +78,41 @@ export function CustomerSocketProvider({
     });
 
     // Order event handlers
-    newSocket.on("new_order", (data) => {
-      console.log("New order received:", data);
-      // You can emit a custom event or update state here
-      window.dispatchEvent(new CustomEvent("newOrder", { detail: data }));
+
+    // Listen for order creation confirmation
+    newSocket.on("order_created", (data) => {
+      console.log("Socket: Order created successfully:", data);
+      window.dispatchEvent(new CustomEvent("orderCreated", { detail: data }));
     });
 
+    // Listen for order creation errors
+    newSocket.on("order_error", (data) => {
+      console.error("Socket: Order creation error:", data);
+      window.dispatchEvent(new CustomEvent("order_error", { detail: data }));
+    });
+
+    // Listen for real-time order updates (when items are added)
+    newSocket.on("order_update", (data) => {
+      console.log("🔔 Socket: order_update received:", data);
+      window.dispatchEvent(new CustomEvent("orderUpdate", { detail: data }));
+    });
+
+    // Listen for order status updates (when status changes or items added)
     newSocket.on("order_status_update", (data) => {
-      console.log("Socket: Order status update received:", data);
-      // Dispatch custom event for order status updates
+      console.log("🔔 Socket: order_status_update received:", data);
       window.dispatchEvent(
         new CustomEvent("orderStatusUpdate", { detail: data })
       );
     });
 
-    // Listen for order creation confirmation
-    newSocket.on("order_created", (data) => {
-      console.log("Socket: Order created successfully:", data);
-      // Dispatch custom event for components to listen
-      window.dispatchEvent(new CustomEvent("orderCreated", { detail: data }));
+    // Listen for joined_table confirmation
+    newSocket.on("joined_table", (data) => {
+      console.log("✅ Successfully joined table room:", data);
+    });
+
+    // Listen for errors
+    newSocket.on("error", (error) => {
+      console.error("❌ Socket error:", error);
     });
 
     // Connect the socket
@@ -130,6 +153,12 @@ export function CustomerSocketProvider({
     }
   };
 
+  const emitWaiterRequest = (data: WaiterRequestData) => {
+    if (socket) {
+      socket.emit("request_waiter", data);
+    }
+  };
+
   const value = {
     socket,
     isConnected,
@@ -138,6 +167,7 @@ export function CustomerSocketProvider({
     leaveRestaurant,
     leaveTable,
     emitCreateOrder,
+    emitWaiterRequest,
   };
 
   return (

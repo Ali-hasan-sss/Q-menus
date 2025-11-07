@@ -9,7 +9,6 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useToast } from "@/components/ui/Toast";
-import Navbar from "@/components/dashboard/Navbar";
 import jsPDF from "jspdf";
 
 function QRPageContent() {
@@ -21,24 +20,19 @@ function QRPageContent() {
     qrCodes,
     restaurantQR,
     loading,
-    error,
     fetchQRCodes,
-    createQRCode,
     createRestaurantQR,
     toggleQRStatus,
     deleteQRCode,
-    bulkCreateQRCodes,
     bulkCreateSequentialQRCodes,
     bulkDeleteQRCodes,
   } = useMenu();
 
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [tableCount, setTableCount] = useState("");
-  const [newTableNumber, setNewTableNumber] = useState("");
   const [activeTab, setActiveTab] = useState<"restaurant" | "tables">(
     "restaurant"
   );
-  const [bulkMode, setBulkMode] = useState<"count">("count");
   const [selectedQRCodes, setSelectedQRCodes] = useState<string[]>([]);
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [hasTriedAutoCreate, setHasTriedAutoCreate] = useState(false);
@@ -54,38 +48,6 @@ function QRPageContent() {
       createRestaurantQR().catch(console.error);
     }
   }, [restaurantQR, loading, hasTriedAutoCreate, createRestaurantQR]);
-
-  const handleCreateQR = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await createQRCode(newTableNumber);
-      setNewTableNumber("");
-      showToast(
-        isRTL
-          ? `تم إنشاء كود QR للطاولة ${newTableNumber} بنجاح`
-          : `QR code for table ${newTableNumber} created successfully`,
-        "success"
-      );
-    } catch (error: any) {
-      console.error("Error creating QR code:", error);
-
-      // Handle specific error messages
-      let errorMessage = error.response?.data?.message || error.message;
-
-      if (errorMessage.includes("maximum number of tables")) {
-        errorMessage = t("qr.tableLimitReached").replace(
-          "{limit}",
-          error.response?.data?.limit || "N/A"
-        );
-      } else if (errorMessage.includes("No active subscription")) {
-        errorMessage = t("qr.noActiveSubscription");
-      } else if (errorMessage.includes("Restaurant not found")) {
-        errorMessage = t("qr.restaurantNotFound");
-      }
-
-      showToast(errorMessage, "error");
-    }
-  };
 
   const handleBulkCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -760,75 +722,59 @@ function QRPageContent() {
           {activeTab === "tables" && (
             <div className="space-y-6">
               {/* Create Single QR Form */}
-              <Card className="p-6">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                  {t("qr.createSingle")}
-                </h3>
-                <form onSubmit={handleCreateQR} className="flex space-x-4">
-                  <div className="flex-1">
-                    <Input
-                      value={newTableNumber}
-                      onChange={(e) => setNewTableNumber(e.target.value)}
-                      placeholder={t("qr.enterTableNumber")}
-                      required
-                    />
+
+              {/* Selection Controls */}
+              <Card className="p-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                    <Button
+                      onClick={toggleSelectMode}
+                      variant={isSelectMode ? "primary" : "outline"}
+                      size="sm"
+                    >
+                      {isSelectMode
+                        ? t("qr.cancelSelection")
+                        : t("qr.selectMultiple")}
+                    </Button>
+
+                    {isSelectMode && (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={
+                            selectedQRCodes.length === qrCodes.length &&
+                            qrCodes.length > 0
+                          }
+                          onChange={handleSelectAll}
+                          className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                        />
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          {t("qr.selectAll")} ({qrCodes.length})
+                        </span>
+                      </div>
+                    )}
                   </div>
-                  <Button type="submit">{t("qr.generate")}</Button>
-                </form>
+
+                  {isSelectMode && selectedQRCodes.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                        {selectedQRCodes.length} {t("qr.selected")}
+                      </span>
+                      <Button
+                        onClick={handleBulkDelete}
+                        variant="outline"
+                        size="sm"
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        {t("qr.deleteSelected")} ({selectedQRCodes.length})
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </Card>
 
               {/* QR Codes Container */}
               <div className="space-y-4">
-                {/* Selection Controls */}
-                <Card className="p-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                      <Button
-                        onClick={toggleSelectMode}
-                        variant={isSelectMode ? "primary" : "outline"}
-                        size="sm"
-                      >
-                        {isSelectMode
-                          ? t("qr.cancelSelection")
-                          : t("qr.selectMultiple")}
-                      </Button>
-
-                      {isSelectMode && (
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={
-                              selectedQRCodes.length === qrCodes.length &&
-                              qrCodes.length > 0
-                            }
-                            onChange={handleSelectAll}
-                            className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                          />
-                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                            {t("qr.selectAll")} ({qrCodes.length})
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {isSelectMode && selectedQRCodes.length > 0 && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-500 dark:text-gray-400">
-                          {selectedQRCodes.length} {t("qr.selected")}
-                        </span>
-                        <Button
-                          onClick={handleBulkDelete}
-                          variant="outline"
-                          size="sm"
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          {t("qr.deleteSelected")} ({selectedQRCodes.length})
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </Card>
-
                 {/* QR Codes Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {qrCodes.map((qr) => (

@@ -13,6 +13,7 @@ import { usePathname } from "next/navigation";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import AdminNotificationsDropdown from "./AdminNotificationsDropdown";
 import { Logo } from "@/components/ui/Logo";
+import { LanguageToggle } from "@/components/ui/LanguageToggle";
 
 interface AdminNotification {
   id: string;
@@ -142,7 +143,7 @@ export default function AdminMobileHeader() {
           <div className="flex items-center space-x-2 rtl:space-x-reverse">
             {/* Theme Toggle */}
             <ThemeToggle />
-
+            <LanguageToggle />
             {/* Notifications */}
             <div className="relative notifications-dropdown">
               <button
@@ -177,7 +178,9 @@ export default function AdminMobileHeader() {
               </button>
 
               {isNotificationsOpen && (
-                <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
+                <div
+                  className={`absolute ${isRTL ? "left-0" : "right-0"} mt-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50`}
+                >
                   <div className="p-3 border-b border-gray-200 dark:border-gray-700">
                     <div className="flex items-center justify-between">
                       <h3 className="text-sm font-semibold text-gray-900 dark:text-white">

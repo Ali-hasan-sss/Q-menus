@@ -175,6 +175,9 @@ export default function Navbar() {
   } = useNotifications();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [waiterRequests, setWaiterRequests] = useState<any[]>([]);
+  const [isWaiterRequestsOpen, setIsWaiterRequestsOpen] = useState(false);
+  const [waiterRequestsCount, setWaiterRequestsCount] = useState(0);
   const desktopNotificationRef = useRef<HTMLDivElement>(null);
   const mobileNotificationRef = useRef<HTMLDivElement>(null);
 
@@ -218,6 +221,7 @@ export default function Navbar() {
 
         if (!clickedInsideDesktop && !clickedInsideMobile) {
           setIsNotificationsOpen(false);
+          setIsWaiterRequestsOpen(false);
         }
       }
     };
@@ -226,7 +230,38 @@ export default function Navbar() {
     return () => {
       document.removeEventListener("click", handleClickOutside);
     };
-  }, [isUserMenuOpen, isNotificationsOpen]);
+  }, [isUserMenuOpen, isNotificationsOpen, isWaiterRequestsOpen]);
+
+  // Handle waiter requests
+  useEffect(() => {
+    const handleWaiterRequest = (event: CustomEvent) => {
+      const { notification, tableNumber, orderType } = event.detail;
+
+      // Add to waiter requests list
+      setWaiterRequests((prev) => [notification, ...prev]);
+      setWaiterRequestsCount((prev) => prev + 1);
+
+      // Show browser notification if enabled
+      if (browserNotificationsEnabled) {
+        new Notification(notification.title, {
+          body: notification.message,
+          icon: "/favicon.ico",
+        });
+      }
+    };
+
+    window.addEventListener(
+      "waiterRequest",
+      handleWaiterRequest as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        "waiterRequest",
+        handleWaiterRequest as EventListener
+      );
+    };
+  }, [browserNotificationsEnabled]);
 
   return (
     <>
@@ -280,6 +315,110 @@ export default function Navbar() {
 
             {/* Right side */}
             <div className="flex items-center space-x-4">
+              {/* Waiter Requests */}
+              <div className="relative">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsWaiterRequestsOpen(!isWaiterRequestsOpen);
+                  }}
+                  className="relative p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 512 512"
+                    fill="currentColor"
+                    className="w-6 h-6"
+                  >
+                    <path d="M256 0C114.6 0 0 114.6 0 256s114.6 256 256 256 256-114.6 256-256S397.4 0 256 0zm0 96c26.5 0 48 21.5 48 48s-21.5 48-48 48-48-21.5-48-48 21.5-48 48-48zm-16 128h32c26.5 0 48 21.5 48 48v32h32v64H160v-64h32v-32c0-26.5 21.5-48 48-48z" />
+                  </svg>
+
+                  {waiterRequestsCount > 0 && (
+                    <span className="absolute top-0 right-0 bg-orange-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
+                      {waiterRequestsCount > 9 ? "9+" : waiterRequestsCount}
+                    </span>
+                  )}
+                </button>
+
+                {/* Waiter Requests Dropdown */}
+                {isWaiterRequestsOpen && (
+                  <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
+                    <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                      <div className="flex justify-between items-center">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                          {isRTL ? "طلبات النادل" : "Waiter Requests"}
+                        </h3>
+                        {waiterRequestsCount > 0 && (
+                          <button
+                            onClick={() => {
+                              setWaiterRequests([]);
+                              setWaiterRequestsCount(0);
+                            }}
+                            className="text-sm text-orange-600 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300"
+                          >
+                            {isRTL ? "مسح الكل" : "Clear All"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="max-h-96 overflow-y-auto">
+                      {waiterRequests.length === 0 ? (
+                        <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+                          {isRTL ? "لا توجد طلبات نادل" : "No waiter requests"}
+                        </div>
+                      ) : (
+                        waiterRequests.map((request, index) => (
+                          <div
+                            key={index}
+                            className="p-4 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                          >
+                            <div className="flex justify-between items-start gap-2">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                  {request.title}
+                                </p>
+                                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                  {request.message}
+                                </p>
+                                <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
+                                  {new Date(request.createdAt).toLocaleString()}
+                                </p>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  setWaiterRequests((prev) =>
+                                    prev.filter((_, i) => i !== index)
+                                  );
+                                  setWaiterRequestsCount((prev) =>
+                                    Math.max(0, prev - 1)
+                                  );
+                                }}
+                                className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                              >
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M6 18L18 6M6 6l12 12"
+                                  />
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Notifications */}
               <div className="relative" ref={desktopNotificationRef}>
                 <button
@@ -617,6 +756,26 @@ export default function Navbar() {
                         {t("nav.settings")}
                       </Link>
                       <Link
+                        href="/dashboard/subscription"
+                        onClick={() => setIsUserMenuOpen(false)}
+                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                      >
+                        <svg
+                          className="w-4 h-4 mr-3"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 8c-1.657 0-3 1.343-3 3v5h6v-5c0-1.657-1.343-3-3-3zm0-5a5 5 0 00-5 5v1H6a2 2 0 00-2 2v7a2 2 0 002 2h12a2 2 0 002-2v-7a2 2 0 00-2-2h-1V8a5 5 0 00-5-5z"
+                          />
+                        </svg>
+                        {isRTL ? "اشتراكي" : "Subscription"}
+                      </Link>
+                      <Link
                         href="/dashboard/invoices"
                         onClick={() => setIsUserMenuOpen(false)}
                         className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
@@ -709,9 +868,37 @@ export default function Navbar() {
       <div className="lg:hidden bg-trancparent backdrop-blur-lg  sticky top-0 z-50 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center">
-            <Logo size="md" />
+            <Link href={"/"}>
+              <Logo size="md" />
+            </Link>
           </div>
           <div className="flex items-center space-x-2">
+            {/* Mobile Waiter Requests */}
+            <div className="relative">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsWaiterRequestsOpen(!isWaiterRequestsOpen);
+                }}
+                className="relative p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 512 512"
+                  fill="currentColor"
+                  className="w-6 h-6"
+                >
+                  <path d="M256 0C114.6 0 0 114.6 0 256s114.6 256 256 256 256-114.6 256-256S397.4 0 256 0zm0 96c26.5 0 48 21.5 48 48s-21.5 48-48 48-48-21.5-48-48 21.5-48 48-48zm-16 128h32c26.5 0 48 21.5 48 48v32h32v64H160v-64h32v-32c0-26.5 21.5-48 48-48z" />
+                </svg>
+
+                {waiterRequestsCount > 0 && (
+                  <span className="absolute top-0 right-0 bg-orange-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center font-bold">
+                    {waiterRequestsCount > 9 ? "9+" : waiterRequestsCount}
+                  </span>
+                )}
+              </button>
+            </div>
+
             {/* Mobile Notifications */}
             <div className="relative" ref={mobileNotificationRef}>
               <button
@@ -1000,6 +1187,26 @@ export default function Navbar() {
                       {t("nav.settings")}
                     </Link>
                     <Link
+                      href="/dashboard/subscription"
+                      onClick={() => setIsUserMenuOpen(false)}
+                      className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    >
+                      <svg
+                        className="w-4 h-4 mr-3"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 8c-1.657 0-3 1.343-3 3v5h6v-5c0-1.657-1.343-3-3-3zm0-5a5 5 0 00-5 5v1H6a2 2 0 00-2 2v7a2 2 0 002 2h12a2 2 0 002-2v-7a2 2 0 00-2-2h-1V8a5 5 0 00-5-5z"
+                        />
+                      </svg>
+                      {isRTL ? "اشتراكي" : "Subscription"}
+                    </Link>
+                    <Link
                       href="/dashboard/invoices"
                       onClick={() => setIsUserMenuOpen(false)}
                       className="flex items-center gap-2 border-b border-gray-200 dark:border-gray-700 w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
@@ -1019,6 +1226,7 @@ export default function Navbar() {
                       </svg>
                       {isRTL ? "فواتيري" : "My Invoices"}
                     </Link>
+
                     <button
                       onClick={() => {
                         setIsUserMenuOpen(false);
@@ -1048,6 +1256,92 @@ export default function Navbar() {
           </div>
         </div>
       </div>
+
+      {/* Mobile Waiter Requests Dropdown */}
+      {isWaiterRequestsOpen && (
+        <div
+          className="lg:hidden fixed inset-0 z-50 bg-black bg-opacity-50"
+          onClick={() => setIsWaiterRequestsOpen(false)}
+        >
+          <div
+            className="absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-800 rounded-t-lg max-h-96 overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {isRTL ? "طلبات النادل" : "Waiter Requests"}
+                </h3>
+                {waiterRequestsCount > 0 && (
+                  <button
+                    onClick={() => {
+                      setWaiterRequests([]);
+                      setWaiterRequestsCount(0);
+                    }}
+                    className="text-sm text-orange-600 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300"
+                  >
+                    {isRTL ? "مسح الكل" : "Clear All"}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="max-h-80 overflow-y-auto">
+              {waiterRequests.length === 0 ? (
+                <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+                  {isRTL ? "لا توجد طلبات نادل" : "No waiter requests"}
+                </div>
+              ) : (
+                waiterRequests.map((request, index) => (
+                  <div
+                    key={index}
+                    className="p-4 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">
+                          {request.title}
+                        </p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          {request.message}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
+                          {new Date(request.createdAt).toLocaleString()}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setWaiterRequests((prev) =>
+                            prev.filter((_, i) => i !== index)
+                          );
+                          setWaiterRequestsCount((prev) =>
+                            Math.max(0, prev - 1)
+                          );
+                        }}
+                        className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

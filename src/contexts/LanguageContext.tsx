@@ -147,7 +147,7 @@ const translations = {
     "qr.restaurantCode": "رمز QR للمطعم",
     "qr.tableCodes": "رموز QR للطاولات",
     "qr.restaurantCodeDesc":
-      "هذا الرمز يوجه العملاء لقائمة المطعم بدون رقم طاولة محدد",
+      "هذا الرمز يوجه العملاء لقائمة المطعم بدون رقم طاولة محدد يستخدم لاستقيال الطلبات الخارجة (التوصيل) ",
     "qr.noRestaurantCode": "لا يوجد رمز QR للمطعم",
     "qr.createRestaurantCodeDesc":
       "إنشاء رمز QR يمكن للعملاء مسحه لعرض قائمة المطعم",
