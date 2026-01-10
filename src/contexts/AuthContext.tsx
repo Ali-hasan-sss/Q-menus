@@ -162,10 +162,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setLoading(true);
       console.log("🔐 Attempting login for:", email);
+      console.log("🌐 API URL:", api.defaults.baseURL);
+      console.log("🍪 withCredentials:", api.defaults.withCredentials);
+
       const response = await api.post("/auth/login", { email, password });
+
+      // Check for Set-Cookie header in response
+      const setCookieHeader = response.headers["set-cookie"];
+      console.log("🍪 Set-Cookie header from response:", setCookieHeader);
+      console.log("📋 Response headers:", {
+        "set-cookie": setCookieHeader,
+        "access-control-allow-origin":
+          response.headers["access-control-allow-origin"],
+        "access-control-allow-credentials":
+          response.headers["access-control-allow-credentials"],
+      });
 
       const { user } = response.data.data;
       console.log("✅ Login successful. User:", user);
+
+      // Check if cookie was set in browser
+      if (typeof document !== "undefined") {
+        const cookies = document.cookie;
+        console.log("🍪 All cookies after login:", cookies);
+        const authToken = cookies
+          .split("; ")
+          .find((row) => row.startsWith("auth-token="));
+        console.log("🔑 auth-token cookie found:", !!authToken);
+        if (authToken) {
+          console.log("✅ Cookie successfully set in browser!");
+        } else {
+          console.warn(
+            "⚠️ Cookie NOT found in browser - this may cause issues!"
+          );
+        }
+      }
 
       setUser(user);
       console.log(
@@ -174,7 +205,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       );
       toast.success("Login successful");
 
-      // Wait a bit for the cookie to be set, then redirect
+      // Wait a bit for the cookie to be fully set, then redirect
       // Check if we're on kitchen login page - if so, don't redirect here (let the page handle it)
       if (
         typeof window !== "undefined" &&
@@ -193,10 +224,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.log("📝 Redirecting to onboarding");
             window.location.href = "/onboarding";
           }
-        }, 100);
+        }, 500); // Increased delay to ensure cookie is set
       }
     } catch (error: any) {
       console.error("❌ Login failed:", error.response?.data || error.message);
+      console.error("❌ Error details:", {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        headers: error.response?.headers,
+        data: error.response?.data,
+      });
       const message = error.response?.data?.message || "Login failed";
       toast.error(message);
       throw error;

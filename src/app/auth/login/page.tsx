@@ -61,12 +61,6 @@ export default function LoginPage() {
     },
   });
 
-  const watchedFields = watch();
-
-  // Debug: Log form values
-  console.log("Form values:", watchedFields);
-  console.log("Form errors:", errors);
-
   const onSubmit = async (data: LoginForm) => {
     try {
       setIsLoading(true);
