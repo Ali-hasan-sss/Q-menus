@@ -1,0 +1,9 @@
+node_modules/@swc
+node_modules/@esbuild
+node_modules/@img
+.next/cache
+**/*.map
+**/test
+**/tests
+**/*.test.*
+**/*.spec.*

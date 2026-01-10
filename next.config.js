@@ -1,27 +1,27 @@
 let withPWA;
 try {
-  withPWA = require('next-pwa')({
-    dest: 'public',
-    disable: process.env.NODE_ENV === 'development',
+  withPWA = require("next-pwa")({
+    dest: "public",
+    disable: process.env.NODE_ENV === "development",
     register: true,
     skipWaiting: true,
     fallbacks: {
-      document: '/offline.html',
+      document: "/offline.html",
     },
     runtimeCaching: [
       {
         urlPattern: /^https?:.*\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/i,
-        handler: 'CacheFirst',
+        handler: "CacheFirst",
         options: {
-          cacheName: 'images-cache',
+          cacheName: "images-cache",
           expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 30 },
         },
       },
       {
         urlPattern: /^https?:\/\/.*\/(?:api)\/.*$/i,
-        handler: 'NetworkFirst',
+        handler: "NetworkFirst",
         options: {
-          cacheName: 'api-cache',
+          cacheName: "api-cache",
           networkTimeoutSeconds: 10,
           expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 },
         },
@@ -34,9 +34,6 @@ try {
 
 /** @type {import('next').NextConfig} */
 const baseConfig = {
-  experimental: {
-    appDir: true,
-  },
   images: {
     domains: [
       "localhost",
@@ -44,7 +41,8 @@ const baseConfig = {
       "mymenus-storage.nyc3.digitaloceanspaces.com",
       "images.unsplash.com",
       "res.cloudinary.com",
-      "https://qmenus-backend.onrender.com",
+      "qmenus-backend.onrender.com",
+      "api.qmenussy.com",
       // Add your S3-compatible storage domains here
     ],
   },
@@ -69,6 +67,16 @@ const baseConfig = {
       },
     ];
   },
+  // Fix for build traces stack overflow - exclude platform-specific binaries
+  // Using simpler patterns to avoid recursion issues
+  outputFileTracingIgnore: [
+    "**/node_modules/**",
+    "**/.next/**",
+    "**/.git/**",
+    "**/logs/**",
+    "**/uploads/**",
+    "**/prisma/**",
+  ],
 };
 
 module.exports = withPWA(baseConfig);
