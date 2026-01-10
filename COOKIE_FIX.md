@@ -9,6 +9,7 @@
 ### 1. إيقاف Proxy في Vercel Environment Variables
 
 في Vercel Dashboard:
+
 1. اذهب إلى **Settings** → **Environment Variables**
 2. تأكد من وجود:
    ```
@@ -29,6 +30,7 @@ ALLOWED_ORIGINS=https://www.qmenussy.com,https://qmenussy.com
 ```
 
 **مهم**: يجب أن يحتوي `ALLOWED_ORIGINS` على:
+
 - `https://www.qmenussy.com` (مع www)
 - `https://qmenussy.com` (بدون www)
 
@@ -67,6 +69,7 @@ pm2 restart all
 ## لماذا Proxy لا يعمل مع Cookies?
 
 Next.js rewrites (`/api` → backend) تمرر الطلبات عبر Next.js server. عند استخدام proxy:
+
 - الـ `Set-Cookie` header قد لا يتم تمريره بشكل صحيح
 - CORS headers قد لا تعمل بشكل صحيح مع cross-origin cookies
 - Browser security policies تمنع cookies من domain مختلف عند استخدام proxy
