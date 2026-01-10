@@ -5,18 +5,31 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.qmenussy.com";
 
 async function verifyAuth(request: NextRequest): Promise<boolean> {
   try {
-    // Try to get token from cookie first (works for same-domain cookies)
-    const token = request.cookies.get("auth-token")?.value;
+    // In Edge Runtime, cookies from different domains (api.qmenussy.com)
+    // may not be accessible via request.cookies
+    // So we check both request.cookies and request.headers.get("cookie")
 
-    // Get all cookies from request header (for cross-origin cookies)
+    const token = request.cookies.get("auth-token")?.value;
     const cookieHeader = request.headers.get("cookie");
+
+    console.log("🔍 Auth check:", {
+      hasToken: !!token,
+      hasCookieHeader: !!cookieHeader,
+      cookieHeader: cookieHeader?.substring(0, 50) + "...",
+    });
 
     // Build cookie string for API request
     let cookieString = "";
     if (token) {
       cookieString = `auth-token=${token}`;
-    } else if (cookieHeader) {
-      cookieString = cookieHeader;
+    } else if (cookieHeader && cookieHeader.includes("auth-token")) {
+      // Extract auth-token from cookie header if it exists
+      const match = cookieHeader.match(/auth-token=([^;]+)/);
+      if (match) {
+        cookieString = `auth-token=${match[1]}`;
+      } else {
+        cookieString = cookieHeader; // Use full cookie header
+      }
     }
 
     // If we have a cookie, verify it with backend
@@ -27,20 +40,30 @@ async function verifyAuth(request: NextRequest): Promise<boolean> {
           headers: {
             Cookie: cookieString,
             "Content-Type": "application/json",
+            Origin: request.headers.get("origin") || request.url,
           },
         });
 
         if (response.ok) {
+          console.log("✅ Auth verified successfully");
           return true;
+        } else {
+          console.log(
+            "❌ Auth verification failed:",
+            response.status,
+            response.statusText
+          );
         }
       } catch (error) {
-        console.error("Auth verification error:", error);
+        console.error("❌ Auth verification error:", error);
       }
+    } else {
+      console.log("⚠️ No cookie found for authentication");
     }
 
     return false;
   } catch (error) {
-    console.error("Auth verification error:", error);
+    console.error("❌ Auth verification error:", error);
     return false;
   }
 }
