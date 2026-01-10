@@ -94,55 +94,90 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const checkAuth = async () => {
-    // Check if we're on a public page first
-    if (typeof window !== "undefined") {
-      const currentPath = window.location.pathname;
-
-      // Skip auth check for public pages
-      if (
-        currentPath === "/" ||
-        currentPath.startsWith("/menu/") ||
-        currentPath.startsWith("/order/") ||
-        currentPath.startsWith("/auth/login") ||
-        currentPath.startsWith("/auth/register") ||
-        currentPath.startsWith("/kitchen/login")
-      ) {
-        console.log("🏠 Public page detected - skipping auth check");
-        setUser(null);
-        setLoading(false);
-        return;
-      }
+    if (typeof window === "undefined") {
+      setLoading(false);
+      return;
     }
+
+    const currentPath = window.location.pathname;
+
+    // Skip auth check for public pages, but only if user is not already authenticated
+    // This allows redirects after login to work properly
+    const isPublicPage =
+      currentPath === "/" ||
+      currentPath.startsWith("/menu/") ||
+      currentPath.startsWith("/order/") ||
+      currentPath.startsWith("/auth/login") ||
+      currentPath.startsWith("/auth/register") ||
+      currentPath.startsWith("/kitchen/login");
+
+    // If user is authenticated and on login page, redirect them
+    if (
+      user &&
+      (currentPath.startsWith("/auth/login") ||
+        currentPath.startsWith("/auth/register"))
+    ) {
+      console.log("✅ User already authenticated on login page - redirecting");
+      if (user.role === "ADMIN") {
+        router.push("/admin");
+      } else if (user.restaurant) {
+        router.push("/dashboard");
+      } else {
+        router.push("/onboarding");
+      }
+      setLoading(false);
+      return;
+    }
+
+    // Skip auth check for public pages if user is not set
+    if (isPublicPage && !user) {
+      console.log("🏠 Public page detected - skipping auth check");
+      setLoading(false);
+      return;
+    }
+
+    // For protected pages (admin, dashboard), always check authentication
+    const isProtectedPage =
+      currentPath.startsWith("/admin") ||
+      currentPath.startsWith("/dashboard") ||
+      currentPath.startsWith("/kitchen");
 
     try {
       console.log("🔐 Checking auth with httpOnly cookie");
-
-      // Get user profile (token is automatically sent via httpOnly cookie)
       console.log("📡 Fetching user profile...");
       const response = await api.get("/auth/me");
       console.log("✅ User profile fetched:", response.data.data.user);
-      const user = response.data.data.user;
-      setUser(user);
-      console.log("🔐 User state updated, isAuthenticated:", !!user);
+      const fetchedUser = response.data.data.user;
+      setUser(fetchedUser);
+      console.log("🔐 User state updated, isAuthenticated:", !!fetchedUser);
 
       // Check if user is on the wrong page and redirect accordingly
-      if (typeof window !== "undefined") {
-        const currentPath = window.location.pathname;
-
-        if (user.role === "ADMIN" && !currentPath.startsWith("/admin")) {
-          // Admin user not on admin page
-          if (
-            currentPath.startsWith("/dashboard") ||
-            currentPath.startsWith("/order/")
-          ) {
-            console.log("🔄 Redirecting admin to admin dashboard");
-            router.push("/admin");
-          }
-        } else if (user.role === "OWNER" && currentPath.startsWith("/admin")) {
-          // Owner user on admin page
-          console.log("🔄 Redirecting owner to restaurant dashboard");
-          router.push("/dashboard");
+      if (fetchedUser.role === "ADMIN" && !currentPath.startsWith("/admin")) {
+        // Admin user not on admin page
+        if (
+          currentPath.startsWith("/dashboard") ||
+          currentPath.startsWith("/order/") ||
+          isProtectedPage
+        ) {
+          console.log("🔄 Redirecting admin to admin dashboard");
+          router.push("/admin");
         }
+      } else if (
+        fetchedUser.role === "OWNER" &&
+        currentPath.startsWith("/admin")
+      ) {
+        // Owner user on admin page
+        console.log("🔄 Redirecting owner to restaurant dashboard");
+        router.push("/dashboard");
+      } else if (
+        isProtectedPage &&
+        fetchedUser.role === "OWNER" &&
+        !fetchedUser.restaurant &&
+        !currentPath.startsWith("/onboarding")
+      ) {
+        // Owner without restaurant should go to onboarding
+        console.log("🔄 Redirecting owner without restaurant to onboarding");
+        router.push("/onboarding");
       }
     } catch (error: any) {
       console.error(
@@ -153,6 +188,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       localStorage.removeItem("token");
       console.log("🔐 User state cleared, isAuthenticated: false");
+
+      // If on protected page and auth failed, redirect to login
+      if (isProtectedPage) {
+        console.log("🔄 Redirecting to login (protected page, auth failed)");
+        if (currentPath.startsWith("/admin")) {
+          router.push("/auth/login");
+        } else if (currentPath.startsWith("/dashboard")) {
+          router.push("/auth/login");
+        } else if (currentPath.startsWith("/kitchen")) {
+          router.push("/kitchen/login");
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -205,26 +252,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       );
       toast.success("Login successful");
 
-      // Wait a bit for the cookie to be fully set, then redirect
+      // Redirect immediately based on role
+      // Use router.push for client-side navigation which is faster
       // Check if we're on kitchen login page - if so, don't redirect here (let the page handle it)
       if (
         typeof window !== "undefined" &&
         !window.location.pathname.startsWith("/kitchen/login")
       ) {
+        console.log("🔄 Redirecting based on role:", user.role);
+        console.log("🔄 User restaurant:", user.restaurant);
+
+        // Use a small delay to ensure state is updated and cookie is set
         setTimeout(() => {
-          console.log("🔄 Redirecting based on role:", user.role);
-          console.log("🔄 User restaurant:", user.restaurant);
           if (user.role === "ADMIN") {
-            console.log("👑 Redirecting to admin dashboard");
-            window.location.href = "/admin";
+            console.log("👑 Redirecting admin to admin dashboard");
+            router.push("/admin");
           } else if (user.restaurant) {
-            console.log("🏪 Redirecting to restaurant dashboard");
-            window.location.href = "/dashboard";
+            console.log("🏪 Redirecting owner to restaurant dashboard");
+            router.push("/dashboard");
           } else {
             console.log("📝 Redirecting to onboarding");
-            window.location.href = "/onboarding";
+            router.push("/onboarding");
           }
-        }, 500); // Increased delay to ensure cookie is set
+        }, 100); // Small delay to ensure state update
       }
     } catch (error: any) {
       console.error("❌ Login failed:", error.response?.data || error.message);

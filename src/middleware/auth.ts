@@ -5,66 +5,31 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.qmenussy.com";
 
 async function verifyAuth(request: NextRequest): Promise<boolean> {
   try {
-    // In Edge Runtime, cookies from different domains (api.qmenussy.com)
-    // may not be accessible via request.cookies
-    // So we check both request.cookies and request.headers.get("cookie")
+    // NOTE: Cookies from different domains (api.qmenussy.com) are NOT accessible
+    // in Next.js middleware due to browser Same-Origin policy.
+    // The cookie is HttpOnly and stored on api.qmenussy.com domain.
+    // We can't read it from qmenussy.com middleware.
 
-    const token = request.cookies.get("auth-token")?.value;
-    const cookieHeader = request.headers.get("cookie");
+    // Since we can't verify the cookie in middleware, we'll allow the request
+    // to proceed and let the client-side AuthContext handle authentication.
+    // The API routes will still verify the cookie server-side.
 
-    console.log("🔍 Auth check:", {
-      hasToken: !!token,
-      hasCookieHeader: !!cookieHeader,
-      cookieHeader: cookieHeader?.substring(0, 50) + "...",
-    });
+    // However, we can check if there's any indication of authentication attempt
+    // For now, we'll allow all requests and rely on client-side checks
+    // The actual authentication will be verified by the backend API
 
-    // Build cookie string for API request
-    let cookieString = "";
-    if (token) {
-      cookieString = `auth-token=${token}`;
-    } else if (cookieHeader && cookieHeader.includes("auth-token")) {
-      // Extract auth-token from cookie header if it exists
-      const match = cookieHeader.match(/auth-token=([^;]+)/);
-      if (match) {
-        cookieString = `auth-token=${match[1]}`;
-      } else {
-        cookieString = cookieHeader; // Use full cookie header
-      }
-    }
+    console.log(
+      "🔍 Middleware: Allowing request (auth will be verified client-side)"
+    );
 
-    // If we have a cookie, verify it with backend
-    if (cookieString) {
-      try {
-        const response = await fetch(`${API_URL}/api/auth/me`, {
-          method: "GET",
-          headers: {
-            Cookie: cookieString,
-            "Content-Type": "application/json",
-            Origin: request.headers.get("origin") || request.url,
-          },
-        });
-
-        if (response.ok) {
-          console.log("✅ Auth verified successfully");
-          return true;
-        } else {
-          console.log(
-            "❌ Auth verification failed:",
-            response.status,
-            response.statusText
-          );
-        }
-      } catch (error) {
-        console.error("❌ Auth verification error:", error);
-      }
-    } else {
-      console.log("⚠️ No cookie found for authentication");
-    }
-
-    return false;
+    // Return true to allow the request - authentication will be checked:
+    // 1. Client-side by AuthContext (on page load)
+    // 2. Server-side by backend API (when API calls are made)
+    return true;
   } catch (error) {
-    console.error("❌ Auth verification error:", error);
-    return false;
+    console.error("❌ Middleware auth check error:", error);
+    // On error, allow request - let client-side handle it
+    return true;
   }
 }
 
@@ -100,57 +65,20 @@ export async function protectRestaurantRoutes(request: NextRequest) {
 
 export async function protectAdminRoutes(request: NextRequest) {
   try {
-    // Verify authentication with backend
-    const isAuthenticated = await verifyAuth(request);
+    // NOTE: We can't verify cross-origin cookies in middleware
+    // Allow the request to proceed - authentication will be handled:
+    // 1. Client-side by AuthContext (will redirect if not authenticated)
+    // 2. Server-side by backend API (will return 401 if not authenticated)
 
-    console.log("🔐 Admin middleware - Authenticated:", isAuthenticated);
+    console.log(
+      "🔐 Admin middleware: Allowing request (client-side auth will handle redirect)"
+    );
 
-    if (!isAuthenticated) {
-      console.log("❌ No valid auth found, redirecting to login");
-      const loginUrl = new URL("/auth/login", request.url);
-      return NextResponse.redirect(loginUrl);
-    }
-
-    // Additional check: verify user is ADMIN
-    try {
-      const cookieHeader = request.headers.get("cookie");
-      const token = request.cookies.get("auth-token")?.value;
-
-      let cookieString = "";
-      if (token) {
-        cookieString = `auth-token=${token}`;
-      } else if (cookieHeader) {
-        cookieString = cookieHeader;
-      }
-
-      if (cookieString) {
-        const response = await fetch(`${API_URL}/api/auth/me`, {
-          method: "GET",
-          headers: {
-            Cookie: cookieString,
-            "Content-Type": "application/json",
-          },
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          if (data.data?.user?.role === "ADMIN") {
-            console.log("✅ Admin middleware - Access granted (ADMIN role)");
-            return NextResponse.next();
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Admin role verification error:", error);
-    }
-
-    // If not admin, redirect to login
-    console.log("❌ Not admin, redirecting to login");
-    const loginUrl = new URL("/auth/login", request.url);
-    return NextResponse.redirect(loginUrl);
+    // Allow request - AuthContext will check authentication and redirect if needed
+    return NextResponse.next();
   } catch (error) {
-    console.error("Admin auth middleware error:", error);
-    const loginUrl = new URL("/auth/login", request.url);
-    return NextResponse.redirect(loginUrl);
+    console.error("Admin middleware error:", error);
+    // On error, allow request - let client-side handle it
+    return NextResponse.next();
   }
 }

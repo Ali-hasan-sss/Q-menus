@@ -42,7 +42,21 @@ export default function LoginPage() {
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated && user) {
-      const dashboardPath = user.role === "ADMIN" ? "/admin" : "/dashboard";
+      console.log("🔄 Login page: User authenticated, redirecting...", {
+        role: user.role,
+        hasRestaurant: !!user.restaurant,
+      });
+      let dashboardPath = "/dashboard";
+
+      if (user.role === "ADMIN") {
+        dashboardPath = "/admin";
+      } else if (user.restaurant) {
+        dashboardPath = "/dashboard";
+      } else {
+        dashboardPath = "/onboarding";
+      }
+
+      console.log("🔄 Redirecting to:", dashboardPath);
       router.push(dashboardPath);
     }
   }, [isAuthenticated, user, router]);
@@ -65,6 +79,8 @@ export default function LoginPage() {
     try {
       setIsLoading(true);
       await login(data.email, data.password);
+      // Login function will handle redirect
+      // The useEffect above will also catch the redirect if needed
       // Don't set loading to false here - let the redirect happen
     } catch (error: any) {
       setIsLoading(false);
