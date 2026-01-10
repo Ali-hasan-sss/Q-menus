@@ -2,28 +2,26 @@ let withPWA;
 try {
   withPWA = require("next-pwa")({
     dest: "public",
-    disable: process.env.NODE_ENV === "development",
+    disable:
+      process.env.NODE_ENV === "development" || process.env.VERCEL === "1",
+
     register: true,
     skipWaiting: true,
+
     fallbacks: {
       document: "/offline.html",
     },
+
     runtimeCaching: [
       {
         urlPattern: /^https?:.*\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/i,
         handler: "CacheFirst",
         options: {
           cacheName: "images-cache",
-          expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 30 },
-        },
-      },
-      {
-        urlPattern: /^https?:\/\/.*\/(?:api)\/.*$/i,
-        handler: "NetworkFirst",
-        options: {
-          cacheName: "api-cache",
-          networkTimeoutSeconds: 10,
-          expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 },
+          expiration: {
+            maxEntries: 100,
+            maxAgeSeconds: 60 * 60 * 24 * 30,
+          },
         },
       },
     ],
@@ -67,16 +65,6 @@ const baseConfig = {
       },
     ];
   },
-  // Fix for build traces stack overflow - exclude platform-specific binaries
-  // Using simpler patterns to avoid recursion issues
-  outputFileTracingIgnore: [
-    "**/node_modules/**",
-    "**/.next/**",
-    "**/.git/**",
-    "**/logs/**",
-    "**/uploads/**",
-    "**/prisma/**",
-  ],
 };
 
 module.exports = withPWA(baseConfig);
