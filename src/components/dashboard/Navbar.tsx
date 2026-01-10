@@ -235,16 +235,22 @@ export default function Navbar() {
   // Handle waiter requests
   useEffect(() => {
     const handleWaiterRequest = (event: CustomEvent) => {
-      const { notification, tableNumber, orderType } = event.detail;
+      const { notification, tableNumber, orderType, message } = event.detail;
+
+      // Add message to notification object for display
+      const waiterRequest = {
+        ...notification,
+        message: message || notification.body,
+      };
 
       // Add to waiter requests list
-      setWaiterRequests((prev) => [notification, ...prev]);
+      setWaiterRequests((prev) => [waiterRequest, ...prev]);
       setWaiterRequestsCount((prev) => prev + 1);
 
       // Show browser notification if enabled
       if (browserNotificationsEnabled) {
         new Notification(notification.title, {
-          body: notification.message,
+          body: message || notification.body,
           icon: "/favicon.ico",
         });
       }

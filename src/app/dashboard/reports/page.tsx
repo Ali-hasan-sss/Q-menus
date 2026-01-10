@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/components/ui/Toast";
@@ -56,22 +56,148 @@ export default function ReportsPage() {
     averageOrderValue: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [restaurantCurrency, setRestaurantCurrency] = useState<string | null>(
+    null
+  );
   const [dateFilter, setDateFilter] = useState<
     "today" | "week" | "month" | "all"
   >("today");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMoreOrders, setHasMoreOrders] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [totalOrders, setTotalOrders] = useState(0);
+  const ordersPerPage = 25; // 25 طلب لكل صفحة
+  const observerTarget = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetchReports();
+    const initCurrency = async () => {
+      const currency = await fetchRestaurantCurrency();
+      // بعد جلب العملة، جلب التقارير مع تمرير العملة مباشرة
+      setCurrentPage(1);
+      setHasMoreOrders(true);
+      // Pass currency directly to fetchReports to avoid race condition
+      fetchReports(1, false, currency);
+    };
+    initCurrency();
+  }, []);
+
+  // دالة جلب المزيد من الطلبات
+  const loadMoreOrders = useCallback(() => {
+    if (!isLoadingMore && hasMoreOrders) {
+      fetchReports(currentPage + 1, true);
+    }
+  }, [currentPage, hasMoreOrders, isLoadingMore]);
+
+  // useEffect للـ Intersection Observer (Infinite Scroll)
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMoreOrders && !isLoadingMore) {
+          loadMoreOrders();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const currentTarget = observerTarget.current;
+    if (currentTarget) {
+      observer.observe(currentTarget);
+    }
+
+    return () => {
+      if (currentTarget) {
+        observer.unobserve(currentTarget);
+      }
+    };
+  }, [hasMoreOrders, isLoadingMore, loadMoreOrders]);
+
+  useEffect(() => {
+    // إعادة تعيين pagination عند تغيير الفلتر
+    // فقط إذا كانت العملة قد تم جلبها بالفعل
+    if (restaurantCurrency !== null) {
+      setCurrentPage(1);
+      setHasMoreOrders(true);
+      fetchReports(1, false);
+    }
   }, [dateFilter, startDate, endDate]);
 
-  const fetchReports = async () => {
+  // Fetch restaurant currency
+  const fetchRestaurantCurrency = async () => {
     try {
-      setLoading(true);
+      const response = await api.get("/restaurant/profile");
+      console.log("🔍 Restaurant profile response:", response.data);
+      if (response.data.success && response.data.data.currency) {
+        console.log(
+          "✅ Restaurant currency found:",
+          response.data.data.currency
+        );
+        setRestaurantCurrency(response.data.data.currency);
+        return response.data.data.currency;
+      } else {
+        console.warn("⚠️ No currency in restaurant profile response");
+      }
+    } catch (error) {
+      console.error("Error fetching restaurant currency:", error);
+      // Fallback: try to get from menu endpoint
+      try {
+        const menuResponse = await api.get("/menu");
+        console.log("🔍 Menu response:", menuResponse.data);
+        if (menuResponse.data.success && menuResponse.data.data.currency) {
+          console.log(
+            "✅ Currency found in menu:",
+            menuResponse.data.data.currency
+          );
+          setRestaurantCurrency(menuResponse.data.data.currency);
+          return menuResponse.data.data.currency;
+        }
+      } catch (menuError) {
+        console.error("Error fetching currency from menu:", menuError);
+      }
+    }
+    console.warn("⚠️ No currency found, returning null");
+    return null;
+  };
+
+  // Helper function to get the correct currency for display
+  const getDisplayCurrency = (orderCurrency?: string): string => {
+    // Always prefer restaurant currency if available
+    if (restaurantCurrency) {
+      console.log("💰 Using restaurant currency:", restaurantCurrency);
+      return restaurantCurrency;
+    }
+    // Fallback to order currency
+    if (orderCurrency) {
+      console.log("💰 Using order currency:", orderCurrency);
+      return orderCurrency;
+    }
+    // Final fallback to USD
+    console.log("💰 Using default currency: USD");
+    return "USD";
+  };
+
+  const fetchReports = async (
+    page: number = 1,
+    append: boolean = false,
+    currencyOverride?: string | null
+  ) => {
+    try {
+      if (append) {
+        setIsLoadingMore(true);
+      } else {
+        setLoading(true);
+      }
+
+      // Use currencyOverride if provided, otherwise use current restaurantCurrency state
+      const currentCurrency =
+        currencyOverride !== undefined ? currencyOverride : restaurantCurrency;
 
       // Build query params
-      const params: any = {};
+      const params: any = {
+        page,
+        limit: ordersPerPage,
+      };
 
       if (dateFilter === "today") {
         const today = new Date();
@@ -94,13 +220,78 @@ export default function ReportsPage() {
 
       if (response.data.success) {
         const fetchedOrders = response.data.data.orders;
-        setOrders(fetchedOrders);
 
-        // Calculate stats
-        const completed = fetchedOrders.filter(
+        if (append) {
+          // إضافة الطلبات الجديدة للقائمة الموجودة
+          setOrders((prev) => {
+            // تجنب التكرار
+            const existingIds = new Set(prev.map((o) => o.id));
+            const newOrders = fetchedOrders.filter(
+              (o: Order) => !existingIds.has(o.id)
+            );
+            return [...prev, ...newOrders];
+          });
+        } else {
+          setOrders(fetchedOrders);
+        }
+
+        // تحديث pagination info
+        if (response.data.data.pagination) {
+          const {
+            total,
+            pages,
+            page: currentPageNum,
+          } = response.data.data.pagination;
+          setTotalOrders(total);
+          setHasMoreOrders(currentPageNum < pages);
+          setCurrentPage(currentPageNum);
+        } else {
+          // إذا لم يكن هناك pagination، تحقق من عدد الطلبات
+          setHasMoreOrders(fetchedOrders.length === ordersPerPage);
+        }
+
+        // Try to get currency from response if available
+        // IMPORTANT: Only update currency if we don't already have restaurant currency
+        // Never override restaurant currency with order currency
+        if (response.data.data.currency && !currentCurrency) {
+          console.log(
+            "💰 Currency from response:",
+            response.data.data.currency
+          );
+          setRestaurantCurrency(response.data.data.currency);
+        } else if (fetchedOrders.length > 0 && !currentCurrency) {
+          // Only update currency from orders if we don't have restaurant currency yet
+          // Try to find a non-USD currency from orders
+          const orderWithCurrency = fetchedOrders.find(
+            (order: Order) => order.currency && order.currency !== "USD"
+          );
+          if (orderWithCurrency && orderWithCurrency.currency) {
+            console.log("💰 Currency from order:", orderWithCurrency.currency);
+            setRestaurantCurrency(orderWithCurrency.currency);
+          } else if (fetchedOrders[0].currency) {
+            // Use currency from first order even if USD (only as last resort)
+            console.log(
+              "💰 Currency from first order (fallback):",
+              fetchedOrders[0].currency
+            );
+            setRestaurantCurrency(fetchedOrders[0].currency);
+          }
+        } else if (currentCurrency) {
+          console.log(
+            "💰 Keeping restaurant currency:",
+            currentCurrency,
+            "(not overriding with order currency)"
+          );
+        }
+
+        // Calculate stats - تحديث الإحصائيات من جميع الطلبات المحملة
+        const allLoadedOrders = append
+          ? [...orders, ...fetchedOrders]
+          : fetchedOrders;
+        const completed = allLoadedOrders.filter(
           (o: Order) => o.status === "COMPLETED"
         );
-        const cancelled = fetchedOrders.filter(
+        const cancelled = allLoadedOrders.filter(
           (o: Order) => o.status === "CANCELLED"
         );
         const revenue = completed.reduce(
@@ -109,7 +300,7 @@ export default function ReportsPage() {
         );
 
         setStats({
-          totalOrders: fetchedOrders.length,
+          totalOrders: allLoadedOrders.length,
           completedOrders: completed.length,
           cancelledOrders: cancelled.length,
           totalRevenue: revenue,
@@ -125,6 +316,7 @@ export default function ReportsPage() {
       );
     } finally {
       setLoading(false);
+      setIsLoadingMore(false);
     }
   };
 
@@ -308,7 +500,7 @@ export default function ReportsPage() {
                   <p className="text-3xl font-bold text-primary-600 dark:text-primary-400 mt-2">
                     {formatCurrencyWithLanguage(
                       stats.totalRevenue,
-                      "SYP",
+                      restaurantCurrency || undefined,
                       language
                     )}
                   </p>
@@ -341,7 +533,7 @@ export default function ReportsPage() {
                   <p className="text-3xl font-bold text-orange-600 dark:text-orange-400 mt-2">
                     {formatCurrencyWithLanguage(
                       stats.averageOrderValue,
-                      "SYP",
+                      restaurantCurrency || undefined,
                       language
                     )}
                   </p>
@@ -445,7 +637,7 @@ export default function ReportsPage() {
                       <td className="px-6 py-4 text-center whitespace-nowrap text-sm font-semibold text-gray-900 dark:text-white">
                         {formatCurrencyWithLanguage(
                           Number(order.totalPrice),
-                          order.currency,
+                          getDisplayCurrency(order.currency),
                           language
                         )}
                       </td>
@@ -457,7 +649,24 @@ export default function ReportsPage() {
                 </tbody>
               </table>
 
-              {orders.length === 0 && (
+              {/* Infinite Scroll Trigger */}
+              {hasMoreOrders && (
+                <div
+                  ref={observerTarget}
+                  className="py-4 text-center border-t border-gray-200 dark:border-gray-700"
+                >
+                  {isLoadingMore ? (
+                    <div className="flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+                      <span className="ml-2 text-gray-600 dark:text-gray-400">
+                        {isRTL ? "جاري تحميل المزيد..." : "Loading more..."}
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+              )}
+
+              {orders.length === 0 && !loading && (
                 <div className="text-center py-12">
                   <svg
                     className="mx-auto h-12 w-12 text-gray-400"

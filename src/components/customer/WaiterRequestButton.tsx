@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useCustomerSocket } from "@/contexts/CustomerSocketContext";
 import toast from "react-hot-toast";
@@ -20,9 +20,25 @@ export default function WaiterRequestButton({
   menuTheme,
   className = "",
 }: WaiterRequestButtonProps) {
-  const { isRTL } = useLanguage();
+  const { isRTL, t } = useLanguage();
   const { socket, isConnected } = useCustomerSocket();
   const [isRequesting, setIsRequesting] = useState(false);
+  const handlersRef = useRef<{
+    errorHandler?: (data: { message: string }) => void;
+    successHandler?: () => void;
+  }>({});
+
+  // Cleanup handlers on unmount
+  useEffect(() => {
+    return () => {
+      if (socket && handlersRef.current.errorHandler) {
+        socket.off("waiter_request_error", handlersRef.current.errorHandler);
+      }
+      if (socket && handlersRef.current.successHandler) {
+        socket.off("waiter_request_sent", handlersRef.current.successHandler);
+      }
+    };
+  }, [socket]);
 
   const handleWaiterRequest = async () => {
     if (!socket || !isConnected) {
@@ -35,6 +51,60 @@ export default function WaiterRequestButton({
     try {
       setIsRequesting(true);
 
+      // Remove old handlers if they exist
+      if (handlersRef.current.errorHandler) {
+        socket.off("waiter_request_error", handlersRef.current.errorHandler);
+      }
+      if (handlersRef.current.successHandler) {
+        socket.off("waiter_request_sent", handlersRef.current.successHandler);
+      }
+
+      // Set up error handler before emitting
+      const errorHandler = (data: { message: string }) => {
+        console.error("Waiter request error:", data);
+        
+        // Translate error message based on content
+        let translatedMessage = data.message;
+        if (data.message) {
+          if (
+            data.message.includes("Table is not occupied") ||
+            data.message.includes("start a session")
+          ) {
+            translatedMessage = t("menu.orderError.tableNotOccupied");
+          } else {
+            // Default error message
+            translatedMessage = t("waiter.requestError.failed");
+          }
+        } else {
+          translatedMessage = t("waiter.requestError.failed");
+        }
+        
+        toast.error(translatedMessage);
+        setIsRequesting(false);
+        if (socket) {
+          socket.off("waiter_request_error", errorHandler);
+        }
+      };
+
+      // Set up success handler
+      const successHandler = () => {
+        toast.success(
+          isRTL
+            ? "تم إرسال طلب النادل بنجاح"
+            : "Waiter request sent successfully"
+        );
+        setIsRequesting(false);
+        if (socket) {
+          socket.off("waiter_request_sent", successHandler);
+        }
+      };
+
+      handlersRef.current.errorHandler = errorHandler;
+      handlersRef.current.successHandler = successHandler;
+
+      socket.on("waiter_request_error", errorHandler);
+      socket.on("waiter_request_sent", successHandler);
+
       // Emit waiter request via socket
       socket.emit("request_waiter", {
         restaurantId,
@@ -42,15 +112,14 @@ export default function WaiterRequestButton({
         orderType,
       });
 
-      // Show success message
-      toast.success(
-        isRTL ? "تم إرسال طلب النادل بنجاح" : "Waiter request sent successfully"
-      );
-
-      // Reset button state after 2 seconds
+      // Cleanup handlers after timeout
       setTimeout(() => {
+        if (socket) {
+          socket.off("waiter_request_error", errorHandler);
+          socket.off("waiter_request_sent", successHandler);
+        }
         setIsRequesting(false);
-      }, 2000);
+      }, 5000);
     } catch (error) {
       console.error("Error sending waiter request:", error);
       toast.error(

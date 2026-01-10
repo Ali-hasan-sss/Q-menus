@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { publicApi } from "@/lib/api";
 
 interface QRScannerProps {
   restaurantId: string;
@@ -113,7 +114,7 @@ export default function QRScanner({ restaurantId }: QRScannerProps) {
     console.log("QR detection running...");
   };
 
-  const handleQRCodeDetected = (qrData: string) => {
+  const handleQRCodeDetected = async (qrData: string) => {
     try {
       // Parse QR code data to extract table number
       const url = new URL(qrData);
@@ -126,11 +127,40 @@ export default function QRScanner({ restaurantId }: QRScannerProps) {
           tableNumber &&
           (tableNumber === "DELIVERY" || /^\d+$/.test(tableNumber))
         ) {
+          // Check for incomplete order before allowing QR scan
+          // Only check for dine-in orders (not DELIVERY)
+          if (tableNumber !== "DELIVERY") {
+            try {
+              const response = await publicApi.get(
+                `/order/incomplete/${restaurantId}?tableNumber=${tableNumber}`
+              );
+              if (
+                response.data.success &&
+                response.data.data.order &&
+                response.data.data.order.status !== "COMPLETED" &&
+                response.data.data.order.status !== "CANCELLED"
+              ) {
+                // Incomplete order found - redirect to order page instead
+                stopScanning();
+                const orderId = response.data.data.order.id;
+                console.log(
+                  "🚫 Incomplete order found, redirecting to order page:",
+                  orderId
+                );
+                router.push(`/order/${orderId}`);
+                return;
+              }
+            } catch (error) {
+              // No incomplete order found, continue with normal flow
+              console.log("No incomplete order found, proceeding with QR scan");
+            }
+          }
+
           stopScanning();
-          
+
           // Clear browser history to prevent back button manipulation
           window.history.replaceState(null, "", window.location.href);
-          
+
           router.push(`/menu/${restaurantId}?tableNumber=${tableNumber}`);
         } else {
           setError(

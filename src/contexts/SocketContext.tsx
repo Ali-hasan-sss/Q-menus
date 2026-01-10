@@ -247,21 +247,24 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
       if (data.order && data.order.id && data.order.status) {
         const status = data.order.status;
 
-        // Don't play sound or increment count for cancelled or completed orders
-        // Also don't play sound if restaurant updated the order themselves
+        // Only show notifications for customer-initiated updates (new order or adding items)
+        // Don't show notifications for restaurant/kitchen status changes
+        // Don't show notifications for cancelled or completed orders
         if (
           status !== "CANCELLED" &&
           status !== "COMPLETED" &&
-          data.updatedBy !== "restaurant"
+          data.updatedBy === "customer"
         ) {
           // Increment updated orders count
           setUpdatedOrdersCount((prev) => prev + 1);
 
-          // Play notification sound for active order updates only
+          // Play notification sound for customer updates only (new order or items added)
           playOrderUpdateSound();
         } else {
           console.log(
-            "Order update for cancelled/completed order or restaurant self-update - no notification"
+            "Order update ignored - cancelled/completed order or not from customer (updatedBy:",
+            data.updatedBy,
+            ")"
           );
         }
       }
@@ -272,16 +275,24 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     newSocket.on("order_status_update", (data) => {
       console.log("Order status update:", data);
 
-      // Mirror behavior of order_updated for sounds and counters
+      // Only show notifications for customer-initiated updates (new order or adding items)
+      // Don't show notifications for restaurant/kitchen status changes
+      // Don't show notifications for cancelled or completed orders
       if (data.order && data.order.id && data.order.status) {
         const status = data.order.status;
         if (
           status !== "CANCELLED" &&
           status !== "COMPLETED" &&
-          data.updatedBy !== "restaurant"
+          data.updatedBy === "customer"
         ) {
           setUpdatedOrdersCount((prev) => prev + 1);
           playOrderUpdateSound();
+        } else {
+          console.log(
+            "Order status update ignored - cancelled/completed order or not from customer (updatedBy:",
+            data.updatedBy,
+            ")"
+          );
         }
       }
 
@@ -301,6 +312,16 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 
       // Dispatch custom event for components to listen
       window.dispatchEvent(new CustomEvent("waiterRequest", { detail: data }));
+    });
+
+    // Notification event handler (for admin notifications to restaurants)
+    newSocket.on("notification", (data) => {
+      console.log("Notification received via socket:", data);
+
+      // Dispatch custom event for NotificationContext to listen
+      window.dispatchEvent(
+        new CustomEvent("socketNotification", { detail: data })
+      );
     });
 
     // Error handlers

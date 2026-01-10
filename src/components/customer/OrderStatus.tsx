@@ -39,6 +39,13 @@ interface OrderStatusProps {
   restaurantId?: string;
   orderType?: string;
   orderItems?: OrderItem[];
+  subtotal?: string | number;
+  taxes?: Array<{
+    name: string;
+    nameAr?: string;
+    percentage: number;
+    amount: number;
+  }>;
   totalPrice?: string | number;
   currency?: string;
   onNewOrder?: () => void;
@@ -115,6 +122,8 @@ export function OrderStatus({
   restaurantId,
   orderType = "DINE_IN",
   orderItems = [],
+  subtotal,
+  taxes,
   totalPrice = "0",
   currency = "USD",
   onNewOrder,
@@ -506,7 +515,7 @@ export function OrderStatus({
                     >
                       {formatCurrencyWithLanguage(
                         Number(item.price) * item.quantity,
-                        item.menuItem?.currency || currency,
+                        currency,
                         language
                       )}
                     </td>
@@ -515,10 +524,63 @@ export function OrderStatus({
               })}
             </tbody>
             <tfoot className="border-t-2 border-gray-300">
+              {subtotal !== undefined && (
+                <tr className="border-t border-gray-200">
+                  <td className="py-2 text-sm text-gray-700">
+                    {isRTL ? "المجموع الفرعي:" : "Subtotal:"}
+                  </td>
+                  <td></td>
+                  <td
+                    className={`py-2 text-sm text-gray-700 ${isRTL ? "text-left" : "text-right"}`}
+                  >
+                    {formatCurrencyWithLanguage(
+                      Number(subtotal),
+                      currency,
+                      language
+                    )}
+                  </td>
+                </tr>
+              )}
+              {taxes && taxes.length > 0 && (
+                <tr className="border-t-2 border-b-2 border-gray-400">
+                  <td
+                    colSpan={3}
+                    className="py-3 px-3 bg-gray-50 dark:bg-gray-800"
+                    style={{ border: "2px solid #9ca3af" }}
+                  >
+                    <div className="mb-2">
+                      <strong className="text-sm text-gray-900 dark:text-white">
+                        {isRTL ? "الضرائب:" : "Taxes:"}
+                      </strong>
+                    </div>
+                    <div className="space-y-1">
+                      {taxes.map((tax, index) => (
+                        <div
+                          key={index}
+                          className="flex justify-between items-center text-sm"
+                        >
+                          <span className="text-gray-700 dark:text-gray-300">
+                            {isRTL ? tax.nameAr || tax.name : tax.name} (
+                            {tax.percentage}%)
+                          </span>
+                          <span className="text-gray-900 dark:text-white font-medium">
+                            {formatCurrencyWithLanguage(
+                              tax.amount,
+                              currency,
+                              language
+                            )}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </td>
+                </tr>
+              )}
               <tr>
-                <td colSpan={2} className="py-3 font-bold text-gray-900">
-                  {isRTL ? "الإجمالي:" : "Total:"}
+                <td className="py-3 font-bold text-gray-900">
+                  {isRTL ? "المجموع الكلي:" : "Total:"}
                 </td>
+                <td></td>
                 <td
                   className={`py-3 font-bold text-lg text-gray-900 ${isRTL ? "text-left" : "text-right"}`}
                 >
@@ -807,13 +869,63 @@ export function OrderStatus({
                       })}
                     </tbody>
                     <tfoot>
+                      {subtotal !== undefined && (
+                        <tr className="border-t border-gray-300 dark:border-gray-600">
+                          <td className="py-2 px-3 text-sm text-gray-700 dark:text-gray-300">
+                            {isRTL ? "المجموع الفرعي:" : "Subtotal:"}
+                          </td>
+                          <td></td>
+                          <td
+                            className={`py-2 px-3 text-sm text-gray-700 dark:text-gray-300 ${isRTL ? "text-left" : "text-right"}`}
+                          >
+                            {formatCurrencyWithLanguage(
+                              Number(subtotal),
+                              currency,
+                              language
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                      {taxes && taxes.length > 0 && (
+                        <tr className="border-t-2 border-b-2 border-gray-400 dark:border-gray-500">
+                          <td
+                            colSpan={3}
+                            className="py-3 px-3 bg-gray-50 dark:bg-gray-800"
+                            style={{ border: "2px solid #9ca3af" }}
+                          >
+                            <div className="mb-2">
+                              <strong className="text-sm text-gray-900 dark:text-white">
+                                {isRTL ? "الضرائب:" : "Taxes:"}
+                              </strong>
+                            </div>
+                            <div className="space-y-1">
+                              {taxes.map((tax, index) => (
+                                <div
+                                  key={index}
+                                  className="flex justify-between items-center text-sm"
+                                >
+                                  <span className="text-gray-700 dark:text-gray-300">
+                                    {isRTL ? tax.nameAr || tax.name : tax.name} (
+                                    {tax.percentage}%)
+                                  </span>
+                                  <span className="text-gray-900 dark:text-white font-medium">
+                                    {formatCurrencyWithLanguage(
+                                      tax.amount,
+                                      currency,
+                                      language
+                                    )}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
                       <tr className="border-t-2 border-gray-300 dark:border-gray-600">
-                        <td
-                          colSpan={2}
-                          className="py-3 px-3 font-semibold text-gray-900 dark:text-white"
-                        >
-                          {isRTL ? "الإجمالي:" : "Total:"}
+                        <td className="py-3 px-3 font-semibold text-gray-900 dark:text-white">
+                          {isRTL ? "المجموع الكلي:" : "Total:"}
                         </td>
+                        <td></td>
                         <td
                           className={`py-3 px-3 font-bold text-lg text-gray-900 dark:text-white ${isRTL ? "text-left" : "text-right"}`}
                         >

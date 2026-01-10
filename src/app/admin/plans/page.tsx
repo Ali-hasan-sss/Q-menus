@@ -56,7 +56,17 @@ export default function PlansPage() {
     maxItems: 50,
     canCustomizeTheme: false,
     isFree: false,
+    features: [] as string[],
   });
+
+  // Available features
+  const availableFeatures = [
+    {
+      value: "KITCHEN_DISPLAY_SYSTEM",
+      label: "Kitchen Display System",
+      labelAr: "لوحة المطبخ",
+    },
+  ];
 
   // Function to format currency based on language and currency type
   const formatCurrency = (price: number, currency: string) => {
@@ -146,8 +156,38 @@ export default function PlansPage() {
       maxItems: plan.maxItems,
       canCustomizeTheme: plan.canCustomizeTheme,
       isFree: plan.isFree,
+      features: plan.features || [],
     });
     setShowModal(true);
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      nameAr: "",
+      description: "",
+      descriptionAr: "",
+      type: "BASIC",
+      price: 0,
+      duration: 30,
+      maxTables: 10,
+      maxMenus: 1,
+      maxCategories: 10,
+      maxItems: 50,
+      canCustomizeTheme: false,
+      isFree: false,
+      features: [],
+    });
+    setEditingPlan(null);
+  };
+
+  const toggleFeature = (featureValue: string) => {
+    setFormData((prev) => {
+      const features = prev.features.includes(featureValue)
+        ? prev.features.filter((f) => f !== featureValue)
+        : [...prev.features, featureValue];
+      return { ...prev, features };
+    });
   };
 
   const handleDelete = (planId: string, planName: string) => {
@@ -175,25 +215,6 @@ export default function PlansPage() {
           );
         }
       },
-    });
-  };
-
-  const resetForm = () => {
-    setEditingPlan(null);
-    setFormData({
-      name: "",
-      nameAr: "",
-      description: "",
-      descriptionAr: "",
-      type: "BASIC",
-      price: 0,
-      duration: 30,
-      maxTables: 10,
-      maxMenus: 1,
-      maxCategories: 10,
-      maxItems: 50,
-      canCustomizeTheme: false,
-      isFree: false,
     });
   };
 
@@ -297,6 +318,16 @@ export default function PlansPage() {
                     <span className="mr-2">✓</span>
                     {isRTL ? "تخصيص التصميم" : "Theme customization"}
                   </p>
+                )}
+                {plan.features && plan.features.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-600">
+                    {plan.features.includes("KITCHEN_DISPLAY_SYSTEM") && (
+                      <p className="flex items-center text-gray-600 dark:text-gray-400">
+                        <span className="mr-2">✓</span>
+                        {isRTL ? "لوحة المطبخ" : "Kitchen Display System"}
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -636,6 +667,44 @@ export default function PlansPage() {
                         {isRTL ? "خطة مجانية" : "Free Plan"}
                       </span>
                     </label>
+                  </div>
+
+                  {/* Features Section */}
+                  <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mt-4">
+                    <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                      <svg
+                        className="w-5 h-5 mr-2 text-primary-600"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                      {isRTL ? "الميزات" : "Features"}
+                    </h4>
+                    <div className="space-y-2">
+                      {availableFeatures.map((feature) => (
+                        <label
+                          key={feature.value}
+                          className="flex items-center cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={formData.features.includes(feature.value)}
+                            onChange={() => toggleFeature(feature.value)}
+                            className="mr-2 w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+                          />
+                          <span className="text-sm text-gray-700 dark:text-gray-300">
+                            {isRTL ? feature.labelAr : feature.label}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
 
                   {/* Modal Footer */}

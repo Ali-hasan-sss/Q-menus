@@ -78,6 +78,7 @@ interface MenuContextType {
   items: MenuItem[];
   qrCodes: QRCode[];
   restaurantQR: RestaurantQRCode | null;
+  restaurantCurrency: string;
   loading: boolean;
   loadingItems: boolean;
   error: string | null;
@@ -111,6 +112,7 @@ interface MenuContextType {
   createQRCode: (tableNumber: string) => Promise<QRCode>;
   createRestaurantQR: () => Promise<RestaurantQRCode>;
   toggleQRStatus: (qrId: string) => Promise<void>;
+  toggleTableOccupied: (qrId: string) => Promise<void>;
   deleteQRCode: (qrId: string) => Promise<void>;
   bulkCreateQRCodes: (tableNumbers: string[]) => Promise<QRCode[]>;
   bulkCreateSequentialQRCodes: (count: number) => Promise<QRCode[]>;
@@ -153,6 +155,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
   const [restaurantQR, setRestaurantQR] = useState<RestaurantQRCode | null>(
     null
   );
+  const [restaurantCurrency, setRestaurantCurrency] = useState<string>("USD");
   const [loading, setLoading] = useState(false);
   const [loadingItems, setLoadingItems] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -165,6 +168,10 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
       const response = await api.get("/menu");
       if (response.data.success) {
         setMenu(response.data.data.menu);
+        // Update currency if provided
+        if (response.data.data.currency) {
+          setRestaurantCurrency(response.data.data.currency);
+        }
       }
     } catch (error: any) {
       setError(error.response?.data?.message || "Failed to fetch menu");
@@ -185,6 +192,10 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
       if (response.data.success) {
         // Only set categories, items will be loaded separately
         setCategories(response.data.data.categories);
+        // Update currency if provided
+        if (response.data.data.currency) {
+          setRestaurantCurrency(response.data.data.currency);
+        }
         console.log(
           "✅ Categories loaded:",
           response.data.data.categories.length
@@ -209,6 +220,10 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
       const response = await api.get(`/menu/items${params}`);
       if (response.data.success) {
         setItems(response.data.data.items);
+        // Update currency if provided
+        if (response.data.data.currency) {
+          setRestaurantCurrency(response.data.data.currency);
+        }
       }
     } catch (error: any) {
       setError(error.response?.data?.message || "Failed to fetch items");
@@ -226,6 +241,11 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
       const response = await api.get(`/menu/categories/${categoryId}/items`);
       if (response.data.success) {
         const categoryItems = response.data.data.items;
+
+        // Update currency if provided
+        if (response.data.data.currency) {
+          setRestaurantCurrency(response.data.data.currency);
+        }
 
         // Add items to the global items state
         setItems((prevItems) => {
@@ -537,6 +557,46 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const toggleTableOccupied = useCallback(
+    async (qrId: string): Promise<void> => {
+      try {
+        console.log(`🔄 [Frontend] Toggling table occupied - QR ID: ${qrId}`);
+        setError(null);
+        const response = await api.put(`/qr/${qrId}/toggle-occupied`);
+        console.log(`✅ [Frontend] Toggle response:`, response.data);
+        if (response.data.success) {
+          const updatedQRCode = response.data.data?.qrCode;
+          const newIsOccupied =
+            updatedQRCode?.isOccupied ??
+            !(qrCodes.find((qr) => qr.id === qrId) as any)?.isOccupied;
+
+          console.log(
+            `✅ [Frontend] Updating QR code state - QR ID: ${qrId}, New isOccupied: ${newIsOccupied}`
+          );
+
+          setQrCodes((prev) =>
+            prev.map((qr) =>
+              qr.id === qrId ? { ...qr, isOccupied: newIsOccupied } : qr
+            )
+          );
+
+          // Dispatch custom event to notify other components
+          window.dispatchEvent(new CustomEvent("qrCodesUpdated"));
+        }
+      } catch (error: any) {
+        const errorMessage =
+          error.response?.data?.message ||
+          "Failed to toggle table occupied status";
+        setError(errorMessage);
+        console.error(
+          "❌ [Frontend] Error toggling table occupied status:",
+          error
+        );
+      }
+    },
+    [qrCodes]
+  );
+
   const deleteQRCode = useCallback(async (qrId: string): Promise<void> => {
     try {
       setError(null);
@@ -709,6 +769,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
     items,
     qrCodes,
     restaurantQR,
+    restaurantCurrency,
     loading,
     loadingItems,
     error,
@@ -739,6 +800,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
     createQRCode,
     createRestaurantQR,
     toggleQRStatus,
+    toggleTableOccupied,
     deleteQRCode,
     bulkCreateQRCodes,
     bulkCreateSequentialQRCodes,

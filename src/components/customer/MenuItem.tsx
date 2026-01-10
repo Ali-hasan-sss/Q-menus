@@ -15,13 +15,14 @@ interface MenuItemProps {
     description?: string;
     descriptionAr?: string;
     price: number;
-    currency: string;
+    currency?: string; // Made optional since we'll use restaurant currency
     image?: string;
     isAvailable: boolean;
     extras?: any;
     isVegetarian?: boolean;
     discount?: number;
   };
+  currency?: string; // Restaurant currency prop
   onAddToOrder: (
     item: any,
     quantity: number,
@@ -55,6 +56,7 @@ interface MenuItemProps {
 
 export function MenuItem({
   item,
+  currency,
   onAddToOrder,
   onItemClick,
   isRTL,
@@ -299,14 +301,14 @@ export function MenuItem({
                       ? parseFloat(item.price)
                       : item.price) *
                       (1 - item.discount / 100),
-                    item.currency,
+                    currency || item.currency || "USD",
                     language
                   )
                 : formatCurrencyWithLanguage(
                     typeof item.price === "string"
                       ? parseFloat(item.price)
                       : item.price,
-                    item.currency,
+                    currency || item.currency || "USD",
                     language
                   )}
             </span>
@@ -316,7 +318,7 @@ export function MenuItem({
                   typeof item.price === "string"
                     ? parseFloat(item.price)
                     : item.price,
-                  item.currency,
+                  currency || item.currency || "USD",
                   language
                 )}
               </span>
@@ -426,14 +428,14 @@ export function MenuItem({
                           ? parseFloat(item.price)
                           : item.price) *
                           (1 - item.discount / 100),
-                        item.currency,
+                        currency || item.currency || "USD",
                         language
                       )
                     : formatCurrencyWithLanguage(
                         typeof item.price === "string"
                           ? parseFloat(item.price)
                           : item.price,
-                        item.currency,
+                        currency || item.currency || "USD",
                         language
                       )}
                 </span>
@@ -443,7 +445,7 @@ export function MenuItem({
                       typeof item.price === "string"
                         ? parseFloat(item.price)
                         : item.price,
-                      item.currency,
+                      currency || item.currency || "USD",
                       language
                     )}
                   </span>
@@ -533,7 +535,7 @@ export function MenuItem({
                                       (+
                                       {formatCurrencyWithLanguage(
                                         option.price,
-                                        item.currency,
+                                        currency || item.currency || "USD",
                                         language
                                       )}
                                       )
@@ -594,7 +596,7 @@ export function MenuItem({
                   {isRTL ? "إضافة" : "Add"} {quantity} -{" "}
                   {formatCurrencyWithLanguage(
                     calculateItemTotal(item, quantity, selectedExtras),
-                    item.currency,
+                    currency || item.currency || "USD",
                     language
                   )}
                 </Button>

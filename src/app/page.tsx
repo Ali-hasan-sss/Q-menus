@@ -7,7 +7,7 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { api } from "@/lib/api";
+import { api, publicApi } from "@/lib/api";
 import { number } from "zod";
 
 interface Plan {
@@ -28,14 +28,35 @@ interface Plan {
   isFree: boolean;
 }
 
+interface SectionAttribute {
+  key: string;
+  keyAr: string;
+  value: string;
+  valueAr: string;
+  icon?: string;
+}
+
+interface ContactSection {
+  id: string;
+  title: string;
+  titleAr: string;
+  description: string | null;
+  descriptionAr: string | null;
+  attributes: SectionAttribute[] | null;
+  images: string[] | null;
+}
+
 export default function HomePage() {
   const { isRTL } = useLanguage();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [contactSection, setContactSection] = useState<ContactSection | null>(null);
+  const [contactLoading, setContactLoading] = useState(true);
   const servicesRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchPlans();
+    fetchContactSection();
   }, []);
 
   useEffect(() => {
@@ -66,6 +87,19 @@ export default function HomePage() {
       console.error("Error fetching plans:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchContactSection = async () => {
+    try {
+      const response = await publicApi.get("/section/type/CONTACT");
+      if (response.data.success && response.data.data.sections.length > 0) {
+        setContactSection(response.data.data.sections[0]);
+      }
+    } catch (error) {
+      console.error("Error fetching contact section:", error);
+    } finally {
+      setContactLoading(false);
     }
   };
 
@@ -652,6 +686,123 @@ export default function HomePage() {
           </div>
         </div>
       </div>
+
+      {/* Contact Section */}
+      {contactSection && (
+        <div id="contact" className="contact-section py-20 bg-gray-50 dark:bg-gray-800">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
+                {isRTL ? contactSection.titleAr : contactSection.title}
+              </h2>
+              {(contactSection.description || contactSection.descriptionAr) && (
+                <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+                  {isRTL ? contactSection.descriptionAr : contactSection.description}
+                </p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+              {/* Contact Info */}
+              {contactSection.attributes && contactSection.attributes.length > 0 && (
+                <div className="bg-white dark:bg-gray-900 p-8 rounded-lg shadow-lg">
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">
+                    {isRTL ? "معلومات التواصل" : "Contact Information"}
+                  </h3>
+                  <div className="space-y-4">
+                    {contactSection.attributes.map((attr, index) => {
+                      const key = isRTL ? attr.keyAr : attr.key;
+                      const value = isRTL ? attr.valueAr : attr.value;
+                      
+                      if (index === 0) {
+                        // Address
+                        return (
+                          <div key={index} className="flex items-start">
+                            <svg
+                              className="h-6 w-6 text-tm-blue mr-3 mt-1"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                              />
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                              />
+                            </svg>
+                            <div>
+                              <p className="font-semibold text-gray-900 dark:text-white">
+                                {key}
+                              </p>
+                              <p className="text-gray-600 dark:text-gray-300">{value}</p>
+                            </div>
+                          </div>
+                        );
+                      } else if (index === 1) {
+                        // Phone
+                        return (
+                          <div key={index} className="flex items-start">
+                            <svg
+                              className="h-6 w-6 text-tm-blue mr-3 mt-1"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
+                              />
+                            </svg>
+                            <div>
+                              <p className="font-semibold text-gray-900 dark:text-white">
+                                {key}
+                              </p>
+                              <a
+                                href={`tel:${value}`}
+                                className="text-tm-blue hover:text-tm-orange transition-colors"
+                              >
+                                {value}
+                              </a>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Images */}
+              {contactSection.images && contactSection.images.length > 0 && (
+                <div className="grid grid-cols-1 gap-4">
+                  {contactSection.images.map((image, index) => (
+                    <img
+                      key={index}
+                      src={image}
+                      alt={`${isRTL ? contactSection.titleAr : contactSection.title} ${index + 1}`}
+                      className="w-full h-auto rounded-lg shadow-lg"
+                      onError={(e) => {
+                        e.currentTarget.src =
+                          "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'%3E%3Crect width='400' height='300' fill='%23f3f4f6'/%3E%3Ctext x='200' y='150' text-anchor='middle' fill='%236b7280' font-family='Arial' font-size='18'%3EContact Image%3C/text%3E%3C/svg%3E";
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <Footer />
     </div>

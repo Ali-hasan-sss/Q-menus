@@ -16,6 +16,7 @@ import { ItemReorderModal } from "@/components/dashboard/ItemReorderModal";
 import { ItemFormModal } from "@/components/dashboard/ItemFormModal";
 import { ThemeEditor } from "@/components/dashboard/ThemeEditor";
 import { ExcelImportButton } from "@/components/dashboard/ExcelImportButton";
+import { api } from "@/lib/api";
 
 interface Category {
   id: string;
@@ -39,7 +40,6 @@ interface MenuItem {
   description?: string;
   descriptionAr?: string;
   price: number;
-  currency: string;
   image?: string;
   isAvailable: boolean;
   sortOrder: number;
@@ -58,6 +58,7 @@ export default function MenuPage() {
     menu,
     categories,
     items,
+    restaurantCurrency,
     loading,
     loadingItems,
     error,
@@ -455,6 +456,7 @@ export default function MenuPage() {
                   items={getCategoryItems()}
                   selectedCategory={getSelectedCategory()}
                   loadingItems={loadingItems}
+                  restaurantCurrency={restaurantCurrency}
                   onBackToCategories={handleBackToCategories}
                   onEditItem={handleEditItem}
                   onDeleteItem={handleDeleteItem}
@@ -495,6 +497,7 @@ export default function MenuPage() {
         item={editingItem}
         categories={categories}
         categoryId={selectedCategory?.id}
+        restaurantCurrency={restaurantCurrency}
         title={
           editingItem
             ? `${t("item.edit")} - ${editingItem.name}`

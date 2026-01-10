@@ -126,6 +126,8 @@ export const endpoints = {
     list: "/qr",
     get: (id: string) => `/qr/${id}`,
     toggle: (id: string) => `/qr/${id}/toggle`,
+    toggleOccupied: (id: string) => `/qr/${id}/toggle-occupied`,
+    setOccupied: (tableNumber: string) => `/qr/table/${tableNumber}/occupied`,
     delete: (id: string) => `/qr/${id}`,
     bulkGenerate: "/qr/bulk-generate",
     bulkDelete: "/qr/bulk-delete",
@@ -185,6 +187,29 @@ export const endpoints = {
       `/public/menu/${restaurantId}/search?q=${encodeURIComponent(query)}`,
     restaurant: (restaurantId: string) => `/public/restaurant/${restaurantId}`,
     health: "/public/health",
+    plans: "/public/plans",
+  },
+
+  // Sections
+  sections: {
+    list: "/section",
+    get: (id: string) => `/section/${id}`,
+    getByType: (type: string) => `/section/type/${type}`,
+  },
+
+  // Kitchen
+  kitchen: {
+    sections: {
+      list: "/kitchen/sections",
+      create: "/kitchen/sections",
+      update: (id: string) => `/kitchen/sections/${id}`,
+      delete: (id: string) => `/kitchen/sections/${id}`,
+    },
+    kds: {
+      items: "/kitchen/kds/items",
+      updateItemStatus: (itemId: string) =>
+        `/kitchen/kds/items/${itemId}/status`,
+    },
   },
 };
 

@@ -39,6 +39,7 @@ export default function DashboardPage() {
     []
   );
   const [loading, setLoading] = useState(true);
+  const [restaurantCurrency, setRestaurantCurrency] = useState<string>("USD");
 
   // Redirect admin users to admin dashboard
   useEffect(() => {
@@ -50,10 +51,35 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (user && user.role === "OWNER") {
+      fetchRestaurantCurrency();
       fetchStats();
       fetchRecentActivities();
     }
   }, [user]);
+
+  // Fetch restaurant currency
+  const fetchRestaurantCurrency = async () => {
+    try {
+      const response = await api.get("/restaurant/profile");
+      if (response.data.success && response.data.data.currency) {
+        setRestaurantCurrency(response.data.data.currency);
+        return response.data.data.currency;
+      }
+    } catch (error) {
+      console.error("Error fetching restaurant currency:", error);
+      // Fallback: try to get from menu endpoint
+      try {
+        const menuResponse = await api.get("/menu");
+        if (menuResponse.data.success && menuResponse.data.data.currency) {
+          setRestaurantCurrency(menuResponse.data.data.currency);
+          return menuResponse.data.data.currency;
+        }
+      } catch (menuError) {
+        console.error("Error fetching currency from menu:", menuError);
+      }
+    }
+    return null;
+  };
 
   const fetchStats = async () => {
     try {
@@ -295,7 +321,7 @@ export default function DashboardPage() {
                     <p className="text-2xl font-semibold text-gray-900 dark:text-white">
                       {formatCurrencyWithLanguage(
                         Number(stats.revenue || 0),
-                        "SYP",
+                        restaurantCurrency,
                         language
                       )}
                     </p>

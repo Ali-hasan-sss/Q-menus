@@ -49,6 +49,95 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
   const [browserNotificationsEnabled, setBrowserNotificationsEnabled] =
     useState(false);
 
+  // Show browser notification
+  const showBrowserNotification = useCallback(
+    (title: string, body: string, orderId?: string) => {
+      if (
+        !browserNotificationsEnabled ||
+        Notification.permission !== "granted"
+      ) {
+        return;
+      }
+
+      // Show notification even if user is on the page
+      const notification = new Notification(title, {
+        body,
+        icon: "/favicon.ico",
+        badge: "/favicon.ico",
+        tag: orderId || "notification",
+        requireInteraction: false,
+      });
+
+      notification.onclick = () => {
+        window.focus();
+        notification.close();
+      };
+
+      // Auto close after 10 seconds
+      setTimeout(() => notification.close(), 10000);
+    },
+    [browserNotificationsEnabled]
+  );
+
+  // Listen for socket notifications
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleSocketNotification = (event: CustomEvent) => {
+      const data = event.detail;
+      console.log("📨 Received notification via socket:", data);
+
+      // Extract notification from the data object
+      const notification = data.notification || data;
+
+      if (!notification || !notification.id) {
+        console.warn("⚠️ Invalid notification data received:", data);
+        return;
+      }
+
+      console.log("✅ Processing notification:", notification);
+
+      // Check if notification already exists to avoid duplicates
+      setNotifications((prev) => {
+        const exists = prev.find((n) => n.id === notification.id);
+        if (exists) {
+          console.log(
+            "⚠️ Notification already exists, skipping:",
+            notification.id
+          );
+          return prev;
+        }
+        return [notification, ...prev];
+      });
+
+      // Increment unread count if notification is not read
+      if (!notification.isRead) {
+        setUnreadCount((prev) => prev + 1);
+      }
+
+      // Show browser notification if enabled
+      if (browserNotificationsEnabled) {
+        showBrowserNotification(
+          notification.title,
+          notification.body,
+          notification.orderId
+        );
+      }
+    };
+
+    window.addEventListener(
+      "socketNotification",
+      handleSocketNotification as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        "socketNotification",
+        handleSocketNotification as EventListener
+      );
+    };
+  }, [socket, browserNotificationsEnabled, showBrowserNotification]);
+
   // Request browser notification permission
   const requestNotificationPermission = useCallback(async () => {
     if (!("Notification" in window)) {
@@ -71,40 +160,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
 
     return false;
   }, []);
-
-  // Show browser notification
-  const showBrowserNotification = useCallback(
-    (title: string, body: string, orderId?: string) => {
-      if (
-        !browserNotificationsEnabled ||
-        Notification.permission !== "granted"
-      ) {
-        return;
-      }
-
-      // Only show if user is not on the page
-      if (!document.hidden) {
-        return;
-      }
-
-      const notification = new Notification(title, {
-        body,
-        icon: "/favicon.ico",
-        badge: "/favicon.ico",
-        tag: orderId || "notification",
-        requireInteraction: false,
-      });
-
-      notification.onclick = () => {
-        window.focus();
-        notification.close();
-      };
-
-      // Auto close after 10 seconds
-      setTimeout(() => notification.close(), 10000);
-    },
-    [browserNotificationsEnabled]
-  );
 
   const fetchUnreadCount = useCallback(async () => {
     if (!user?.restaurant?.id || !socket) return;
@@ -205,42 +260,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
     requestNotificationPermission,
   ]);
 
-  // Listen for real-time notifications via Socket.IO
-  useEffect(() => {
-    if (!socket) return;
-
-    const handleNewNotification = (notification: Notification) => {
-      console.log("📬 New notification received:", notification);
-
-      // Add to notifications list
-      setNotifications((prev) => [notification, ...prev]);
-
-      // Increment unread count
-      if (!notification.isRead) {
-        setUnreadCount((prev) => prev + 1);
-      }
-
-      // Show browser notification if user is not on the page
-      showBrowserNotification(
-        notification.title,
-        notification.body,
-        notification.orderId
-      );
-    };
-
-    const handleUnreadCountUpdate = (data: { unreadCount: number }) => {
-      console.log("📊 Unread count updated:", data.unreadCount);
-      setUnreadCount(data.unreadCount);
-    };
-
-    socket.on("new_notification", handleNewNotification);
-    socket.on("restaurant_unread_count", handleUnreadCountUpdate);
-
-    return () => {
-      socket.off("new_notification", handleNewNotification);
-      socket.off("restaurant_unread_count", handleUnreadCountUpdate);
-    };
-  }, [socket, showBrowserNotification]);
+  // Note: Real-time notifications are handled via the socketNotification custom event
+  // from SocketContext, which listens to the "notification" socket event
 
   return (
     <NotificationContext.Provider

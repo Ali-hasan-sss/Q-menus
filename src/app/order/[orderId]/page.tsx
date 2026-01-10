@@ -18,6 +18,7 @@ import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import WaiterRequestButton from "@/components/customer/WaiterRequestButton";
 import toast from "react-hot-toast";
 import { hexToRgba } from "@/lib/helper";
+import { formatCurrencyWithLanguage } from "@/lib/utils";
 
 interface MenuItem {
   id: string;
@@ -101,6 +102,13 @@ interface Order {
   tableNumber?: string;
   qrCodeId?: string;
   status: string;
+  subtotal?: number | string;
+  taxes?: Array<{
+    name: string;
+    nameAr?: string;
+    percentage: number;
+    amount: number;
+  }>;
   totalPrice: number | string;
   currency: string;
   customerName?: string;
@@ -113,6 +121,7 @@ interface Order {
     id: string;
     name: string;
     nameAr?: string;
+    currency?: string;
   };
   items: {
     id: string;
@@ -141,6 +150,7 @@ export default function OrderPage() {
 
   const [order, setOrder] = useState<Order | null>(null);
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
+  const [restaurantCurrency, setRestaurantCurrency] = useState<string>("USD");
   const [menus, setMenus] = useState<Menu[]>([]);
   const [menuTheme, setMenuTheme] = useState<MenuTheme | null>(null);
   const [loading, setLoading] = useState(true);
@@ -312,11 +322,28 @@ export default function OrderPage() {
         // Merge the updated order with existing order data to preserve restaurant info
         setOrder((prevOrder) => {
           if (prevOrder) {
-            return {
+            const mergedOrder = {
               ...updatedOrder,
               restaurant: updatedOrder.restaurant || prevOrder.restaurant,
             };
+
+            // Update currency from updated order if available
+            if (mergedOrder.restaurant?.currency) {
+              setRestaurantCurrency(mergedOrder.restaurant.currency);
+            } else if (mergedOrder.currency) {
+              setRestaurantCurrency(mergedOrder.currency);
+            }
+
+            return mergedOrder;
           }
+
+          // Update currency from new order if available
+          if (updatedOrder.restaurant?.currency) {
+            setRestaurantCurrency(updatedOrder.restaurant.currency);
+          } else if (updatedOrder.currency) {
+            setRestaurantCurrency(updatedOrder.currency);
+          }
+
           return updatedOrder;
         });
       }
@@ -375,6 +402,13 @@ export default function OrderPage() {
       const orderData = orderResponse.data.data.order;
       setOrder(orderData);
 
+      // Extract currency from restaurant if available
+      if (orderData.restaurant?.currency) {
+        setRestaurantCurrency(orderData.restaurant.currency);
+      } else if (orderData.currency) {
+        setRestaurantCurrency(orderData.currency);
+      }
+
       // Set customer details if available
       if (orderData.customerName) setCustomerName(orderData.customerName);
       if (orderData.customerPhone) setCustomerPhone(orderData.customerPhone);
@@ -387,10 +421,18 @@ export default function OrderPage() {
         const menuResponse = await publicApi.get(
           endpoints.public.menuCategories(orderData.restaurant.id)
         );
-        const { restaurant, categories, menuTheme } = menuResponse.data.data;
+        const { restaurant, categories, menuTheme, currency } =
+          menuResponse.data.data;
 
         setRestaurant(restaurant);
         setMenuTheme(menuTheme);
+
+        // Update currency from menu response if available
+        if (currency) {
+          setRestaurantCurrency(currency);
+        } else if (restaurant?.currency) {
+          setRestaurantCurrency(restaurant.currency);
+        }
 
         // Update CSS custom properties with restaurant theme (or default)
         updateThemeVariables(menuTheme);
@@ -475,8 +517,15 @@ export default function OrderPage() {
               restaurantId={order.restaurant?.id}
               orderType={order.orderType}
               orderItems={order.items || []}
+              subtotal={order.subtotal}
+              taxes={order.taxes}
               totalPrice={order.totalPrice?.toString()}
-              currency={order.currency}
+              currency={
+                restaurantCurrency ||
+                (order.restaurant as any)?.currency ||
+                order.currency ||
+                "USD"
+              }
               menuTheme={menuTheme}
               onNewOrder={() => {
                 // Navigate to menu page with appropriate tableNumber for adding items
@@ -620,7 +669,14 @@ export default function OrderPage() {
                     {isRTL ? "إجمالي الطلب" : "Total Amount"}
                   </p>
                   <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                    {Number(order.totalPrice).toFixed(2)} {order.currency}
+                    {formatCurrencyWithLanguage(
+                      Number(order.totalPrice),
+                      restaurantCurrency ||
+                        (order.restaurant as any)?.currency ||
+                        order.currency ||
+                        "USD",
+                      language
+                    )}
                   </p>
                 </div>
 

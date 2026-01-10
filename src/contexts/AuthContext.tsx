@@ -102,7 +102,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (
         currentPath === "/" ||
         currentPath.startsWith("/menu/") ||
-        currentPath.startsWith("/order/")
+        currentPath.startsWith("/order/") ||
+        currentPath.startsWith("/auth/login") ||
+        currentPath.startsWith("/auth/register") ||
+        currentPath.startsWith("/kitchen/login")
       ) {
         console.log("🏠 Public page detected - skipping auth check");
         setUser(null);
@@ -172,20 +175,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       toast.success("Login successful");
 
       // Wait a bit for the cookie to be set, then redirect
-      setTimeout(() => {
-        console.log("🔄 Redirecting based on role:", user.role);
-        console.log("🔄 User restaurant:", user.restaurant);
-        if (user.role === "ADMIN") {
-          console.log("👑 Redirecting to admin dashboard");
-          window.location.href = "/admin";
-        } else if (user.restaurant) {
-          console.log("🏪 Redirecting to restaurant dashboard");
-          window.location.href = "/dashboard";
-        } else {
-          console.log("📝 Redirecting to onboarding");
-          window.location.href = "/onboarding";
-        }
-      }, 100);
+      // Check if we're on kitchen login page - if so, don't redirect here (let the page handle it)
+      if (
+        typeof window !== "undefined" &&
+        !window.location.pathname.startsWith("/kitchen/login")
+      ) {
+        setTimeout(() => {
+          console.log("🔄 Redirecting based on role:", user.role);
+          console.log("🔄 User restaurant:", user.restaurant);
+          if (user.role === "ADMIN") {
+            console.log("👑 Redirecting to admin dashboard");
+            window.location.href = "/admin";
+          } else if (user.restaurant) {
+            console.log("🏪 Redirecting to restaurant dashboard");
+            window.location.href = "/dashboard";
+          } else {
+            console.log("📝 Redirecting to onboarding");
+            window.location.href = "/onboarding";
+          }
+        }, 100);
+      }
     } catch (error: any) {
       console.error("❌ Login failed:", error.response?.data || error.message);
       const message = error.response?.data?.message || "Login failed";

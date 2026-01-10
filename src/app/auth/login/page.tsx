@@ -217,16 +217,41 @@ export default function LoginPage() {
                 </Button>
               </div>
 
-              <div className="text-center">
-                <span className="text-sm text-gray-600 dark:text-gray-400">
-                  {t("auth.noAccount")}
-                </span>
-                <Link
-                  href="/auth/register"
-                  className="font-medium text-tm-blue hover:text-tm-orange"
-                >
-                  {t("auth.register")}
-                </Link>
+              <div className="text-center space-y-3">
+                <div>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    {t("auth.noAccount")}
+                  </span>
+                  <Link
+                    href="/auth/register"
+                    className="font-medium text-tm-blue hover:text-tm-orange"
+                  >
+                    {t("auth.register")}
+                  </Link>
+                </div>
+                <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+                  <Link
+                    href="/kitchen/login"
+                    className="inline-flex items-center gap-2 text-sm font-medium text-orange-600 hover:text-orange-500 dark:text-orange-400 dark:hover:text-orange-300 transition-colors"
+                  >
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"
+                      />
+                    </svg>
+                    {isRTL
+                      ? "تسجيل الدخول إلى لوحة المطبخ"
+                      : "Kitchen Display Login"}
+                  </Link>
+                </div>
               </div>
             </form>
           </Card>

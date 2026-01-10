@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { api } from "@/lib/api";
+import { api, publicApi, endpoints } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
@@ -44,6 +44,21 @@ interface UserSubscription {
   };
 }
 
+interface SectionAttribute {
+  key: string;
+  keyAr: string;
+  value: string;
+  valueAr: string;
+  icon?: string;
+}
+
+interface ContactSection {
+  id: string;
+  title: string;
+  titleAr: string;
+  attributes: SectionAttribute[] | null;
+}
+
 export default function SubscriptionPage() {
   const { isRTL } = useLanguage();
   const { user } = useAuth();
@@ -53,13 +68,22 @@ export default function SubscriptionPage() {
   const [subscriptions, setSubscriptions] = useState<UserSubscription[]>([]);
   const [open, setOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
+  const [restaurant, setRestaurant] = useState<{
+    name: string;
+    nameAr?: string;
+  } | null>(null);
+  const [adminPhone, setAdminPhone] = useState<string>("963994488858"); // Fallback
 
   useEffect(() => {
     const run = async () => {
       try {
-        const [plansRes, meRes] = await Promise.all([
+        const [plansRes, meRes, contactRes, restaurantRes] = await Promise.all([
           api.get("/public/plans"),
           api.get("/auth/me"),
+          publicApi
+            .get(endpoints.sections.getByType("CONTACT"))
+            .catch(() => null),
+          api.get("/restaurant").catch(() => null),
         ]);
 
         if (plansRes.data?.success) {
@@ -106,6 +130,41 @@ export default function SubscriptionPage() {
             });
           }
         }
+
+        // Get contact section for admin phone
+        if (
+          contactRes?.data?.success &&
+          contactRes.data.data.sections.length > 0
+        ) {
+          const contactSection: ContactSection =
+            contactRes.data.data.sections[0];
+          const attributes = contactSection.attributes || [];
+          if (attributes.length > 1) {
+            const phoneValue = isRTL
+              ? attributes[1].valueAr
+              : attributes[1].value;
+            const phoneNumber = phoneValue.replace(/\D/g, ""); // Remove non-digits
+            if (phoneNumber) {
+              setAdminPhone(phoneNumber);
+            }
+          }
+        }
+
+        // Get restaurant info
+        if (restaurantRes?.data?.success) {
+          const restaurantData =
+            restaurantRes.data.data.restaurant || restaurantRes.data.data;
+          setRestaurant({
+            name: restaurantData.name || "",
+            nameAr: restaurantData.nameAr,
+          });
+        } else if (meRes.data?.success && meRes.data.data.user?.restaurant) {
+          const r = meRes.data.data.user.restaurant;
+          setRestaurant({
+            name: r.name || "",
+            nameAr: r.nameAr,
+          });
+        }
       } catch (e) {
         // ignore
       } finally {
@@ -113,20 +172,26 @@ export default function SubscriptionPage() {
       }
     };
     run();
-  }, []);
+  }, [isRTL]);
 
   const whatsappHref = useMemo(() => {
-    if (!selectedPlan || !user?.email) return "";
+    if (!selectedPlan) return "";
     const planName = isRTL
       ? selectedPlan.nameAr || selectedPlan.name
       : selectedPlan.name;
-    const price = `${selectedPlan.price} ${selectedPlan.currency}`;
+    const restaurantName = restaurant
+      ? isRTL
+        ? restaurant.nameAr || restaurant.name
+        : restaurant.name
+      : "";
+    const userEmail = user?.email || "غير محدد";
+
     const msg = isRTL
-      ? `المستخدم ${user.firstName} ${user.lastName} صاحب الايميل ${user.email} يريد الاشتراك بالخطة ${planName} بسعر ${price}`
-      : `User ${user.firstName} ${user.lastName} with email ${user.email} wants to subscribe to plan ${planName} priced ${price}`;
+      ? `المستخدم صاحب الإيميل ${userEmail} صاحب مطعم ${restaurantName} يريد تفعيل اشتراك بالخطة ${planName}`
+      : `User with email ${userEmail}, owner of restaurant ${restaurantName}, wants to activate subscription to plan ${planName}`;
     const encoded = encodeURIComponent(msg);
-    return `https://wa.me/963994488858?text=${encoded}`;
-  }, [selectedPlan, user, isRTL]);
+    return `https://wa.me/${adminPhone}?text=${encoded}`;
+  }, [selectedPlan, user, restaurant, adminPhone, isRTL]);
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -262,18 +327,32 @@ export default function SubscriptionPage() {
                   {p.price} {p.currency}
                 </p>
                 <div className="mt-4">
-                  <a
-                    href={selectedPlan?.id === p.id ? whatsappHref : "#"}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`inline-flex items-center justify-center px-4 py-2 rounded-md text-white ${
-                      selectedPlan?.id === p.id
-                        ? "bg-green-600 hover:bg-green-700"
-                        : "bg-gray-400 cursor-not-allowed"
-                    }`}
-                  >
-                    {isRTL ? "الاشتراك" : "Subscribe"}
-                  </a>
+                  {selectedPlan?.id === p.id ? (
+                    <a
+                      href={whatsappHref || "#"}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`inline-flex items-center justify-center px-4 py-2 rounded-md text-white transition-colors ${
+                        whatsappHref
+                          ? "bg-green-600 hover:bg-green-700 cursor-pointer"
+                          : "bg-gray-400 cursor-not-allowed"
+                      }`}
+                      onClick={(e) => {
+                        if (!whatsappHref) {
+                          e.preventDefault();
+                        }
+                      }}
+                    >
+                      {isRTL ? "الاشتراك" : "Subscribe"}
+                    </a>
+                  ) : (
+                    <button
+                      disabled
+                      className="inline-flex items-center justify-center px-4 py-2 rounded-md text-white bg-gray-400 cursor-not-allowed"
+                    >
+                      {isRTL ? "الاشتراك" : "Subscribe"}
+                    </button>
+                  )}
                 </div>
               </Card>
             ))}

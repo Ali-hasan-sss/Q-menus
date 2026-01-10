@@ -204,19 +204,52 @@ export function formatCurrencyWithLanguage(
   currency: string = "USD",
   language: string = "EN"
 ): string {
+  // Currency translations
+  const currencyTranslations: Record<string, { ar: string; en: string }> = {
+    USD: { ar: "دولار", en: "USD" },
+    SYP: { ar: "ل.س", en: "SYP" },
+    EUR: { ar: "يورو", en: "EUR" },
+    SAR: { ar: "ريال", en: "SAR" },
+    AED: { ar: "درهم", en: "AED" },
+    GBP: { ar: "جنيه", en: "GBP" },
+    JPY: { ar: "ين", en: "JPY" },
+    CAD: { ar: "دولار كندي", en: "CAD" },
+    AUD: { ar: "دولار أسترالي", en: "AUD" },
+  };
+
   // Handle SYP currency with Arabic/English formatting
   if (currency === "SYP") {
     const formattedAmount = new Intl.NumberFormat(
       language === "AR" ? "ar-SY" : "en-US"
     ).format(amount);
     return language === "AR"
-      ? `${formattedAmount} ل.س`
-      : `${formattedAmount} SYP`;
+      ? `${formattedAmount} ${currencyTranslations.SYP.ar}`
+      : `${formattedAmount} ${currencyTranslations.SYP.en}`;
   }
 
-  // For other currencies, use standard formatting
-  return new Intl.NumberFormat(language === "AR" ? "ar-SA" : "en-US", {
+  // For other currencies, use standard formatting with translated currency name
+  const locale = language === "AR" ? "ar-SA" : "en-US";
+
+  // Format the number with proper locale
+  const numericPart = new Intl.NumberFormat(locale, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+
+  // If currency has translation, use translated name
+  if (currencyTranslations[currency]) {
+    const currencyName =
+      language === "AR"
+        ? currencyTranslations[currency].ar
+        : currencyTranslations[currency].en;
+    return `${numericPart} ${currencyName}`;
+  }
+
+  // Fallback to standard currency formatting
+  return new Intl.NumberFormat(locale, {
     style: "currency",
     currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(amount);
 }

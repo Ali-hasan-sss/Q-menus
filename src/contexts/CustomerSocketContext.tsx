@@ -115,6 +115,22 @@ export function CustomerSocketProvider({
       console.error("❌ Socket error:", error);
     });
 
+    // Listen for waiter request errors
+    newSocket.on("waiter_request_error", (data) => {
+      console.error("❌ Waiter request error:", data);
+      window.dispatchEvent(
+        new CustomEvent("waiter_request_error", { detail: data })
+      );
+    });
+
+    // Listen for waiter request success
+    newSocket.on("waiter_request_sent", (data) => {
+      console.log("✅ Waiter request sent:", data);
+      window.dispatchEvent(
+        new CustomEvent("waiter_request_sent", { detail: data })
+      );
+    });
+
     // Connect the socket
     newSocket.connect();
 

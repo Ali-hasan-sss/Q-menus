@@ -213,6 +213,9 @@ const translations = {
       "رقم الهاتف يجب أن يكون 10 أرقام ويبدأ بـ 09",
     "menu.orderError.customerAddressRequired": "العنوان مطلوب لطلبات التوصيل",
     "menu.orderError.addItemsFailed": "فشل في إضافة الأصناف للطلب",
+    "menu.orderError.tableNotOccupied":
+      "الطاولة غير مفتوحة الجلسة. يرجى طلب فتح الجلسة من الكاشير.",
+    "waiter.requestError.failed": "فشل في إرسال طلب النادل",
     "menu.orderSuccess.itemsAdded": "تم إضافة الأصناف للطلب بنجاح!",
 
     // Dashboard Plan Limits
@@ -439,6 +442,9 @@ const translations = {
     "menu.orderError.customerAddressRequired":
       "Address is required for delivery orders",
     "menu.orderError.addItemsFailed": "Failed to add items to order",
+    "menu.orderError.tableNotOccupied":
+      "Table is not occupied. Please ask the cashier to start a session for this table.",
+    "waiter.requestError.failed": "Failed to send waiter request",
     "menu.orderSuccess.itemsAdded": "Items added to order successfully!",
 
     // Dashboard Plan Limits

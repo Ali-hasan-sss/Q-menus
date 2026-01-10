@@ -8,7 +8,11 @@ export async function protectRestaurantRoutes(request: NextRequest) {
 
     if (!token) {
       console.log("❌ No token found, redirecting to login");
-      const loginUrl = new URL("/auth/login", request.url);
+      // Redirect to kitchen login if accessing kitchen, otherwise regular login
+      const loginPath = request.nextUrl.pathname.startsWith("/kitchen")
+        ? "/kitchen/login"
+        : "/auth/login";
+      const loginUrl = new URL(loginPath, request.url);
       return NextResponse.redirect(loginUrl);
     }
 
@@ -16,7 +20,11 @@ export async function protectRestaurantRoutes(request: NextRequest) {
     return NextResponse.next();
   } catch (error) {
     console.error("Restaurant auth middleware error:", error);
-    const loginUrl = new URL("/auth/login", request.url);
+    // Redirect to kitchen login if accessing kitchen, otherwise regular login
+    const loginPath = request.nextUrl.pathname.startsWith("/kitchen")
+      ? "/kitchen/login"
+      : "/auth/login";
+    const loginUrl = new URL(loginPath, request.url);
     return NextResponse.redirect(loginUrl);
   }
 }

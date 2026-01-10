@@ -15,7 +15,6 @@ interface MenuItem {
   description?: string;
   descriptionAr?: string;
   price: number;
-  currency: string;
   image?: string;
   isAvailable: boolean;
   sortOrder: number;
@@ -37,6 +36,7 @@ interface ItemListProps {
   items: MenuItem[];
   selectedCategory: Category | null;
   loadingItems?: boolean;
+  restaurantCurrency?: string;
   onBackToCategories: () => void;
   onEditItem: (item: MenuItem) => void;
   onDeleteItem: (itemId: string) => void;
@@ -49,6 +49,7 @@ export function ItemList({
   items,
   selectedCategory,
   loadingItems = false,
+  restaurantCurrency = "USD",
   onBackToCategories,
   onEditItem,
   onDeleteItem,
@@ -225,7 +226,7 @@ export function ItemList({
                 <p className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
                   {formatCurrencyWithLanguage(
                     item.price,
-                    item.currency,
+                    restaurantCurrency,
                     language
                   )}
                 </p>

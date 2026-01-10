@@ -15,6 +15,8 @@ import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { MenuLoadingSkeleton } from "@/components/customer/MenuLoadingSkeleton";
 import QRScanner from "@/components/customer/QRScanner";
 import WaiterRequestButton from "@/components/customer/WaiterRequestButton";
+import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
 import toast from "react-hot-toast";
 import { hexToRgba } from "@/lib/helper";
 import { DEFAULT_THEME, mergeWithDefaultTheme } from "@/lib/defaultTheme";
@@ -60,6 +62,7 @@ interface Restaurant {
   description?: string;
   descriptionAr?: string;
   logo?: string;
+  currency?: string;
   theme?: any;
 }
 
@@ -138,6 +141,7 @@ export default function CustomerMenuPage() {
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [menus, setMenus] = useState<Menu[]>([]);
   const [menuTheme, setMenuTheme] = useState<MenuTheme | null>(null);
+  const [restaurantCurrency, setRestaurantCurrency] = useState<string>("USD");
   const [loading, setLoading] = useState(true);
   const [loadingItems, setLoadingItems] = useState(false);
   const [loadingCategory, setLoadingCategory] = useState<string | null>(null);
@@ -248,15 +252,52 @@ export default function CustomerMenuPage() {
   };
 
   useEffect(() => {
+    // Check for incomplete order first before loading menu
+    // This prevents menu access if there's an incomplete order
+    const checkIncompleteOrderBeforeLoad = async () => {
+      // Only check if we have a tableNumber and NOT adding to existing order
+      if (tableNumber && tableNumber !== "DELIVERY" && !addToOrderParam) {
+        try {
+          const response = await publicApi.get(
+            `/order/incomplete/${restaurantId}?tableNumber=${tableNumber}`
+          );
+          if (
+            response.data.success &&
+            response.data.data.order &&
+            response.data.data.order.status !== "COMPLETED" &&
+            response.data.data.order.status !== "CANCELLED"
+          ) {
+            // Incomplete order found - set it but don't redirect
+            // This will prevent menu from being displayed
+            const order = response.data.data.order;
+            setIncompleteOrder(order);
+            console.log(
+              "🚫 Incomplete order found for table:",
+              tableNumber,
+              "Order ID:",
+              order.id
+            );
+            // Don't load menu if there's an incomplete order
+            return;
+          }
+        } catch (error) {
+          // No incomplete order found, continue with normal flow
+          console.log("No incomplete order found, loading menu");
+        }
+      }
+      // Load menu only if no incomplete order or if adding to existing order
     loadMenuData();
     checkIncompleteOrder();
     loadOrderFromStorage(); // Load saved order from localStorage
+    };
+
+    checkIncompleteOrderBeforeLoad();
 
     // Clear browser history to prevent back button manipulation
     if (typeof window !== "undefined") {
       window.history.replaceState(null, "", window.location.href);
     }
-  }, [restaurantId, tableNumber]);
+  }, [restaurantId, tableNumber, addToOrderParam, router]);
 
   // Debug effect to log color opacity and theme changes
   useEffect(() => {
@@ -309,11 +350,26 @@ export default function CustomerMenuPage() {
   const checkIncompleteOrder = async () => {
     try {
       // Check if there's an incomplete order for this table/customer
+      // Only check if we have a tableNumber (not when adding to existing order)
+      if (!tableNumber || addToOrderParam) {
+        return; // Allow access if adding to existing order or no table number
+      }
+
       const response = await publicApi.get(
-        `/order/incomplete/${restaurantId}?tableNumber=${tableNumber || ""}`
+        `/order/incomplete/${restaurantId}?tableNumber=${tableNumber}`
       );
       if (response.data.success && response.data.data.order) {
-        setIncompleteOrder(response.data.data.order);
+        const order = response.data.data.order;
+        // Only block if order is not completed or cancelled
+        if (order.status !== "COMPLETED" && order.status !== "CANCELLED") {
+          setIncompleteOrder(order);
+          console.log(
+            "🚫 Incomplete order found:",
+            order.id,
+            "Status:",
+            order.status
+          );
+        }
       }
     } catch (error) {
       // No incomplete order found, which is fine
@@ -401,7 +457,36 @@ export default function CustomerMenuPage() {
       setIsOrdering(false);
       setPendingOrder(null);
 
-      toast.error(message || "Failed to create order");
+      // Translate error message based on content
+      let translatedMessage = message;
+      if (message) {
+        if (
+          message.includes("Table is not occupied") ||
+          message.includes("start a session")
+        ) {
+          translatedMessage = t("menu.orderError.tableNotOccupied");
+        } else {
+          // Try to find matching translation key
+          const errorKeys = [
+            "menu.orderError.failed",
+            "menu.orderError.qrRequired",
+            "menu.orderError.customerNameRequired",
+            "menu.orderError.customerPhoneRequired",
+            "menu.orderError.customerAddressRequired",
+            "menu.orderError.addItemsFailed",
+            "menu.orderError.tableNotOccupied",
+          ];
+          // If message matches a known error, use translation
+          for (const key of errorKeys) {
+            if (message.toLowerCase().includes(t(key).toLowerCase())) {
+              translatedMessage = t(key);
+              break;
+            }
+          }
+        }
+      }
+
+      toast.error(translatedMessage || t("menu.orderError.failed"));
     };
 
     window.addEventListener(
@@ -439,9 +524,11 @@ export default function CustomerMenuPage() {
       const response = await publicApi.get(
         endpoints.public.menuCategories(restaurantId)
       );
-      const { restaurant, categories, menuTheme } = response.data.data;
+      const { restaurant, categories, menuTheme, currency } =
+        response.data.data;
 
       setRestaurant(restaurant);
+      setRestaurantCurrency(currency || restaurant?.currency || "USD");
 
       // Merge custom theme with default theme
       const mergedTheme = mergeWithDefaultTheme(menuTheme);
@@ -489,7 +576,12 @@ export default function CustomerMenuPage() {
       const response = await publicApi.get(
         endpoints.public.categoryItems(restaurantId, categoryId)
       );
-      const { category, items } = response.data.data;
+      const { category, items, currency } = response.data.data;
+      
+      // Update restaurant currency if provided
+      if (currency) {
+        setRestaurantCurrency(currency);
+      }
 
       // Update the specific category with its items
       setMenus((prevMenus) =>
@@ -629,7 +721,7 @@ export default function CustomerMenuPage() {
               name: menuItem.name,
               nameAr: menuItem.nameAr,
               price: totalPrice.toString(),
-              currency: menuItem.currency,
+              currency: restaurantCurrency,
               quantity,
               notes,
               extras,
@@ -644,7 +736,7 @@ export default function CustomerMenuPage() {
             name: menuItem.name,
             nameAr: menuItem.nameAr,
             price: totalPrice.toString(),
-            currency: menuItem.currency,
+            currency: restaurantCurrency,
             quantity,
             notes,
             extras,
@@ -867,6 +959,47 @@ export default function CustomerMenuPage() {
   // Show QR Scanner if not authorized access
   if (!isAuthorizedAccess) {
     return <QRScanner restaurantId={restaurantId} />;
+  }
+
+  // If there's an incomplete order and we're not adding to it, block menu access
+  // Only allow menu access if addToOrderParam (order ID) is in the URL
+  if (
+    incompleteOrder &&
+    incompleteOrder.status !== "CANCELLED" &&
+    incompleteOrder.status !== "COMPLETED" &&
+    !addToOrderParam
+  ) {
+    // Block menu access - show message instead
+    // Don't show order ID for security - only the person who created the order has the link
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
+        <Card className="max-w-md w-full p-6 text-center">
+          <div className="mb-4">
+            <svg
+              className="w-16 h-16 mx-auto text-orange-500"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
+            </svg>
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+            {isRTL ? "طلب قيد التنفيذ" : "Order in Progress"}
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400">
+            {isRTL
+              ? "يوجد طلب قيد التنفيذ لهذه الطاولة. لإضافة عناصر للطلب، يرجى استخدام رابط الطلب الذي تم إرساله لك."
+              : "There is an order in progress for this table. To add items to the order, please use the order link that was sent to you."}
+          </p>
+        </Card>
+      </div>
+    );
   }
 
   if (loading) {
@@ -1093,6 +1226,7 @@ export default function CustomerMenuPage() {
                         <MenuItem
                           key={item.id}
                           item={item}
+                          currency={restaurantCurrency}
                           onAddToOrder={addItemToOrder}
                           onItemClick={handleItemClick}
                           isRTL={isRTL}
@@ -1290,6 +1424,7 @@ export default function CustomerMenuPage() {
                       <MenuItem
                         key={item.id}
                         item={item}
+                        currency={restaurantCurrency}
                         onAddToOrder={addItemToOrder}
                         onItemClick={handleItemClick}
                         isRTL={isRTL}
@@ -1376,7 +1511,7 @@ export default function CustomerMenuPage() {
             <FloatingOrderSummary
               orderItems={orderItems}
               total={calculateTotal()}
-              currency={orderItems[0].currency}
+              currency={restaurantCurrency}
               onUpdateQuantity={updateQuantity}
               onRemoveItem={removeFromOrder}
               onPlaceOrder={handlePlaceOrder}

@@ -23,6 +23,7 @@ function QRPageContent() {
     fetchQRCodes,
     createRestaurantQR,
     toggleQRStatus,
+    toggleTableOccupied,
     deleteQRCode,
     bulkCreateSequentialQRCodes,
     bulkDeleteQRCodes,
@@ -868,6 +869,35 @@ function QRPageContent() {
                               <span
                                 className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                                   qr.isActive
+                                    ? "translate-x-6"
+                                    : "translate-x-1"
+                                }`}
+                              />
+                            </button>
+                          </div>
+
+                          {/* Toggle Occupied Switch */}
+                          <div
+                            className={`flex items-center justify-between ${isRTL ? "flex-row-reverse" : ""}`}
+                          >
+                            <span className="text-sm text-gray-600 dark:text-gray-400">
+                              {isRTL ? "جلسة نشطة" : "Active Session"}
+                            </span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleTableOccupied(qr.id);
+                              }}
+                              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 ${
+                                (qr as any).isOccupied
+                                  ? "bg-green-600"
+                                  : "bg-gray-200 dark:bg-gray-700"
+                              }`}
+                              dir="ltr"
+                            >
+                              <span
+                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                  (qr as any).isOccupied
                                     ? "translate-x-6"
                                     : "translate-x-1"
                                 }`}

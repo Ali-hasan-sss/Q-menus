@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { ImageUpload } from "@/components/ui/ImageUpload";
 import Navbar from "@/components/dashboard/Navbar";
+import { KitchenSectionsManager } from "@/components/dashboard/KitchenSectionsManager";
 import { api } from "@/lib/api";
 
 interface UserProfile {
@@ -27,6 +28,7 @@ interface RestaurantProfile {
   address?: string;
   phone?: string;
   logo?: string;
+  currency?: string;
   kitchenWhatsApp?: string;
 }
 
@@ -56,6 +58,7 @@ export default function SettingsPage() {
     address: "",
     phone: "",
     logo: "",
+    currency: "USD",
     kitchenWhatsApp: "",
   });
 
@@ -65,8 +68,13 @@ export default function SettingsPage() {
     confirmPassword: "",
   });
 
+  // Tax settings state
+  const [taxSettings, setTaxSettings] = useState<any[]>([]);
+  const [loadingSettings, setLoadingSettings] = useState(false);
+
   useEffect(() => {
     fetchProfileData();
+    fetchTaxSettings();
   }, []);
 
   const fetchProfileData = async () => {
@@ -100,6 +108,7 @@ export default function SettingsPage() {
           address: restaurantData.address || "",
           phone: restaurantData.phone || "",
           logo: restaurantData.logo || "",
+          currency: restaurantData.currency || "USD",
           kitchenWhatsApp: restaurantData.kitchenWhatsApp || "",
         });
       }
@@ -144,7 +153,7 @@ export default function SettingsPage() {
     try {
       setSaving(true);
 
-      const response = await api.put("/restaurant", restaurantForm);
+      const response = await api.put("/restaurant/profile", restaurantForm);
       if (response.data.success) {
         showToast(
           isRTL
@@ -223,6 +232,77 @@ export default function SettingsPage() {
 
   const handleLogoUpload = (url: string | null) => {
     setRestaurantForm((prev) => ({ ...prev, logo: url || "" }));
+  };
+
+  const fetchTaxSettings = async () => {
+    try {
+      setLoadingSettings(true);
+      const response = await api.get("/restaurant/settings");
+      if (response.data.success) {
+        const taxes = response.data.data.taxes || [];
+        setTaxSettings(taxes);
+      }
+    } catch (error) {
+      console.error("Error fetching tax settings:", error);
+    } finally {
+      setLoadingSettings(false);
+    }
+  };
+
+  const handleTaxSettingsSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setSaving(true);
+
+      // Filter out empty taxes
+      const validTaxes = taxSettings.filter(
+        (tax) => tax.name && tax.percentage !== undefined && tax.percentage > 0
+      );
+
+      const response = await api.put("/restaurant/settings", {
+        taxes: validTaxes,
+      });
+
+      if (response.data.success) {
+        showToast(
+          isRTL
+            ? "تم حفظ إعدادات الضرائب بنجاح"
+            : "Tax settings saved successfully",
+          "success"
+        );
+        setTaxSettings(validTaxes);
+      }
+    } catch (error: any) {
+      const message =
+        error.response?.data?.message ||
+        (isRTL
+          ? "حدث خطأ أثناء حفظ إعدادات الضرائب"
+          : "Error saving tax settings");
+      showToast(message, "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addTax = () => {
+    if (taxSettings.length >= 3) {
+      showToast(
+        isRTL ? "يمكن إضافة 3 ضرائب فقط" : "Maximum 3 taxes allowed",
+        "error"
+      );
+      return;
+    }
+    setTaxSettings([...taxSettings, { name: "", nameAr: "", percentage: 0 }]);
+  };
+
+  const removeTax = (index: number) => {
+    setTaxSettings(taxSettings.filter((_, i) => i !== index));
+  };
+
+  const updateTax = (index: number, field: string, value: any) => {
+    const updated = [...taxSettings];
+    updated[index] = { ...updated[index], [field]: value };
+    setTaxSettings(updated);
   };
 
   if (loading) {
@@ -452,6 +532,29 @@ export default function SettingsPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {isRTL ? "العملة" : "Currency"}
+                </label>
+                <select
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  value={restaurantForm.currency}
+                  onChange={(e) =>
+                    setRestaurantForm((prev) => ({
+                      ...prev,
+                      currency: e.target.value,
+                    }))
+                  }
+                >
+                  <option value="USD">
+                    {isRTL ? "دولار أمريكي (USD)" : "US Dollar (USD)"}
+                  </option>
+                  <option value="SYP">
+                    {isRTL ? "ليرة سورية (SYP)" : "Syrian Pound (SYP)"}
+                  </option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   <div className="flex items-center gap-2">
                     <svg
                       className="w-4 h-4 text-green-600"
@@ -465,11 +568,7 @@ export default function SettingsPage() {
                 </label>
                 <Input
                   type="text"
-                  placeholder={
-                    isRTL
-                      ? "رقم الواتساب "
-                      : "WhatsApp number "
-                  }
+                  placeholder={isRTL ? "رقم الواتساب " : "WhatsApp number "}
                   value={restaurantForm.kitchenWhatsApp}
                   onChange={(e) =>
                     setRestaurantForm((prev) => ({
@@ -479,9 +578,7 @@ export default function SettingsPage() {
                   }
                 />
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {isRTL
-                    ? "مثال: 963999123456  "
-                    : "Example: 963999123456 "}
+                  {isRTL ? "مثال: 963999123456  " : "Example: 963999123456 "}
                 </p>
               </div>
 
@@ -497,6 +594,137 @@ export default function SettingsPage() {
                 </Button>
               </div>
             </form>
+          </Card>
+
+          {/* Tax Settings */}
+          <Card className="p-6">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">
+              {isRTL ? "إعدادات الضرائب" : "Tax Settings"}
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              {isRTL
+                ? "يمكنك إضافة حتى 3 ضرائب. سيتم حسابها تلقائياً وإضافتها إلى قيمة الطلبات."
+                : "You can add up to 3 taxes. They will be automatically calculated and added to order totals."}
+            </p>
+
+            <form onSubmit={handleTaxSettingsSubmit} className="space-y-4">
+              {taxSettings.map((tax, index) => (
+                <div
+                  key={index}
+                  className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg space-y-3"
+                >
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      {isRTL ? `ضريبة ${index + 1}` : `Tax ${index + 1}`}
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => removeTax(index)}
+                      className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm"
+                    >
+                      {isRTL ? "حذف" : "Remove"}
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        {isRTL ? "اسم الضريبة (عربي)" : "Tax Name (Arabic)"}
+                      </label>
+                      <Input
+                        type="text"
+                        value={tax.nameAr || ""}
+                        onChange={(e) =>
+                          updateTax(index, "nameAr", e.target.value)
+                        }
+                        placeholder={
+                          isRTL ? "مثال: ضريبة القيمة المضافة" : "e.g., VAT"
+                        }
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        {isRTL ? "اسم الضريبة (إنجليزي)" : "Tax Name (English)"}
+                      </label>
+                      <Input
+                        type="text"
+                        value={tax.name || ""}
+                        onChange={(e) =>
+                          updateTax(index, "name", e.target.value)
+                        }
+                        placeholder={isRTL ? "مثال: VAT" : "e.g., VAT"}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      {isRTL ? "النسبة المئوية (%)" : "Percentage (%)"}
+                    </label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      value={tax.percentage || 0}
+                      onChange={(e) =>
+                        updateTax(
+                          index,
+                          "percentage",
+                          parseFloat(e.target.value) || 0
+                        )
+                      }
+                      required
+                    />
+                  </div>
+                </div>
+              ))}
+
+              {taxSettings.length < 3 && (
+                <button
+                  type="button"
+                  onClick={addTax}
+                  className="w-full py-2 px-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-gray-600 dark:text-gray-400 hover:border-primary-500 hover:text-primary-500 transition-colors"
+                >
+                  {isRTL ? "+ إضافة ضريبة" : "+ Add Tax"}
+                </button>
+              )}
+
+              {taxSettings.length === 0 && (
+                <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+                  {isRTL
+                    ? "لا توجد ضرائب مضافة. اضغط على 'إضافة ضريبة' لإضافة ضريبة جديدة."
+                    : "No taxes added. Click 'Add Tax' to add a new tax."}
+                </p>
+              )}
+
+              <div className="flex justify-end">
+                <Button type="submit" disabled={saving || loadingSettings}>
+                  {saving
+                    ? isRTL
+                      ? "جاري الحفظ..."
+                      : "Saving..."
+                    : isRTL
+                      ? "حفظ إعدادات الضرائب"
+                      : "Save Tax Settings"}
+                </Button>
+              </div>
+            </form>
+          </Card>
+
+          {/* Kitchen Display Settings */}
+          <Card className="p-6">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">
+              {isRTL ? "إعدادات لوحة المطبخ" : "Kitchen Display Settings"}
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              {isRTL
+                ? "إدارة أقسام المطبخ لتوزيع الطلبات حسب نوع التحضير"
+                : "Manage kitchen sections to organize orders by preparation type"}
+            </p>
+            <KitchenSectionsManager />
           </Card>
 
           {/* Change Password */}
