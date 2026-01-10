@@ -46,12 +46,13 @@ const baseConfig = {
   },
   env: {
     NEXT_PUBLIC_API_URL:
-      process.env.NEXT_PUBLIC_API_URL || "https://qmenus-backend.onrender.com",
+      process.env.NEXT_PUBLIC_API_URL || "https://api.qmenussy.com",
     NEXT_PUBLIC_SOCKET_URL:
-      process.env.NEXT_PUBLIC_SOCKET_URL ||
-      "https://qmenus-backend.onrender.com",
+      process.env.NEXT_PUBLIC_SOCKET_URL || "https://socket.qmenussy.com",
     NEXT_PUBLIC_SKIP_EMAIL_VERIFICATION:
       process.env.NEXT_PUBLIC_SKIP_EMAIL_VERIFICATION || "false",
+    // IMPORTANT: Proxy must be false for cookies to work with cross-origin
+    // Next.js rewrites don't properly forward Set-Cookie headers
     NEXT_PUBLIC_PROXY_API: process.env.NEXT_PUBLIC_PROXY_API || "false",
   },
   async rewrites() {
