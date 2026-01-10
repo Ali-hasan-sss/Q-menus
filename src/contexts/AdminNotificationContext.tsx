@@ -117,25 +117,41 @@ export const AdminNotificationProvider: React.FC<{
     }
   }, [user?.id, socket]);
 
-  const fetchNotifications = useCallback(async () => {
-    if (!user || user.role !== "ADMIN") return;
+  const fetchNotifications = useCallback(
+    async (retryCount = 0) => {
+      if (!user || user.role !== "ADMIN") return;
 
-    try {
-      setLoading(true);
-      const response = await api.get("/admin/notifications");
-      if (response.data.success) {
-        console.log("📬 Admin notifications fetched:", response.data.data);
-        setNotifications(response.data.data);
+      try {
+        setLoading(true);
+        const response = await api.get("/admin/notifications");
+        if (response.data.success) {
+          console.log("📬 Admin notifications fetched:", response.data.data);
+          setNotifications(response.data.data);
 
-        // Fetch accurate unread count from API
-        await fetchUnreadCount();
+          // Fetch accurate unread count from API
+          await fetchUnreadCount();
+        }
+      } catch (error: any) {
+        console.error("❌ Error fetching admin notifications:", error);
+        // Retry once if 401 error and user is still authenticated
+        // This can happen right after login before cookie is fully set
+        if (error.response?.status === 401 && user && retryCount === 0) {
+          console.log(
+            "⚠️ 401 error but admin user exists - retrying after delay..."
+          );
+          setTimeout(() => {
+            if (user && user.role === "ADMIN") {
+              fetchNotifications(1); // Pass retryCount to prevent infinite loop
+            }
+          }, 1000);
+          return; // Return early to avoid setting loading to false
+        }
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error("❌ Error fetching admin notifications:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [user, fetchUnreadCount]);
+    },
+    [user, fetchUnreadCount]
+  );
 
   const markAsRead = useCallback(async (id: string) => {
     try {
@@ -193,10 +209,19 @@ export const AdminNotificationProvider: React.FC<{
       // Request browser notification permission
       requestNotificationPermission();
 
-      fetchNotifications();
-      fetchUnreadCount(); // Get initial unread count quickly
+      // Add a small delay to ensure cookie is set after login
+      // This prevents 401 errors right after login
+      const timer = setTimeout(() => {
+        fetchNotifications();
+        fetchUnreadCount(); // Get initial unread count quickly
+      }, 500); // 500ms delay to ensure cookie is ready
+
+      return () => clearTimeout(timer);
     } else {
       console.log("⚠️ No admin user, skipping notifications fetch");
+      // Clear notifications when admin logs out
+      setNotifications([]);
+      setUnreadCount(0);
     }
   }, [
     user,

@@ -44,15 +44,34 @@ api.interceptors.response.use(
       // Token expired or invalid - clear any stale localStorage tokens
       localStorage.removeItem("token");
 
-      // Redirect to login if not already there and not on public pages
+      // Only redirect to login if:
+      // 1. Not on public pages
+      // 2. Not already on login/register pages
+      // 3. The request was not for notifications (which can fail right after login)
+      const currentPath = window.location.pathname;
+      const isPublicPage =
+        currentPath === "/" ||
+        currentPath.startsWith("/menu/") ||
+        currentPath.startsWith("/order/") ||
+        currentPath.includes("/auth") ||
+        currentPath.startsWith("/kitchen/login");
+
+      // Don't redirect if:
+      // - On public pages
+      // - Request was for notifications (handled by NotificationContext with retry)
+      const isNotificationRequest = error.config?.url?.includes("/notifications");
+
       if (
         typeof window !== "undefined" &&
-        !window.location.pathname.includes("/auth") &&
-        !window.location.pathname.startsWith("/menu/") &&
-        !window.location.pathname.startsWith("/order/") &&
-        window.location.pathname !== "/"
+        !isPublicPage &&
+        !isNotificationRequest
       ) {
-        window.location.href = "/auth/login";
+        // Small delay to avoid redirect loops
+        setTimeout(() => {
+          if (!isPublicPage && !window.location.pathname.includes("/auth")) {
+            window.location.href = "/auth/login";
+          }
+        }, 100);
       }
     }
 

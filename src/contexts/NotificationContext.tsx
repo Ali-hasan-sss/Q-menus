@@ -174,28 +174,43 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [user?.restaurant?.id, socket]);
 
-  const fetchNotifications = useCallback(async () => {
-    if (!user) return;
+  const fetchNotifications = useCallback(
+    async (retryCount = 0) => {
+      if (!user) return;
 
-    try {
-      setLoading(true);
-      const response = await api.get("/notifications");
-      if (response.data.success) {
-        console.log(
-          "📬 Notifications fetched:",
-          response.data.data.notifications
-        );
-        setNotifications(response.data.data.notifications);
+      try {
+        setLoading(true);
+        const response = await api.get("/notifications");
+        if (response.data.success) {
+          console.log(
+            "📬 Notifications fetched:",
+            response.data.data.notifications
+          );
+          setNotifications(response.data.data.notifications);
 
-        // Fetch accurate unread count from API
-        await fetchUnreadCount();
+          // Fetch accurate unread count from API
+          await fetchUnreadCount();
+        }
+      } catch (error: any) {
+        console.error("❌ Error fetching notifications:", error);
+        // Don't redirect on 401 if user is still authenticated
+        // This can happen right after login before cookie is fully set
+        // Retry once after a delay (max 1 retry to prevent infinite loops)
+        if (error.response?.status === 401 && user && retryCount === 0) {
+          console.log("⚠️ 401 error but user exists - retrying after delay...");
+          setTimeout(() => {
+            if (user) {
+              fetchNotifications(1); // Pass retryCount to prevent infinite loop
+            }
+          }, 1000);
+          return; // Return early to avoid setting loading to false
+        }
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error("❌ Error fetching notifications:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [user, fetchUnreadCount]);
+    },
+    [user, fetchUnreadCount]
+  );
 
   const markAsRead = useCallback(async (id: string) => {
     try {
@@ -248,10 +263,19 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
       // Request browser notification permission
       requestNotificationPermission();
 
-      fetchNotifications();
-      fetchUnreadCount(); // Get initial unread count quickly
+      // Add a small delay to ensure cookie is set after login
+      // This prevents 401 errors right after login
+      const timer = setTimeout(() => {
+        fetchNotifications();
+        fetchUnreadCount(); // Get initial unread count quickly
+      }, 500); // 500ms delay to ensure cookie is ready
+
+      return () => clearTimeout(timer);
     } else {
       console.log("⚠️ No user, skipping notifications fetch");
+      // Clear notifications when user logs out
+      setNotifications([]);
+      setUnreadCount(0);
     }
   }, [
     user,
