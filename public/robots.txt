@@ -1,19 +1,8 @@
+# This file is now generated dynamically by Next.js
+# See: frontend/src/app/robots.ts
+# The static robots.txt will be automatically replaced by the dynamic version
 User-agent: *
 Allow: /
 
 # Sitemap
-Sitemap: https://qmenus.com/sitemap.xml
-
-# Crawl-delay for better server performance
-Crawl-delay: 1
-
-# Disallow admin and sensitive areas
-Disallow: /admin/
-Disallow: /dashboard/
-Disallow: /api/
-Disallow: /_next/
-Disallow: /auth/
-
-# Allow public menu pages
-Allow: /menu/
-Allow: /order/
+Sitemap: https://www.qmenussy.com/sitemap.xml

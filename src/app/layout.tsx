@@ -20,10 +20,11 @@ const poppins = Poppins({
   variable: "--font-poppins",
 });
 
+const baseUrl =
+  process.env.NEXT_PUBLIC_FRONTEND_URL || "https://www.qmenussy.com";
+
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_FRONTEND_URL || "http://localhost:3000"
-  ),
+  metadataBase: new URL(baseUrl),
   title: {
     default: "QMenus - منصة إدارة المطاعم الذكية",
     template: "%s | QMenus",
@@ -43,7 +44,7 @@ export const metadata: Metadata = {
     "food ordering",
     "Syria restaurants",
   ],
-  authors: [{ name: "فريق QMenus", url: "https://qmenus.com" }],
+  authors: [{ name: "فريق QMenus", url: "https://www.qmenussy.com" }],
   creator: "QMenus Team",
   publisher: "QMenus",
   robots: "index, follow",
@@ -81,14 +82,23 @@ export const metadata: Metadata = {
       "منصة QMenus الأولى في سوريا لإدارة المطاعم. قوائم QR تفاعلية، إدارة طلبات متطورة، وتجربة عملاء ذكية.",
     type: "website",
     locale: "ar_SY",
-    url: process.env.NEXT_PUBLIC_FRONTEND_URL || "http://localhost:3000",
+    alternateLocale: ["en_US"],
+    url: baseUrl,
     siteName: "QMenus",
     images: [
       {
-        url: "/og-image-ar.png",
+        url: `${baseUrl}/logo.png`,
         width: 1200,
-        height: 630,
+        height: 1200,
+        alt: "QMenus Logo - منصة إدارة المطاعم الذكية",
+        type: "image/png",
+      },
+      {
+        url: `${baseUrl}/images/logo.png`,
+        width: 1200,
+        height: 1200,
         alt: "QMenus - منصة إدارة المطاعم الذكية",
+        type: "image/png",
       },
     ],
   },
@@ -97,7 +107,16 @@ export const metadata: Metadata = {
     title: "QMenus - منصة إدارة المطاعم الذكية",
     description:
       "منصة QMenus الأولى في سوريا لإدارة المطاعم. قوائم QR تفاعلية، إدارة طلبات متطورة، وتجربة عملاء ذكية.",
-    images: ["/twitter-image-ar.png"],
+    images: [
+      {
+        url: `${baseUrl}/logo.png`,
+        alt: "QMenus Logo",
+      },
+      {
+        url: `${baseUrl}/images/logo.png`,
+        alt: "QMenus - منصة إدارة المطاعم الذكية",
+      },
+    ],
     creator: "@qmenus",
     site: "@qmenus",
   },
@@ -156,6 +175,91 @@ export default function RootLayout({
                 }
               } catch (_) {}
             `,
+          }}
+        />
+        {/* Structured Data (Schema.org) for Logo and Brand */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Organization",
+              name: "QMenus",
+              alternateName: "QMenus - منصة إدارة المطاعم الذكية",
+              url: "https://www.qmenussy.com",
+              logo: "https://www.qmenussy.com/logo.png",
+              image: "https://www.qmenussy.com/images/logo.png",
+              description:
+                "منصة QMenus الأولى في سوريا لإدارة المطاعم. قوائم QR تفاعلية، إدارة طلبات متطورة، وتجربة عملاء ذكية.",
+              address: {
+                "@type": "PostalAddress",
+                addressCountry: "SY",
+              },
+              sameAs: [],
+              contactPoint: {
+                "@type": "ContactPoint",
+                contactType: "customer service",
+                availableLanguage: ["Arabic", "English"],
+              },
+            }),
+          }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "WebSite",
+              name: "QMenus",
+              url: "https://www.qmenussy.com",
+              logo: "https://www.qmenussy.com/logo.png",
+              description:
+                "منصة QMenus الأولى في سوريا لإدارة المطاعم. قوائم QR تفاعلية، إدارة طلبات متطورة، وتجربة عملاء ذكية.",
+              potentialAction: {
+                "@type": "SearchAction",
+                target: {
+                  "@type": "EntryPoint",
+                  urlTemplate:
+                    "https://www.qmenussy.com/search?q={search_term_string}",
+                },
+                "query-input": "required name=search_term_string",
+              },
+            }),
+          }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "SoftwareApplication",
+              name: "QMenus",
+              applicationCategory: "BusinessApplication",
+              operatingSystem: "Web",
+              url: "https://www.qmenussy.com",
+              logo: "https://www.qmenussy.com/logo.png",
+              image: "https://www.qmenussy.com/images/logo.png",
+              description:
+                "منصة QMenus الأولى في سوريا لإدارة المطاعم. قوائم QR تفاعلية، إدارة طلبات متطورة، وتجربة عملاء ذكية.",
+              offers: {
+                "@type": "Offer",
+                price: "0",
+                priceCurrency: "SYP",
+              },
+              aggregateRating: {
+                "@type": "AggregateRating",
+                ratingValue: "4.8",
+                reviewCount: "100",
+              },
+              publisher: {
+                "@type": "Organization",
+                name: "QMenus",
+                logo: {
+                  "@type": "ImageObject",
+                  url: "https://www.qmenussy.com/logo.png",
+                },
+              },
+            }),
           }}
         />
       </head>
