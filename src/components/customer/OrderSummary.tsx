@@ -82,6 +82,15 @@ export function OrderSummary({
 }: OrderSummaryProps) {
   const { language } = useLanguage();
 
+  // Get currency display name (translated)
+  const getCurrencyDisplayName = (currencyCode: string): string => {
+    // Use formatCurrencyWithLanguage to get translated name, then extract just the name
+    const formatted = formatCurrencyWithLanguage(0, currencyCode, language);
+    // Extract currency name (everything after the number)
+    const parts = formatted.split(" ");
+    return parts.slice(1).join(" ") || currencyCode;
+  };
+
   // Calculate total in selected currency
   const calculateTotalInCurrency = (
     totalInBaseCurrency: number,
@@ -258,11 +267,11 @@ export function OrderSummary({
             className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-black focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
           >
             <option value={currency}>
-              {currency} ({isRTL ? "أساسي" : "Base"})
+              {getCurrencyDisplayName(currency)} ({isRTL ? "أساسي" : "Base"})
             </option>
             {currencyExchanges.map((ce) => (
               <option key={ce.id} value={ce.currency}>
-                {ce.currency}
+                {getCurrencyDisplayName(ce.currency)}
               </option>
             ))}
           </select>
@@ -282,7 +291,11 @@ export function OrderSummary({
                 color: theme?.primaryColor || "var(--theme-primary)",
               }}
             >
-              {formatCurrencyWithLanguage(displayTotal.amount, displayTotal.currency, language)}
+              {formatCurrencyWithLanguage(
+                displayTotal.amount,
+                displayTotal.currency,
+                language
+              )}
             </span>
             {selectedPaymentCurrency &&
               selectedPaymentCurrency !== currency && (

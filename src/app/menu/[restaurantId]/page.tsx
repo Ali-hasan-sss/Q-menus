@@ -1227,7 +1227,7 @@ export default function CustomerMenuPage() {
             onCurrencyChange={handleCurrencyChange}
           />
 
-          <div className="max-w-7xl pt-[100px] mx-auto px-4 sm:px-6 lg:px-8 pb-24">
+          <div className="max-w-7xl pt-[70px] sm:pt-[100px] mx-auto px-4 sm:px-6 lg:px-8 pb-24">
             {incompleteOrder && incompleteOrder.status !== "CANCELLED" && (
               <div className="">
                 <button

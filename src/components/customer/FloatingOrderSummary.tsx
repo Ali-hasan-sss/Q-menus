@@ -142,6 +142,7 @@ export function FloatingOrderSummary({
         style={{
           backgroundColor: menuTheme?.primaryColor || "#f97316",
           color: menuTheme?.textColor || "#ffffff",
+          border: `2px solid ${menuTheme?.secondaryColor || "#27ae1e"}`,
         }}
         onClick={() => setShowDetails(!showDetails)}
       >

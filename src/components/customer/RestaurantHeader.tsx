@@ -94,12 +94,12 @@ export function RestaurantHeader({
         zIndex: 10,
       }}
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          <div className="flex items-center gap-3">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8">
+        <div className="flex justify-between items-center h-14 sm:h-16">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
             {/* Restaurant Logo or Name */}
             {restaurant?.logo && (
-              <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-700 flex-shrink-0">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-700 flex-shrink-0">
                 <img
                   src={restaurant.logo}
                   alt={
@@ -112,8 +112,8 @@ export function RestaurantHeader({
               </div>
             )}
 
-            <div>
-              <h1 className="text-xl font-semibold text-white">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-base sm:text-xl font-semibold text-white truncate">
                 {isRTL
                   ? restaurant?.nameAr || restaurant?.name
                   : restaurant?.name}
@@ -121,7 +121,7 @@ export function RestaurantHeader({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
             {/* Currency Selector - Always show if onCurrencyChange is provided */}
             {onCurrencyChange && restaurantCurrency && (
               <select
@@ -133,7 +133,7 @@ export function RestaurantHeader({
                       : e.target.value
                   )
                 }
-                className="px-2 py-1 text-sm rounded-md bg-white/20 backdrop-blur-sm border border-white/30 text-white focus:outline-none focus:ring-2 focus:ring-white/50 hover:bg-white/30 transition-colors"
+                className="px-1.5 sm:px-2 py-1 text-xs sm:text-sm rounded-md bg-white/20 backdrop-blur-sm border border-white/30 text-white focus:outline-none focus:ring-2 focus:ring-white/50 hover:bg-white/30 transition-colors"
                 style={{
                   color: "white",
                 }}
@@ -164,11 +164,6 @@ export function RestaurantHeader({
                       </option>
                     ))}
               </select>
-            )}
-            {tableNumber && (
-              <p className="text-sm font-medium text-white">
-                {isRTL ? `طاولة ${tableNumber}` : `Table ${tableNumber}`}
-              </p>
             )}
             <LanguageToggle />
           </div>

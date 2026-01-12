@@ -62,7 +62,7 @@ export default function WaiterRequestButton({
       // Set up error handler before emitting
       const errorHandler = (data: { message: string }) => {
         console.error("Waiter request error:", data);
-        
+
         // Translate error message based on content
         let translatedMessage = data.message;
         if (data.message) {
@@ -78,7 +78,7 @@ export default function WaiterRequestButton({
         } else {
           translatedMessage = t("waiter.requestError.failed");
         }
-        
+
         toast.error(translatedMessage);
         setIsRequesting(false);
         if (socket) {
@@ -139,22 +139,11 @@ export default function WaiterRequestButton({
     <button
       onClick={handleWaiterRequest}
       disabled={isRequesting || !isConnected}
-      className={`${isCircular ? "flex items-center justify-center" : "flex items-center gap-2 px-4 py-2 rounded-lg font-medium"} transition-all duration-200 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+      className={`${isCircular ? "flex items-center justify-center" : "flex items-center gap-2 px-4 py-2 rounded-lg font-medium"} transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
       style={{
         backgroundColor: menuTheme?.primaryColor || "#f58114",
         color: menuTheme?.textColor || "#ffffff",
-      }}
-      onMouseEnter={(e) => {
-        if (!isRequesting && isConnected) {
-          e.currentTarget.style.backgroundColor =
-            menuTheme?.secondaryColor || "#2797dd";
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (!isRequesting && isConnected) {
-          e.currentTarget.style.backgroundColor =
-            menuTheme?.primaryColor || "#f58114";
-        }
+        border: `2px solid ${menuTheme?.secondaryColor || "#27ae1e"}`,
       }}
       title={isRTL ? "طلب النادل" : "Call Waiter"}
     >
