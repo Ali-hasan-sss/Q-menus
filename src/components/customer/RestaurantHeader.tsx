@@ -3,6 +3,7 @@
 import { useLanguage } from "@/contexts/LanguageContext";
 import { LanguageToggle } from "@/components/ui/LanguageToggle";
 import { hexToRgba } from "@/lib/helper";
+import { formatCurrencyWithLanguage } from "@/lib/utils";
 
 interface Restaurant {
   id: string;
@@ -26,6 +27,13 @@ interface MenuTheme {
   backgroundRepeat?: string;
 }
 
+interface CurrencyExchange {
+  id: string;
+  currency: string;
+  exchangeRate: number;
+  isActive: boolean;
+}
+
 interface RestaurantHeaderProps {
   restaurant: Restaurant | null;
   menuTheme: MenuTheme | null;
@@ -37,6 +45,10 @@ interface RestaurantHeaderProps {
     text: number;
     accent: number;
   };
+  restaurantCurrency?: string;
+  currencyExchanges?: CurrencyExchange[];
+  selectedCurrency?: string | null;
+  onCurrencyChange?: (currency: string | null) => void;
 }
 
 // Default theme for all restaurants
@@ -52,8 +64,21 @@ export function RestaurantHeader({
   menuTheme,
   tableNumber,
   colorOpacity,
+  restaurantCurrency = "USD",
+  currencyExchanges = [],
+  selectedCurrency,
+  onCurrencyChange,
 }: RestaurantHeaderProps) {
-  const { isRTL } = useLanguage();
+  const { isRTL, language } = useLanguage();
+
+  // Get currency display name
+  const getCurrencyDisplayName = (currencyCode: string): string => {
+    // Use formatCurrencyWithLanguage to get translated name, then extract just the name
+    const formatted = formatCurrencyWithLanguage(0, currencyCode, language);
+    // Extract currency name (everything after the number)
+    const parts = formatted.split(" ");
+    return parts.slice(1).join(" ") || currencyCode;
+  };
 
   // Use default theme if no custom theme exists
   const activeTheme = menuTheme || defaultTheme;
@@ -96,10 +121,53 @@ export function RestaurantHeader({
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center gap-2">
+            {/* Currency Selector - Always show if onCurrencyChange is provided */}
+            {onCurrencyChange && restaurantCurrency && (
+              <select
+                value={selectedCurrency || restaurantCurrency}
+                onChange={(e) =>
+                  onCurrencyChange(
+                    e.target.value === restaurantCurrency
+                      ? null
+                      : e.target.value
+                  )
+                }
+                className="px-2 py-1 text-sm rounded-md bg-white/20 backdrop-blur-sm border border-white/30 text-white focus:outline-none focus:ring-2 focus:ring-white/50 hover:bg-white/30 transition-colors"
+                style={{
+                  color: "white",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor =
+                    "rgba(255, 255, 255, 0.3)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor =
+                    "rgba(255, 255, 255, 0.2)";
+                }}
+              >
+                <option value={restaurantCurrency} style={{ color: "#000" }}>
+                  {getCurrencyDisplayName(restaurantCurrency)}{" "}
+                  {isRTL ? "(أساسي)" : "(Base)"}
+                </option>
+                {currencyExchanges &&
+                  currencyExchanges.length > 0 &&
+                  currencyExchanges
+                    .filter((ce) => ce.isActive)
+                    .map((ce) => (
+                      <option
+                        key={ce.id}
+                        value={ce.currency}
+                        style={{ color: "#000" }}
+                      >
+                        {getCurrencyDisplayName(ce.currency)}
+                      </option>
+                    ))}
+              </select>
+            )}
             {tableNumber && (
               <p className="text-sm font-medium text-white">
-                Table {tableNumber}
+                {isRTL ? `طاولة ${tableNumber}` : `Table ${tableNumber}`}
               </p>
             )}
             <LanguageToggle />

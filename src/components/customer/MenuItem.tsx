@@ -7,6 +7,13 @@ import { formatCurrencyWithLanguage } from "@/lib/utils";
 import { useLanguage } from "@/contexts/LanguageContext";
 import Image from "next/image";
 
+interface CurrencyExchange {
+  id: string;
+  currency: string;
+  exchangeRate: number;
+  isActive: boolean;
+}
+
 interface MenuItemProps {
   item: {
     id: string;
@@ -23,6 +30,8 @@ interface MenuItemProps {
     discount?: number;
   };
   currency?: string; // Restaurant currency prop
+  selectedCurrency?: string | null; // Selected payment currency
+  currencyExchanges?: CurrencyExchange[]; // Available currency exchanges
   onAddToOrder: (
     item: any,
     quantity: number,
@@ -57,6 +66,8 @@ interface MenuItemProps {
 export function MenuItem({
   item,
   currency,
+  selectedCurrency,
+  currencyExchanges = [],
   onAddToOrder,
   onItemClick,
   isRTL,
@@ -130,6 +141,61 @@ export function MenuItem({
     }
 
     return (itemPrice + extrasPrice) * quantity;
+  };
+
+  // Calculate price in selected currency
+  const calculatePriceInCurrency = (
+    priceInBaseCurrency: number,
+    selectedCurrency: string | null | undefined
+  ): { amount: number; currency: string } => {
+    const baseCurrency = currency || item.currency || "USD";
+
+    if (!selectedCurrency || selectedCurrency === baseCurrency) {
+      return { amount: priceInBaseCurrency, currency: baseCurrency };
+    }
+
+    const currencyExchange = currencyExchanges.find(
+      (ce) =>
+        ce.currency.toUpperCase() === selectedCurrency.toUpperCase() &&
+        ce.isActive
+    );
+
+    if (!currencyExchange) {
+      return { amount: priceInBaseCurrency, currency: baseCurrency };
+    }
+
+    // Convert from base currency to selected currency
+    // exchangeRate interpretation depends on its value:
+    // - If exchangeRate >= 1: represents how many units of base currency equal 1 unit of selected currency
+    //   Example: exchangeRate = 12100 means 1 USD = 12100 SYP → use division
+    // - If exchangeRate < 1: represents how many units of selected currency equal 1 unit of base currency
+    //   Example: exchangeRate = 0.01 means 1 SYP = 0.01 NEW → use multiplication
+    const exchangeRate = Number(currencyExchange.exchangeRate);
+    const convertedAmount =
+      exchangeRate >= 1
+        ? priceInBaseCurrency / exchangeRate
+        : priceInBaseCurrency * exchangeRate;
+    return {
+      amount: convertedAmount,
+      currency: selectedCurrency,
+    };
+  };
+
+  // Get display price
+  const getDisplayPrice = () => {
+    const basePrice =
+      typeof item.price === "string" ? parseFloat(item.price) : item.price;
+    const priceWithDiscount =
+      typeof item.discount === "number" && item.discount > 0
+        ? basePrice * (1 - item.discount / 100)
+        : basePrice;
+
+    const displayPrice = calculatePriceInCurrency(
+      priceWithDiscount,
+      selectedCurrency
+    );
+
+    return displayPrice;
   };
 
   const handleAddToOrder = () => {
@@ -289,40 +355,47 @@ export function MenuItem({
 
         <div className="flex items-center justify-between">
           <div className="flex flex-col">
-            <span
-              className="text-sm sm:text-base font-semibold"
-              style={{
-                color: hexToRgba(theme?.textColor || "#1f2937", opacity.text),
-              }}
-            >
-              {typeof item.discount === "number" && item.discount > 0
-                ? formatCurrencyWithLanguage(
-                    (typeof item.price === "string"
-                      ? parseFloat(item.price)
-                      : item.price) *
-                      (1 - item.discount / 100),
-                    currency || item.currency || "USD",
-                    language
-                  )
-                : formatCurrencyWithLanguage(
-                    typeof item.price === "string"
-                      ? parseFloat(item.price)
-                      : item.price,
-                    currency || item.currency || "USD",
-                    language
+            {(() => {
+              const displayPrice = getDisplayPrice();
+              const basePrice =
+                typeof item.price === "string"
+                  ? parseFloat(item.price)
+                  : item.price;
+              const baseDisplayPrice = calculatePriceInCurrency(
+                basePrice,
+                null
+              );
+              return (
+                <>
+                  <span
+                    className="text-sm sm:text-base font-semibold"
+                    style={{
+                      color: hexToRgba(
+                        theme?.textColor || "#1f2937",
+                        opacity.text
+                      ),
+                    }}
+                  >
+                    {formatCurrencyWithLanguage(
+                      displayPrice.amount,
+                      displayPrice.currency,
+                      language
+                    )}
+                  </span>
+                  {typeof item.discount === "number" && item.discount > 0 && (
+                    <span className="text-xs text-gray-500 line-through">
+                      {formatCurrencyWithLanguage(
+                        calculatePriceInCurrency(basePrice, selectedCurrency)
+                          .amount,
+                        calculatePriceInCurrency(basePrice, selectedCurrency)
+                          .currency,
+                        language
+                      )}
+                    </span>
                   )}
-            </span>
-            {typeof item.discount === "number" && item.discount > 0 && (
-              <span className="text-xs text-gray-500 line-through">
-                {formatCurrencyWithLanguage(
-                  typeof item.price === "string"
-                    ? parseFloat(item.price)
-                    : item.price,
-                  currency || item.currency || "USD",
-                  language
-                )}
-              </span>
-            )}
+                </>
+              );
+            })()}
           </div>
 
           <button
@@ -416,40 +489,50 @@ export function MenuItem({
 
               {/* Price */}
               <div className="flex items-center justify-between">
-                <span
-                  className="text-lg font-semibold"
-                  style={{
-                    color: theme?.primaryColor || "var(--theme-primary)",
-                  }}
-                >
-                  {typeof item.discount === "number" && item.discount > 0
-                    ? formatCurrencyWithLanguage(
-                        (typeof item.price === "string"
-                          ? parseFloat(item.price)
-                          : item.price) *
-                          (1 - item.discount / 100),
-                        currency || item.currency || "USD",
-                        language
-                      )
-                    : formatCurrencyWithLanguage(
-                        typeof item.price === "string"
-                          ? parseFloat(item.price)
-                          : item.price,
-                        currency || item.currency || "USD",
-                        language
-                      )}
-                </span>
-                {typeof item.discount === "number" && item.discount > 0 && (
-                  <span className="text-sm text-gray-500 line-through">
-                    {formatCurrencyWithLanguage(
-                      typeof item.price === "string"
-                        ? parseFloat(item.price)
-                        : item.price,
-                      currency || item.currency || "USD",
-                      language
-                    )}
-                  </span>
-                )}
+                {(() => {
+                  const basePrice =
+                    typeof item.price === "string"
+                      ? parseFloat(item.price)
+                      : item.price;
+                  const priceWithDiscount =
+                    typeof item.discount === "number" && item.discount > 0
+                      ? basePrice * (1 - item.discount / 100)
+                      : basePrice;
+                  const displayPrice = calculatePriceInCurrency(
+                    priceWithDiscount,
+                    selectedCurrency
+                  );
+                  const originalDisplayPrice = calculatePriceInCurrency(
+                    basePrice,
+                    selectedCurrency
+                  );
+                  return (
+                    <>
+                      <span
+                        className="text-lg font-semibold"
+                        style={{
+                          color: theme?.primaryColor || "var(--theme-primary)",
+                        }}
+                      >
+                        {formatCurrencyWithLanguage(
+                          displayPrice.amount,
+                          displayPrice.currency,
+                          language
+                        )}
+                      </span>
+                      {typeof item.discount === "number" &&
+                        item.discount > 0 && (
+                          <span className="text-sm text-gray-500 line-through">
+                            {formatCurrencyWithLanguage(
+                              originalDisplayPrice.amount,
+                              originalDisplayPrice.currency,
+                              language
+                            )}
+                          </span>
+                        )}
+                    </>
+                  );
+                })()}
               </div>
 
               {/* Quantity */}
@@ -534,8 +617,14 @@ export function MenuItem({
                                     <span className="text-xs text-gray-500 ml-1">
                                       (+
                                       {formatCurrencyWithLanguage(
-                                        option.price,
-                                        currency || item.currency || "USD",
+                                        calculatePriceInCurrency(
+                                          option.price,
+                                          selectedCurrency
+                                        ).amount,
+                                        calculatePriceInCurrency(
+                                          option.price,
+                                          selectedCurrency
+                                        ).currency,
                                         language
                                       )}
                                       )

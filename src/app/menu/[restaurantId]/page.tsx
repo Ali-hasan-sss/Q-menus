@@ -142,6 +142,10 @@ export default function CustomerMenuPage() {
   const [menus, setMenus] = useState<Menu[]>([]);
   const [menuTheme, setMenuTheme] = useState<MenuTheme | null>(null);
   const [restaurantCurrency, setRestaurantCurrency] = useState<string>("USD");
+  const [currencyExchanges, setCurrencyExchanges] = useState<any[]>([]);
+  const [selectedPaymentCurrency, setSelectedPaymentCurrency] = useState<
+    string | null
+  >(null);
   const [loading, setLoading] = useState(true);
   const [loadingItems, setLoadingItems] = useState(false);
   const [loadingCategory, setLoadingCategory] = useState<string | null>(null);
@@ -170,9 +174,12 @@ export default function CustomerMenuPage() {
   const [searchResults, setSearchResults] = useState<MenuItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
+  const [categorySearchQuery, setCategorySearchQuery] = useState("");
 
   // LocalStorage key for this restaurant's order
   const orderStorageKey = `order_${restaurantId}_${tableNumber || "delivery"}`;
+  // LocalStorage key for selected currency
+  const currencyStorageKey = `selectedCurrency_${restaurantId}`;
 
   // Color opacity states (load from theme or default to 1)
   const [colorOpacity, setColorOpacity] = useState({
@@ -251,6 +258,37 @@ export default function CustomerMenuPage() {
     }
   };
 
+  // Save selected currency to localStorage
+  const saveSelectedCurrency = (currency: string | null) => {
+    try {
+      if (currency) {
+        localStorage.setItem(currencyStorageKey, currency);
+      } else {
+        localStorage.removeItem(currencyStorageKey);
+      }
+    } catch (error) {
+      console.error("Failed to save selected currency:", error);
+    }
+  };
+
+  // Load selected currency from localStorage
+  const loadSelectedCurrency = () => {
+    try {
+      const savedCurrency = localStorage.getItem(currencyStorageKey);
+      if (savedCurrency) {
+        setSelectedPaymentCurrency(savedCurrency);
+      }
+    } catch (error) {
+      console.error("Failed to load selected currency:", error);
+    }
+  };
+
+  // Handle currency change
+  const handleCurrencyChange = (currency: string | null) => {
+    setSelectedPaymentCurrency(currency);
+    saveSelectedCurrency(currency);
+  };
+
   useEffect(() => {
     // Check for incomplete order first before loading menu
     // This prevents menu access if there's an incomplete order
@@ -286,9 +324,10 @@ export default function CustomerMenuPage() {
         }
       }
       // Load menu only if no incomplete order or if adding to existing order
-    loadMenuData();
-    checkIncompleteOrder();
-    loadOrderFromStorage(); // Load saved order from localStorage
+      loadMenuData();
+      checkIncompleteOrder();
+      loadOrderFromStorage(); // Load saved order from localStorage
+      loadSelectedCurrency(); // Load selected currency from localStorage
     };
 
     checkIncompleteOrderBeforeLoad();
@@ -434,12 +473,24 @@ export default function CustomerMenuPage() {
       const { order } = event.detail;
       console.log("Order created successfully:", order);
 
+      // Clear backup (order was successful)
+      delete (window as any).__orderBackup;
+
       // Only process if this is our pending order
       if (pendingOrder && order.id) {
         setOrderId(order.id);
         setOrderStatus(order.status);
         setPendingOrder(null);
         setIsOrdering(false);
+
+        // Clear order form (only after successful creation)
+        setOrderItems([]);
+        setCustomerName("");
+        setCustomerPhone("");
+        setCustomerAddress("");
+        setOrderNotes("");
+        setShowOrderSummary(false);
+        clearOrderFromStorage(); // Clear from localStorage
 
         const successMessage =
           tableNumber === "DELIVERY"
@@ -456,6 +507,31 @@ export default function CustomerMenuPage() {
 
       setIsOrdering(false);
       setPendingOrder(null);
+
+      // Restore order data from backup if available
+      const orderBackup = (window as any).__orderBackup;
+      if (orderBackup) {
+        setOrderItems(orderBackup.items || []);
+        setCustomerName(orderBackup.customerName || "");
+        setCustomerPhone(orderBackup.customerPhone || "");
+        setCustomerAddress(orderBackup.customerAddress || "");
+        setOrderNotes(orderBackup.orderNotes || "");
+
+        // Restore to localStorage
+        if (orderBackup.items && orderBackup.items.length > 0) {
+          saveOrderToStorage({
+            items: orderBackup.items,
+            customerName: orderBackup.customerName || "",
+            customerPhone: orderBackup.customerPhone || "",
+            customerAddress: orderBackup.customerAddress || "",
+            orderNotes: orderBackup.orderNotes || "",
+          });
+          setShowOrderSummary(true);
+        }
+
+        // Clear backup
+        delete (window as any).__orderBackup;
+      }
 
       // Translate error message based on content
       let translatedMessage = message;
@@ -561,6 +637,23 @@ export default function CustomerMenuPage() {
           })),
         },
       ]);
+
+      // Fetch currency exchanges
+      try {
+        const currencyResponse = await publicApi.get(
+          `/public/restaurant/${restaurantId}/currency-exchanges`
+        );
+        if (currencyResponse.data.success) {
+          // Filter only active currencies
+          const activeCurrencies = currencyResponse.data.data.filter(
+            (ce: any) => ce.isActive === true
+          );
+          setCurrencyExchanges(activeCurrencies);
+        }
+      } catch (currencyError) {
+        console.error("Error fetching currency exchanges:", currencyError);
+        // Don't set error state, just log it - currencies are optional
+      }
     } catch (error: any) {
       const message = error.response?.data?.message || "Failed to load menu";
       setError(message);
@@ -577,7 +670,7 @@ export default function CustomerMenuPage() {
         endpoints.public.categoryItems(restaurantId, categoryId)
       );
       const { category, items, currency } = response.data.data;
-      
+
       // Update restaurant currency if provided
       if (currency) {
         setRestaurantCurrency(currency);
@@ -812,6 +905,7 @@ export default function CustomerMenuPage() {
 
   const handleBackToCategories = () => {
     setSelectedCategory(null);
+    setCategorySearchQuery(""); // Clear category search when going back
   };
 
   // Function to handle item click
@@ -826,6 +920,42 @@ export default function CustomerMenuPage() {
       const itemPrice = parseFloat(item.price);
       return total + itemPrice * item.quantity;
     }, 0);
+  };
+
+  // Calculate total in selected currency
+  const calculateTotalInCurrency = (
+    totalInBaseCurrency: number,
+    selectedCurrency: string | null
+  ): { amount: number; currency: string } => {
+    if (!selectedCurrency || selectedCurrency === restaurantCurrency) {
+      return { amount: totalInBaseCurrency, currency: restaurantCurrency };
+    }
+
+    const currencyExchange = currencyExchanges.find(
+      (ce) =>
+        ce.currency.toUpperCase() === selectedCurrency.toUpperCase() &&
+        ce.isActive
+    );
+
+    if (!currencyExchange) {
+      return { amount: totalInBaseCurrency, currency: restaurantCurrency };
+    }
+
+    // Convert from base currency to selected currency
+    // exchangeRate interpretation depends on its value:
+    // - If exchangeRate >= 1: represents how many units of base currency equal 1 unit of selected currency
+    //   Example: exchangeRate = 12100 means 1 USD = 12100 SYP → use division
+    // - If exchangeRate < 1: represents how many units of selected currency equal 1 unit of base currency
+    //   Example: exchangeRate = 0.01 means 1 SYP = 0.01 NEW → use multiplication
+    const exchangeRate = Number(currencyExchange.exchangeRate);
+    const convertedAmount =
+      exchangeRate >= 1
+        ? totalInBaseCurrency / exchangeRate
+        : totalInBaseCurrency * exchangeRate;
+    return {
+      amount: convertedAmount,
+      currency: selectedCurrency,
+    };
   };
 
   const findMenuItemById = (id: string): MenuItem | null => {
@@ -936,17 +1066,20 @@ export default function CustomerMenuPage() {
       // Store pending order data
       setPendingOrder(orderData);
 
-      // Emit order via socket only
-      emitCreateOrder(orderData);
+      // Store backup of order data before sending (for error recovery)
+      const orderBackup = {
+        items: [...orderItems],
+        customerName,
+        customerPhone,
+        customerAddress,
+        orderNotes,
+      };
 
-      // Clear form immediately
-      setOrderItems([]);
-      setCustomerName("");
-      setCustomerPhone("");
-      setCustomerAddress("");
-      setOrderNotes("");
-      setShowOrderSummary(false);
-      clearOrderFromStorage(); // Clear from localStorage
+      // Save backup to state for error recovery
+      (window as any).__orderBackup = orderBackup;
+
+      // Emit order via socket only (don't clear data yet - wait for success/error event)
+      emitCreateOrder(orderData);
     } catch (error: any) {
       const message =
         error.response?.data?.message || t("menu.orderError.failed");
@@ -1088,6 +1221,10 @@ export default function CustomerMenuPage() {
             menuTheme={menuTheme}
             tableNumber={tableNumber || undefined}
             colorOpacity={colorOpacity}
+            restaurantCurrency={restaurantCurrency}
+            currencyExchanges={currencyExchanges}
+            selectedCurrency={selectedPaymentCurrency}
+            onCurrencyChange={handleCurrencyChange}
           />
 
           <div className="max-w-7xl pt-[100px] mx-auto px-4 sm:px-6 lg:px-8 pb-24">
@@ -1227,6 +1364,8 @@ export default function CustomerMenuPage() {
                           key={item.id}
                           item={item}
                           currency={restaurantCurrency}
+                          selectedCurrency={selectedPaymentCurrency}
+                          currencyExchanges={currencyExchanges}
                           onAddToOrder={addItemToOrder}
                           onItemClick={handleItemClick}
                           isRTL={isRTL}
@@ -1406,6 +1545,57 @@ export default function CustomerMenuPage() {
                   </div>
                 </div>
 
+                {/* Category Search Bar */}
+                {selectedCategory.items &&
+                  selectedCategory.items.length > 0 && (
+                    <div className="mb-6 max-w-2xl mx-auto">
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={categorySearchQuery}
+                          onChange={(e) =>
+                            setCategorySearchQuery(e.target.value)
+                          }
+                          placeholder={
+                            isRTL
+                              ? "ابحث عن العناصر في هذه الفئة..."
+                              : "Search items in this category..."
+                          }
+                          className="w-full !text-black px-4 py-3 ltr:pr-12 rtl:pl-12 rounded-lg border focus:outline-none focus:ring-2 transition-all"
+                          style={{
+                            backgroundColor: hexToRgba(
+                              menuTheme?.backgroundColor || "#ffffff",
+                              0.9
+                            ),
+                            borderColor: hexToRgba(
+                              menuTheme?.secondaryColor || "#e5e7eb",
+                              colorOpacity.secondary
+                            ),
+                            color: menuTheme?.textColor || "#1f2937",
+                          }}
+                        />
+                        <div className="absolute !text-black inset-y-0 ltr:right-0 rtl:left-0 flex items-center ltr:pr-3 rtl:pl-3 pointer-events-none">
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            style={{
+                              color: "#6b7280",
+                            }}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                            />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                 {/* Items Grid */}
                 {(() => {
                   console.log("🎯 Items Grid Debug:", {
@@ -1419,20 +1609,69 @@ export default function CustomerMenuPage() {
                   <MenuLoadingSkeleton menuTheme={menuTheme} />
                 ) : selectedCategory.items &&
                   selectedCategory.items.length > 0 ? (
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-                    {selectedCategory.items.map((item) => (
-                      <MenuItem
-                        key={item.id}
-                        item={item}
-                        currency={restaurantCurrency}
-                        onAddToOrder={addItemToOrder}
-                        onItemClick={handleItemClick}
-                        isRTL={isRTL}
-                        theme={menuTheme || undefined}
-                        colorOpacity={colorOpacity}
-                      />
-                    ))}
-                  </div>
+                  (() => {
+                    // Filter items based on category search query
+                    const filteredItems = selectedCategory.items.filter(
+                      (item) => {
+                        if (!categorySearchQuery.trim()) return true;
+                        const searchLower = categorySearchQuery
+                          .toLowerCase()
+                          .trim();
+                        const nameMatch = item.name
+                          ?.toLowerCase()
+                          .includes(searchLower);
+                        const nameArMatch = item.nameAr
+                          ?.toLowerCase()
+                          .includes(searchLower);
+                        const descriptionMatch = item.description
+                          ?.toLowerCase()
+                          .includes(searchLower);
+                        const descriptionArMatch = item.descriptionAr
+                          ?.toLowerCase()
+                          .includes(searchLower);
+                        return (
+                          nameMatch ||
+                          nameArMatch ||
+                          descriptionMatch ||
+                          descriptionArMatch
+                        );
+                      }
+                    );
+
+                    return filteredItems.length > 0 ? (
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+                        {filteredItems.map((item) => (
+                          <MenuItem
+                            key={item.id}
+                            item={item}
+                            currency={restaurantCurrency}
+                            selectedCurrency={selectedPaymentCurrency}
+                            currencyExchanges={currencyExchanges}
+                            onAddToOrder={addItemToOrder}
+                            onItemClick={handleItemClick}
+                            isRTL={isRTL}
+                            theme={menuTheme || undefined}
+                            colorOpacity={colorOpacity}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-12">
+                        <p
+                          style={{
+                            color: hexToRgba(
+                              menuTheme?.secondaryColor || "#6b7280",
+                              colorOpacity.secondary
+                            ),
+                          }}
+                        >
+                          {isRTL
+                            ? "لا توجد نتائج للبحث"
+                            : "No search results found"}
+                        </p>
+                      </div>
+                    );
+                  })()
                 ) : (
                   <div className="text-center py-12">
                     <p className="text-gray-600 dark:text-gray-400">
@@ -1529,6 +1768,9 @@ export default function CustomerMenuPage() {
               isAddingToExisting={!!existingOrderId}
               menuTheme={menuTheme}
               findMenuItemById={findMenuItemById}
+              currencyExchanges={currencyExchanges}
+              selectedPaymentCurrency={selectedPaymentCurrency}
+              setSelectedPaymentCurrency={setSelectedPaymentCurrency}
             />
           )}
         </div>

@@ -93,7 +93,7 @@ const translations = {
     "item.edit": "تعديل الصنف",
     "item.name": " اسم الصنف (انجليزي)",
     "item.nameAr": "اسم الصنف (عربي)",
-    "item.description": "الوصف",
+    "item.description": "الوصف (انجليزي)",
     "item.descriptionAr": "الوصف (عربي)",
     "item.price": "السعر",
     "item.currency": "العملة",

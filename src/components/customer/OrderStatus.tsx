@@ -48,6 +48,13 @@ interface OrderStatusProps {
   }>;
   totalPrice?: string | number;
   currency?: string;
+  currencyExchanges?: Array<{
+    id: string;
+    currency: string;
+    exchangeRate: string | number;
+    isActive: boolean;
+  }>;
+  selectedPaymentCurrency?: string | null;
   onNewOrder?: () => void;
   menuTheme?: {
     primaryColor?: string;
@@ -81,8 +88,8 @@ const getStatusConfig = (isRTL: boolean) => ({
   READY: {
     label: isRTL ? "جاهز" : "Ready",
     description: isRTL
-      ? "طلبك جاهز! يرجى التوجه للكاونتر"
-      : "Your order is ready! Please come to the counter",
+      ? "طلبك جاهز! يرجى الانتظار قليلا ريثما نقدمه لك"
+      : "Your order is ready! Please wait a moment while we bring it to you",
     color: "text-green-600",
     bgColor: "bg-green-100",
     icon: "✅",
@@ -126,6 +133,8 @@ export function OrderStatus({
   taxes,
   totalPrice = "0",
   currency = "USD",
+  currencyExchanges = [],
+  selectedPaymentCurrency = null,
   onNewOrder,
   menuTheme,
 }: OrderStatusProps) {
@@ -135,6 +144,42 @@ export function OrderStatus({
   const { isRTL, language } = useLanguage();
   const router = useRouter();
   const invoiceRef = useRef<HTMLDivElement>(null);
+
+  // Calculate total in selected currency
+  const calculateTotalInCurrency = (
+    totalInBaseCurrency: number,
+    selectedCurrency: string | null | undefined
+  ): { amount: number; currency: string } => {
+    if (!selectedCurrency || selectedCurrency === currency) {
+      return { amount: totalInBaseCurrency, currency };
+    }
+
+    const currencyExchange = currencyExchanges.find(
+      (ce) =>
+        ce.currency.toUpperCase() === selectedCurrency.toUpperCase() &&
+        ce.isActive
+    );
+
+    if (!currencyExchange) {
+      return { amount: totalInBaseCurrency, currency };
+    }
+
+    // Convert from base currency to selected currency
+    // exchangeRate interpretation depends on its value:
+    // - If exchangeRate >= 1: represents how many units of base currency equal 1 unit of selected currency
+    //   Example: exchangeRate = 12100 means 1 USD = 12100 SYP → use division
+    // - If exchangeRate < 1: represents how many units of selected currency equal 1 unit of base currency
+    //   Example: exchangeRate = 0.01 means 1 SYP = 0.01 NEW → use multiplication
+    const exchangeRate = Number(currencyExchange.exchangeRate);
+    const convertedAmount =
+      exchangeRate >= 1
+        ? totalInBaseCurrency / exchangeRate
+        : totalInBaseCurrency * exchangeRate;
+    return {
+      amount: convertedAmount,
+      currency: selectedCurrency,
+    };
+  };
 
   // Function to get extras names
   const getExtrasNames = (extras: any, originalMenuItem?: any): string[] => {
@@ -513,11 +558,34 @@ export function OrderStatus({
                     <td
                       className={`py-3 text-gray-900 ${isRTL ? "text-left" : "text-right"}`}
                     >
-                      {formatCurrencyWithLanguage(
-                        Number(item.price) * item.quantity,
-                        currency,
-                        language
-                      )}
+                      {(() => {
+                        const basePrice = Number(item.price) * item.quantity;
+                        const displayPrice = calculateTotalInCurrency(
+                          basePrice,
+                          selectedPaymentCurrency
+                        );
+                        return (
+                          <>
+                            {formatCurrencyWithLanguage(
+                              displayPrice.amount,
+                              displayPrice.currency,
+                              language
+                            )}
+                            {selectedPaymentCurrency &&
+                              selectedPaymentCurrency !== currency && (
+                                <div className="text-xs font-normal text-gray-500 mt-0.5">
+                                  (
+                                  {formatCurrencyWithLanguage(
+                                    basePrice,
+                                    currency,
+                                    language
+                                  )}
+                                  )
+                                </div>
+                              )}
+                          </>
+                        );
+                      })()}
                     </td>
                   </tr>
                 );
@@ -533,11 +601,34 @@ export function OrderStatus({
                   <td
                     className={`py-2 text-sm text-gray-700 ${isRTL ? "text-left" : "text-right"}`}
                   >
-                    {formatCurrencyWithLanguage(
-                      Number(subtotal),
-                      currency,
-                      language
-                    )}
+                    {(() => {
+                      const baseSubtotal = Number(subtotal);
+                      const displaySubtotal = calculateTotalInCurrency(
+                        baseSubtotal,
+                        selectedPaymentCurrency
+                      );
+                      return (
+                        <>
+                          {formatCurrencyWithLanguage(
+                            displaySubtotal.amount,
+                            displaySubtotal.currency,
+                            language
+                          )}
+                          {selectedPaymentCurrency &&
+                            selectedPaymentCurrency !== currency && (
+                              <div className="text-xs font-normal text-gray-500 mt-0.5">
+                                (
+                                {formatCurrencyWithLanguage(
+                                  baseSubtotal,
+                                  currency,
+                                  language
+                                )}
+                                )
+                              </div>
+                            )}
+                        </>
+                      );
+                    })()}
                   </td>
                 </tr>
               )}
@@ -564,11 +655,34 @@ export function OrderStatus({
                             {tax.percentage}%)
                           </span>
                           <span className="text-gray-900 dark:text-white font-medium">
-                            {formatCurrencyWithLanguage(
-                              tax.amount,
-                              currency,
-                              language
-                            )}
+                            {(() => {
+                              const baseTaxAmount = tax.amount;
+                              const displayTaxAmount = calculateTotalInCurrency(
+                                baseTaxAmount,
+                                selectedPaymentCurrency
+                              );
+                              return (
+                                <>
+                                  {formatCurrencyWithLanguage(
+                                    displayTaxAmount.amount,
+                                    displayTaxAmount.currency,
+                                    language
+                                  )}
+                                  {selectedPaymentCurrency &&
+                                    selectedPaymentCurrency !== currency && (
+                                      <span className="text-xs font-normal text-gray-500 ml-1">
+                                        (
+                                        {formatCurrencyWithLanguage(
+                                          baseTaxAmount,
+                                          currency,
+                                          language
+                                        )}
+                                        )
+                                      </span>
+                                    )}
+                                </>
+                              );
+                            })()}
                           </span>
                         </div>
                       ))}
@@ -584,11 +698,34 @@ export function OrderStatus({
                 <td
                   className={`py-3 font-bold text-lg text-gray-900 ${isRTL ? "text-left" : "text-right"}`}
                 >
-                  {formatCurrencyWithLanguage(
-                    Number(totalPrice),
-                    currency,
-                    language
-                  )}
+                  {(() => {
+                    const baseTotal = Number(totalPrice);
+                    const displayTotal = calculateTotalInCurrency(
+                      baseTotal,
+                      selectedPaymentCurrency
+                    );
+                    return (
+                      <>
+                        {formatCurrencyWithLanguage(
+                          displayTotal.amount,
+                          displayTotal.currency,
+                          language
+                        )}
+                        {selectedPaymentCurrency &&
+                          selectedPaymentCurrency !== currency && (
+                            <div className="text-xs font-normal text-gray-500 mt-1">
+                              (
+                              {formatCurrencyWithLanguage(
+                                baseTotal,
+                                currency,
+                                language
+                              )}
+                              )
+                            </div>
+                          )}
+                      </>
+                    );
+                  })()}
                 </td>
               </tr>
             </tfoot>
@@ -858,11 +995,34 @@ export function OrderStatus({
                             <td
                               className={`py-3 px-3 text-gray-900 dark:text-white ${isRTL ? "text-left" : "text-right"}`}
                             >
-                              {formatCurrencyWithLanguage(
-                                Number(item.price) * item.quantity,
-                                currency,
-                                language
-                              )}
+                              {(() => {
+                                const basePrice = Number(item.price) * item.quantity;
+                                const displayPrice = calculateTotalInCurrency(
+                                  basePrice,
+                                  selectedPaymentCurrency
+                                );
+                                return (
+                                  <>
+                                    {formatCurrencyWithLanguage(
+                                      displayPrice.amount,
+                                      displayPrice.currency,
+                                      language
+                                    )}
+                                    {selectedPaymentCurrency &&
+                                      selectedPaymentCurrency !== currency && (
+                                        <div className="text-xs font-normal text-gray-500 dark:text-gray-400 mt-0.5">
+                                          (
+                                          {formatCurrencyWithLanguage(
+                                            basePrice,
+                                            currency,
+                                            language
+                                          )}
+                                          )
+                                        </div>
+                                      )}
+                                  </>
+                                );
+                              })()}
                             </td>
                           </tr>
                         );
@@ -878,11 +1038,34 @@ export function OrderStatus({
                           <td
                             className={`py-2 px-3 text-sm text-gray-700 dark:text-gray-300 ${isRTL ? "text-left" : "text-right"}`}
                           >
-                            {formatCurrencyWithLanguage(
-                              Number(subtotal),
-                              currency,
-                              language
-                            )}
+                            {(() => {
+                              const baseSubtotal = Number(subtotal);
+                              const displaySubtotal = calculateTotalInCurrency(
+                                baseSubtotal,
+                                selectedPaymentCurrency
+                              );
+                              return (
+                                <>
+                                  {formatCurrencyWithLanguage(
+                                    displaySubtotal.amount,
+                                    displaySubtotal.currency,
+                                    language
+                                  )}
+                                  {selectedPaymentCurrency &&
+                                    selectedPaymentCurrency !== currency && (
+                                      <div className="text-xs font-normal text-gray-500 dark:text-gray-400 mt-0.5">
+                                        (
+                                        {formatCurrencyWithLanguage(
+                                          baseSubtotal,
+                                          currency,
+                                          language
+                                        )}
+                                        )
+                                      </div>
+                                    )}
+                                </>
+                              );
+                            })()}
                           </td>
                         </tr>
                       )}
@@ -905,15 +1088,38 @@ export function OrderStatus({
                                   className="flex justify-between items-center text-sm"
                                 >
                                   <span className="text-gray-700 dark:text-gray-300">
-                                    {isRTL ? tax.nameAr || tax.name : tax.name} (
-                                    {tax.percentage}%)
+                                    {isRTL ? tax.nameAr || tax.name : tax.name}{" "}
+                                    ({tax.percentage}%)
                                   </span>
                                   <span className="text-gray-900 dark:text-white font-medium">
-                                    {formatCurrencyWithLanguage(
-                                      tax.amount,
-                                      currency,
-                                      language
-                                    )}
+                                    {(() => {
+                                      const baseTaxAmount = tax.amount;
+                                      const displayTaxAmount = calculateTotalInCurrency(
+                                        baseTaxAmount,
+                                        selectedPaymentCurrency
+                                      );
+                                      return (
+                                        <>
+                                          {formatCurrencyWithLanguage(
+                                            displayTaxAmount.amount,
+                                            displayTaxAmount.currency,
+                                            language
+                                          )}
+                                          {selectedPaymentCurrency &&
+                                            selectedPaymentCurrency !== currency && (
+                                              <span className="text-xs font-normal text-gray-500 dark:text-gray-400 ml-1">
+                                                (
+                                                {formatCurrencyWithLanguage(
+                                                  baseTaxAmount,
+                                                  currency,
+                                                  language
+                                                )}
+                                                )
+                                              </span>
+                                            )}
+                                        </>
+                                      );
+                                    })()}
                                   </span>
                                 </div>
                               ))}
@@ -929,11 +1135,34 @@ export function OrderStatus({
                         <td
                           className={`py-3 px-3 font-bold text-lg text-gray-900 dark:text-white ${isRTL ? "text-left" : "text-right"}`}
                         >
-                          {formatCurrencyWithLanguage(
-                            Number(totalPrice),
-                            currency,
-                            language
-                          )}
+                          {(() => {
+                            const baseTotal = Number(totalPrice);
+                            const displayTotal = calculateTotalInCurrency(
+                              baseTotal,
+                              selectedPaymentCurrency
+                            );
+                            return (
+                              <>
+                                {formatCurrencyWithLanguage(
+                                  displayTotal.amount,
+                                  displayTotal.currency,
+                                  language
+                                )}
+                                {selectedPaymentCurrency &&
+                                  selectedPaymentCurrency !== currency && (
+                                    <div className="text-xs font-normal text-gray-500 dark:text-gray-400 mt-1">
+                                      (
+                                      {formatCurrencyWithLanguage(
+                                        baseTotal,
+                                        currency,
+                                        language
+                                      )}
+                                      )
+                                    </div>
+                                  )}
+                              </>
+                            );
+                          })()}
                         </td>
                       </tr>
                     </tfoot>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/components/ui/Toast";
 import { api } from "@/lib/api";
@@ -41,6 +41,11 @@ export default function AdminNotificationsPage() {
   const [sending, setSending] = useState(false);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"send" | "received">("received");
+  const [hasMoreNotifications, setHasMoreNotifications] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const notificationsPerPage = 25;
+  const observerTarget = useRef<HTMLDivElement>(null);
+  const currentPageRef = useRef(1);
   const [formData, setFormData] = useState({
     title: "",
     body: "",
@@ -48,11 +53,6 @@ export default function AdminNotificationsPage() {
     sendTo: "ALL" as "ALL" | "SELECTED" | "SINGLE",
     selectedRestaurants: [] as string[],
   });
-
-  useEffect(() => {
-    fetchRestaurants();
-    fetchNotifications();
-  }, []);
 
   const fetchRestaurants = async () => {
     try {
@@ -68,19 +68,115 @@ export default function AdminNotificationsPage() {
     }
   };
 
-  const fetchNotifications = async () => {
+  const fetchNotifications = async (
+    page: number = 1,
+    append: boolean = false
+  ) => {
     try {
-      setNotificationsLoading(true);
-      const response = await api.get("/admin/notifications");
+      if (append) {
+        setIsLoadingMore(true);
+      } else {
+        setNotificationsLoading(true);
+      }
+
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: notificationsPerPage.toString(),
+      });
+
+      const response = await api.get(`/admin/notifications?${params}`);
       if (response.data.success) {
-        setNotifications(response.data.data);
+        const fetchedNotifications = response.data.data.notifications || [];
+
+        if (append) {
+          // إضافة الإشعارات الجديدة للقائمة الموجودة
+          setNotifications((prev) => {
+            // تجنب التكرار
+            const existingIds = new Set(prev.map((n) => n.id));
+            const newNotifications = fetchedNotifications.filter(
+              (n: AdminNotification) => !existingIds.has(n.id)
+            );
+            return [...prev, ...newNotifications];
+          });
+        } else {
+          setNotifications(fetchedNotifications);
+        }
+
+        // تحديث pagination info
+        if (response.data.data.pagination) {
+          const {
+            total,
+            pages,
+            page: currentPageNum,
+          } = response.data.data.pagination;
+          setHasMoreNotifications(
+            currentPageNum < pages &&
+              fetchedNotifications.length === notificationsPerPage
+          );
+          currentPageRef.current = currentPageNum;
+        } else {
+          setHasMoreNotifications(
+            fetchedNotifications.length === notificationsPerPage
+          );
+          currentPageRef.current = page;
+        }
       }
     } catch (error) {
       console.error("Error fetching notifications:", error);
     } finally {
       setNotificationsLoading(false);
+      setIsLoadingMore(false);
     }
   };
+
+  // دالة جلب المزيد من الإشعارات
+  const loadMoreNotifications = useCallback(() => {
+    if (!isLoadingMore && hasMoreNotifications && !notificationsLoading) {
+      const nextPage = currentPageRef.current + 1;
+      fetchNotifications(nextPage, true);
+    }
+  }, [hasMoreNotifications, isLoadingMore, notificationsLoading]);
+
+  useEffect(() => {
+    fetchRestaurants();
+    fetchNotifications(1, false);
+  }, []);
+
+  // Infinite scroll observer
+  useEffect(() => {
+    if (activeTab !== "received") return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (
+          entries[0].isIntersecting &&
+          hasMoreNotifications &&
+          !isLoadingMore &&
+          !notificationsLoading
+        ) {
+          loadMoreNotifications();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const currentTarget = observerTarget.current;
+    if (currentTarget) {
+      observer.observe(currentTarget);
+    }
+
+    return () => {
+      if (currentTarget) {
+        observer.unobserve(currentTarget);
+      }
+    };
+  }, [
+    hasMoreNotifications,
+    isLoadingMore,
+    notificationsLoading,
+    activeTab,
+    loadMoreNotifications,
+  ]);
 
   const handleSendNotification = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -172,7 +268,7 @@ export default function AdminNotificationsPage() {
     try {
       await api.delete(`/admin/notifications/${notificationId}`);
       showToast(isRTL ? "تم حذف الإشعار" : "Notification deleted", "success");
-      fetchNotifications();
+      fetchNotifications(1, false);
     } catch (error: any) {
       showToast(
         error.response?.data?.message ||
@@ -224,7 +320,12 @@ export default function AdminNotificationsPage() {
                 </div>
               </button>
               <button
-                onClick={() => setActiveTab("received")}
+                onClick={() => {
+                  setActiveTab("received");
+                  if (notifications.length === 0) {
+                    fetchNotifications(1, false);
+                  }
+                }}
                 className={`py-2 px-1 border-b-2 font-medium text-sm ${
                   activeTab === "received"
                     ? "border-primary-500 text-primary-600 dark:text-primary-400"
@@ -538,6 +639,23 @@ export default function AdminNotificationsPage() {
                   </div>
                 </Card>
               ))
+            )}
+
+            {/* Infinite Scroll Trigger */}
+            {hasMoreNotifications && activeTab === "received" && (
+              <div
+                ref={observerTarget}
+                className="py-4 text-center border-t border-gray-200 dark:border-gray-700 mt-8"
+              >
+                {isLoadingMore ? (
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+                    <span className="ml-2 text-gray-600 dark:text-gray-400">
+                      {isRTL ? "جاري تحميل المزيد..." : "Loading more..."}
+                    </span>
+                  </div>
+                ) : null}
+              </div>
             )}
           </div>
         )}

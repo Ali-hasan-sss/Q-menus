@@ -100,7 +100,7 @@ export default function AdminNotificationsDropdown({
           <div className="p-8 text-center">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600 mx-auto"></div>
           </div>
-        ) : notifications.length === 0 ? (
+        ) : !Array.isArray(notifications) || notifications.length === 0 ? (
           <div className="p-8 text-center text-gray-500 dark:text-gray-400">
             {isRTL ? "لا توجد إشعارات" : "No notifications"}
           </div>

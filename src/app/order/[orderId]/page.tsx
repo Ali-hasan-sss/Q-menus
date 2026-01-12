@@ -151,6 +151,10 @@ export default function OrderPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [restaurantCurrency, setRestaurantCurrency] = useState<string>("USD");
+  const [currencyExchanges, setCurrencyExchanges] = useState<any[]>([]);
+  const [selectedPaymentCurrency, setSelectedPaymentCurrency] = useState<
+    string | null
+  >(null);
   const [menus, setMenus] = useState<Menu[]>([]);
   const [menuTheme, setMenuTheme] = useState<MenuTheme | null>(null);
   const [loading, setLoading] = useState(true);
@@ -390,6 +394,42 @@ export default function OrderPage() {
     }
   }, [order?.restaurant?.id, order?.qrCodeId, joinRestaurant, joinTable]);
 
+  // Calculate total in selected currency
+  const calculateTotalInCurrency = (
+    totalInBaseCurrency: number,
+    selectedCurrency: string | null
+  ): { amount: number; currency: string } => {
+    if (!selectedCurrency || selectedCurrency === restaurantCurrency) {
+      return { amount: totalInBaseCurrency, currency: restaurantCurrency };
+    }
+
+    const currencyExchange = currencyExchanges.find(
+      (ce) =>
+        ce.currency.toUpperCase() === selectedCurrency.toUpperCase() &&
+        ce.isActive
+    );
+
+    if (!currencyExchange) {
+      return { amount: totalInBaseCurrency, currency: restaurantCurrency };
+    }
+
+    // Convert from base currency to selected currency
+    // exchangeRate interpretation depends on its value:
+    // - If exchangeRate >= 1: represents how many units of base currency equal 1 unit of selected currency
+    //   Example: exchangeRate = 12100 means 1 USD = 12100 SYP → use division
+    // - If exchangeRate < 1: represents how many units of selected currency equal 1 unit of base currency
+    //   Example: exchangeRate = 0.01 means 1 SYP = 0.01 NEW → use multiplication
+    const exchangeRate = Number(currencyExchange.exchangeRate);
+    const convertedAmount =
+      exchangeRate >= 1
+        ? totalInBaseCurrency / exchangeRate
+        : totalInBaseCurrency * exchangeRate;
+    return {
+      amount: convertedAmount,
+      currency: selectedCurrency,
+    };
+  };
+
   const loadOrderData = async () => {
     try {
       setLoading(true);
@@ -445,6 +485,48 @@ export default function OrderPage() {
             categories: categories,
           },
         ]);
+
+        // Fetch currency exchanges
+        try {
+          const currencyResponse = await publicApi.get(
+            `/public/restaurant/${orderData.restaurant.id}/currency-exchanges`
+          );
+          if (currencyResponse.data.success) {
+            // Filter only active currencies
+            const activeCurrencies = currencyResponse.data.data.filter(
+              (ce: any) => ce.isActive === true
+            );
+            setCurrencyExchanges(activeCurrencies);
+            
+            // Load selected currency from localStorage, or use restaurant default currency
+            try {
+              const savedCurrency = localStorage.getItem(
+                `selectedCurrency_${orderData.restaurant.id}`
+              );
+              if (savedCurrency) {
+                setSelectedPaymentCurrency(savedCurrency);
+              } else {
+                // Default to restaurant's base currency if no saved currency
+                const defaultCurrency = restaurantCurrency || 
+                  (orderData.restaurant as any)?.currency || 
+                  orderData.currency || 
+                  "USD";
+                setSelectedPaymentCurrency(defaultCurrency);
+              }
+            } catch (currencyError) {
+              console.error("Failed to load selected currency:", currencyError);
+              // Default to restaurant's base currency on error
+              const defaultCurrency = restaurantCurrency || 
+                (orderData.restaurant as any)?.currency || 
+                orderData.currency || 
+                "USD";
+              setSelectedPaymentCurrency(defaultCurrency);
+            }
+          }
+        } catch (currencyError) {
+          console.error("Error fetching currency exchanges:", currencyError);
+          // Don't set error state, just log it - currencies are optional
+        }
       }
     } catch (error: any) {
       const message =
@@ -503,6 +585,27 @@ export default function OrderPage() {
         menuTheme={menuTheme}
         tableNumber={order.tableNumber}
         colorOpacity={colorOpacity}
+        restaurantCurrency={restaurantCurrency}
+        currencyExchanges={currencyExchanges}
+        selectedCurrency={selectedPaymentCurrency}
+        onCurrencyChange={(currency) => {
+          setSelectedPaymentCurrency(currency);
+          // Save to localStorage
+          try {
+            if (currency && order?.restaurant?.id) {
+              localStorage.setItem(
+                `selectedCurrency_${order.restaurant.id}`,
+                currency
+              );
+            } else if (order?.restaurant?.id) {
+              localStorage.removeItem(
+                `selectedCurrency_${order.restaurant.id}`
+              );
+            }
+          } catch (error) {
+            console.error("Failed to save selected currency:", error);
+          }
+        }}
       />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-[100px]">
@@ -526,6 +629,8 @@ export default function OrderPage() {
                 order.currency ||
                 "USD"
               }
+              currencyExchanges={currencyExchanges}
+              selectedPaymentCurrency={selectedPaymentCurrency}
               menuTheme={menuTheme}
               onNewOrder={() => {
                 // Navigate to menu page with appropriate tableNumber for adding items
@@ -669,14 +774,37 @@ export default function OrderPage() {
                     {isRTL ? "إجمالي الطلب" : "Total Amount"}
                   </p>
                   <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                    {formatCurrencyWithLanguage(
-                      Number(order.totalPrice),
-                      restaurantCurrency ||
-                        (order.restaurant as any)?.currency ||
-                        order.currency ||
-                        "USD",
-                      language
-                    )}
+                    {(() => {
+                      const baseTotal = Number(order.totalPrice);
+                      const displayTotal = calculateTotalInCurrency(
+                        baseTotal,
+                        selectedPaymentCurrency
+                      );
+                      return (
+                        <>
+                          {formatCurrencyWithLanguage(
+                            displayTotal.amount,
+                            displayTotal.currency,
+                            language
+                          )}
+                          {selectedPaymentCurrency &&
+                            selectedPaymentCurrency !== restaurantCurrency && (
+                              <div className="text-xs font-normal text-gray-500 dark:text-gray-400 mt-1">
+                                (
+                                {formatCurrencyWithLanguage(
+                                  baseTotal,
+                                  restaurantCurrency ||
+                                    (order.restaurant as any)?.currency ||
+                                    order.currency ||
+                                    "USD",
+                                  language
+                                )}
+                                )
+                              </div>
+                            )}
+                        </>
+                      );
+                    })()}
                   </p>
                 </div>
 

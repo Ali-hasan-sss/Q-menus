@@ -215,41 +215,62 @@ export function formatCurrencyWithLanguage(
     JPY: { ar: "ين", en: "JPY" },
     CAD: { ar: "دولار كندي", en: "CAD" },
     AUD: { ar: "دولار أسترالي", en: "AUD" },
+    TRY: { ar: "ليرة تركية", en: "TRY" },
+    EGP: { ar: "جنيه مصري", en: "EGP" },
+    JOD: { ar: "دينار أردني", en: "JOD" },
+    LBP: { ar: "ليرة لبنانية", en: "LBP" },
+    IQD: { ar: "دينار عراقي", en: "IQD" },
+    KWD: { ar: "دينار كويتي", en: "KWD" },
+    QAR: { ar: "ريال قطري", en: "QAR" },
+    OMR: { ar: "ريال عماني", en: "OMR" },
+    BHD: { ar: "دينار بحريني", en: "BHD" },
+    CNY: { ar: "يوان صيني", en: "CNY" },
+    INR: { ar: "روبية هندية", en: "INR" },
+    RUB: { ar: "روبل روسي", en: "RUB" },
+    CHF: { ar: "فرنك سويسري", en: "CHF" },
+    // Special Syrian Pound variants
+    SYP_NEW: { ar: "ليرة سورية جديدة", en: "SYP (New)" },
+    SYP_OLD: { ar: "ليرة سورية قديمة", en: "SYP (Old)" },
+    NEW: { ar: "نيو", en: "NEW" },
   };
 
-  // Handle SYP currency with Arabic/English formatting
-  if (currency === "SYP") {
-    const formattedAmount = new Intl.NumberFormat(
-      language === "AR" ? "ar-SY" : "en-US"
-    ).format(amount);
-    return language === "AR"
-      ? `${formattedAmount} ${currencyTranslations.SYP.ar}`
-      : `${formattedAmount} ${currencyTranslations.SYP.en}`;
-  }
+  const isArabic = language === "AR";
+  const locale = isArabic ? "ar-SA" : "en-US";
 
-  // For other currencies, use standard formatting with translated currency name
-  const locale = language === "AR" ? "ar-SA" : "en-US";
+  // Check if amount has decimal part and if it's zero
+  const hasDecimalPart = amount % 1 !== 0;
+  const decimalPart = amount % 1;
+  const isDecimalZero = Math.abs(decimalPart) < 0.0001; // Account for floating point precision
 
   // Format the number with proper locale
-  const numericPart = new Intl.NumberFormat(locale, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
+  // Only show decimals if they exist and are not zero
+  const formatter = new Intl.NumberFormat(locale, {
+    minimumFractionDigits: hasDecimalPart && !isDecimalZero ? 2 : 0,
+    maximumFractionDigits: hasDecimalPart && !isDecimalZero ? 2 : 0,
+    useGrouping: true, // Enable thousands separator
+  });
 
-  // If currency has translation, use translated name
-  if (currencyTranslations[currency]) {
-    const currencyName =
-      language === "AR"
-        ? currencyTranslations[currency].ar
-        : currencyTranslations[currency].en;
-    return `${numericPart} ${currencyName}`;
+  let formattedAmount = formatter.format(amount);
+
+  // Improve separator clarity for better distinction between thousands and decimals
+  if (isArabic) {
+    // For Arabic: Use Arabic comma (،) for thousands and dot (.) for decimals
+    // This makes it clearer: 15،000.50 vs 15,000.50
+    formattedAmount = formattedAmount
+      .replace(/,/g, "،") // Replace comma with Arabic comma (،) for thousands
+      .replace(/\./g, "."); // Keep dot (.) for decimals - clearer distinction
+  } else {
+    // For English: Keep standard formatting but ensure clarity
+    // Standard: 15,000.50 (comma for thousands, dot for decimals)
+    formattedAmount = formattedAmount; // Already correct format
   }
 
-  // Fallback to standard currency formatting
-  return new Intl.NumberFormat(locale, {
-    style: "currency",
-    currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
+  // Get currency name
+  const currencyName = currencyTranslations[currency]
+    ? isArabic
+      ? currencyTranslations[currency].ar
+      : currencyTranslations[currency].en
+    : currency;
+
+  return `${formattedAmount} ${currencyName}`;
 }

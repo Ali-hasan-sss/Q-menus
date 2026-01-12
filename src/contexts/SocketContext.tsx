@@ -226,13 +226,16 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 
       // Check if order was successfully created (not failed)
       if (data.order && data.order.id) {
-        // Increment new orders count
+        // Check if this is a quick order (created by cashier)
+        const isQuickOrder = data.order.tableNumber === "QUICK";
+
+        // Increment new orders count (including quick orders)
         setNewOrdersCount((prev) => prev + 1);
 
-        // Play notification sound for successful new orders only
+        // Play notification sound for all new orders (including quick orders)
         playNewOrderSound();
 
-        // You can emit a custom event or update state here
+        // Dispatch event for UI updates
         window.dispatchEvent(new CustomEvent("newOrder", { detail: data }));
       } else {
         // Order creation failed - no sound, no count increment
@@ -246,6 +249,20 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
       // Check if order exists and is not cancelled or completed
       if (data.order && data.order.id && data.order.status) {
         const status = data.order.status;
+
+        // Check if this is a quick order (created by cashier)
+        const isQuickOrder = data.order.tableNumber === "QUICK";
+
+        // Skip notifications for quick orders
+        if (isQuickOrder) {
+          console.log(
+            "⚡ Quick order update detected - skipping sound and visual effects"
+          );
+          window.dispatchEvent(
+            new CustomEvent("orderUpdated", { detail: data })
+          );
+          return;
+        }
 
         // Only show notifications for customer-initiated updates (new order or adding items)
         // Don't show notifications for restaurant/kitchen status changes
@@ -274,6 +291,22 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 
     newSocket.on("order_status_update", (data) => {
       console.log("Order status update:", data);
+
+      // Check if this is a quick order (created by cashier)
+      const isQuickOrder = data.order?.tableNumber === "QUICK";
+
+      // Skip notifications for quick orders
+      if (isQuickOrder) {
+        console.log(
+          "⚡ Quick order status update detected - skipping sound and visual effects"
+        );
+        // Still dispatch events for UI updates, but without sound/visual effects
+        window.dispatchEvent(
+          new CustomEvent("orderStatusUpdate", { detail: data })
+        );
+        window.dispatchEvent(new CustomEvent("orderUpdated", { detail: data }));
+        return;
+      }
 
       // Only show notifications for customer-initiated updates (new order or adding items)
       // Don't show notifications for restaurant/kitchen status changes
@@ -307,8 +340,17 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     newSocket.on("waiter_request", (data) => {
       console.log("Waiter request received:", data);
 
-      // Play notification sound for waiter requests
-      playWaiterRequestSound();
+      // Check if we're on the kitchen display page - don't play sound there
+      const isKitchenPage =
+        typeof window !== "undefined" &&
+        window.location.pathname.startsWith("/kitchen");
+
+      // Play notification sound for waiter requests only if not on kitchen page
+      if (!isKitchenPage) {
+        playWaiterRequestSound();
+      } else {
+        console.log("🔇 Kitchen display page - skipping waiter request sound");
+      }
 
       // Dispatch custom event for components to listen
       window.dispatchEvent(new CustomEvent("waiterRequest", { detail: data }));
@@ -389,7 +431,13 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 
   const joinAdmin = (adminId: string) => {
     if (socket) {
+      console.log("🔗 Joining admin room:", adminId);
       socket.emit("join_admin", { adminId });
+      
+      // Listen for confirmation
+      socket.once("joined_admin", (data) => {
+        console.log("✅ Successfully joined admin room:", data);
+      });
     }
   };
 

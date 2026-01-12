@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/ui/Toast";
@@ -84,11 +84,11 @@ export default function UsersPage() {
   const [totalUsers, setTotalUsers] = useState(0);
   const [isSearching, setIsSearching] = useState(false);
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
-
-  useEffect(() => {
-    fetchUsers();
-    fetchPlans();
-  }, []);
+  const [hasMoreUsers, setHasMoreUsers] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const usersPerPage = 25;
+  const observerTarget = useRef<HTMLDivElement>(null);
+  const currentPageRef = useRef(1);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -105,41 +105,76 @@ export default function UsersPage() {
     };
   }, []);
 
-  useEffect(() => {
-    // Only run search when filters change, not on initial load
-    if (searchTerm || roleFilter !== "ALL" || statusFilter !== "ALL") {
-      const timeoutId = setTimeout(() => {
-        searchUsers();
-      }, 500);
-
-      return () => clearTimeout(timeoutId);
-    }
-  }, [searchTerm, roleFilter, statusFilter, currentPage]);
-
-  const fetchUsers = async () => {
+  const fetchUsers = async (page: number = 1, append: boolean = false) => {
     try {
-      setLoading(true);
-      const response = await api.get("/admin/users");
+      if (append) {
+        setIsLoadingMore(true);
+      } else {
+        setLoading(true);
+      }
+
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: usersPerPage.toString(),
+      });
+
+      const response = await api.get(`/admin/users?${params}`);
       if (response.data.success) {
-        setUsers(response.data.data.users);
-        setTotalUsers(
-          response.data.data.total || response.data.data.users.length
-        );
-        setTotalPages(response.data.data.totalPages || 1);
+        const fetchedUsers = response.data.data.users || [];
+
+        if (append) {
+          // إضافة المستخدمين الجدد للقائمة الموجودة
+          setUsers((prev) => {
+            // تجنب التكرار
+            const existingIds = new Set(prev.map((u) => u.id));
+            const newUsers = fetchedUsers.filter(
+              (u: User) => !existingIds.has(u.id)
+            );
+            return [...prev, ...newUsers];
+          });
+        } else {
+          setUsers(fetchedUsers);
+        }
+
+        // تحديث pagination info
+        if (response.data.data.pagination) {
+          const {
+            total,
+            pages,
+            page: currentPageNum,
+          } = response.data.data.pagination;
+          setTotalUsers(total);
+          setHasMoreUsers(
+            currentPageNum < pages && fetchedUsers.length === usersPerPage
+          );
+          setCurrentPage(currentPageNum);
+          currentPageRef.current = currentPageNum;
+        } else {
+          setTotalUsers(response.data.data.total || fetchedUsers.length);
+          setTotalPages(response.data.data.totalPages || 1);
+          setHasMoreUsers(fetchedUsers.length === usersPerPage);
+          currentPageRef.current = page;
+        }
       }
     } catch (error) {
       console.error("Error fetching users:", error);
     } finally {
       setLoading(false);
+      setIsLoadingMore(false);
     }
   };
 
-  const searchUsers = async () => {
+  const searchUsers = async (page: number = 1, append: boolean = false) => {
     try {
-      setIsSearching(true);
+      if (append) {
+        setIsLoadingMore(true);
+      } else {
+        setIsSearching(true);
+      }
+
       const params = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: "10",
+        page: page.toString(),
+        limit: usersPerPage.toString(),
         ...(searchTerm && { search: searchTerm }),
         ...(roleFilter !== "ALL" && { role: roleFilter }),
         ...(statusFilter !== "ALL" && { status: statusFilter }),
@@ -147,16 +182,116 @@ export default function UsersPage() {
 
       const response = await api.get(`/admin/users/search?${params}`);
       if (response.data.success) {
-        setUsers(response.data.data.users);
-        setTotalUsers(response.data.data.total);
-        setTotalPages(response.data.data.totalPages);
+        const fetchedUsers = response.data.data.users || [];
+
+        if (append) {
+          // إضافة المستخدمين الجدد للقائمة الموجودة
+          setUsers((prev) => {
+            // تجنب التكرار
+            const existingIds = new Set(prev.map((u) => u.id));
+            const newUsers = fetchedUsers.filter(
+              (u: User) => !existingIds.has(u.id)
+            );
+            return [...prev, ...newUsers];
+          });
+        } else {
+          setUsers(fetchedUsers);
+        }
+
+        // تحديث pagination info
+        // search endpoint يستخدم بنية مختلفة (total, totalPages, currentPage)
+        const total = response.data.data.total || fetchedUsers.length;
+        const totalPages =
+          response.data.data.totalPages || Math.ceil(total / usersPerPage);
+        const currentPageNum = response.data.data.currentPage || page;
+
+        setTotalUsers(total);
+        setTotalPages(totalPages);
+        setHasMoreUsers(
+          currentPageNum < totalPages && fetchedUsers.length === usersPerPage
+        );
+        setCurrentPage(currentPageNum);
+        currentPageRef.current = currentPageNum;
       }
     } catch (error) {
       console.error("Error searching users:", error);
     } finally {
       setIsSearching(false);
+      setIsLoadingMore(false);
     }
   };
+
+  // دالة جلب المزيد من المستخدمين
+  const loadMoreUsers = useCallback(() => {
+    if (!isLoadingMore && hasMoreUsers && !loading) {
+      const nextPage = currentPageRef.current + 1;
+      if (searchTerm || roleFilter !== "ALL" || statusFilter !== "ALL") {
+        searchUsers(nextPage, true);
+      } else {
+        fetchUsers(nextPage, true);
+      }
+    }
+  }, [
+    hasMoreUsers,
+    isLoadingMore,
+    loading,
+    searchTerm,
+    roleFilter,
+    statusFilter,
+  ]);
+
+  useEffect(() => {
+    fetchUsers(1, false);
+    fetchPlans();
+  }, []);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    if (searchTerm || roleFilter !== "ALL" || statusFilter !== "ALL") {
+      setCurrentPage(1);
+      currentPageRef.current = 1;
+      setHasMoreUsers(true);
+    }
+  }, [searchTerm, roleFilter, statusFilter]);
+
+  useEffect(() => {
+    // Only run search when filters change, not on initial load
+    if (searchTerm || roleFilter !== "ALL" || statusFilter !== "ALL") {
+      const timeoutId = setTimeout(() => {
+        searchUsers(1, false);
+      }, 500);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [searchTerm, roleFilter, statusFilter]);
+
+  // Infinite scroll observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (
+          entries[0].isIntersecting &&
+          hasMoreUsers &&
+          !isLoadingMore &&
+          !loading
+        ) {
+          loadMoreUsers();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const currentTarget = observerTarget.current;
+    if (currentTarget) {
+      observer.observe(currentTarget);
+    }
+
+    return () => {
+      if (currentTarget) {
+        observer.unobserve(currentTarget);
+      }
+    };
+  }, [hasMoreUsers, isLoadingMore, loading, loadMoreUsers]);
 
   const fetchPlans = async () => {
     try {
@@ -285,9 +420,9 @@ export default function UsersPage() {
 
       // Refresh users data to show updated subscriptions
       if (searchTerm || roleFilter !== "ALL" || statusFilter !== "ALL") {
-        searchUsers();
+        searchUsers(1, false);
       } else {
-        fetchUsers();
+        fetchUsers(1, false);
       }
     } catch (error: any) {
       showToast(
@@ -305,9 +440,11 @@ export default function UsersPage() {
     setRoleFilter("ALL");
     setStatusFilter("ALL");
     setCurrentPage(1);
+    currentPageRef.current = 1;
+    setHasMoreUsers(true);
     setShowSearchBar(false);
     setShowFilters(false);
-    fetchUsers();
+    fetchUsers(1, false);
   };
 
   if (loading) {
@@ -1099,76 +1236,46 @@ export default function UsersPage() {
           </Card>
         )}
 
-        {/* Pagination */}
-        {totalPages > 1 && (
+        {/* Infinite Scroll Trigger */}
+        {hasMoreUsers && (
           <div
-            className={`flex justify-center items-center mt-8 ${isRTL ? "space-x-reverse space-x-2" : "space-x-2"}`}
+            ref={observerTarget}
+            className="py-4 text-center border-t border-gray-200 dark:border-gray-700 mt-8"
           >
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setCurrentPage(currentPage - 1)}
-              disabled={currentPage === 1}
-              className={isRTL ? "flex-row-reverse" : "flex-row"}
-            >
-              <svg
-                className={`w-4 h-4 ${isRTL ? "ml-1" : "mr-1"}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 19l-7-7 7-7"
-                />
-              </svg>
-              {isRTL ? "السابق" : "Previous"}
-            </Button>
+            {isLoadingMore ? (
+              <div className="flex items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+                <span className="ml-2 text-gray-600 dark:text-gray-400">
+                  {isRTL ? "جاري تحميل المزيد..." : "Loading more..."}
+                </span>
+              </div>
+            ) : null}
+          </div>
+        )}
 
-            <div
-              className={`flex ${isRTL ? "space-x-reverse space-x-1" : "space-x-1"}`}
+        {users.length === 0 && !loading && (
+          <div className="text-center py-12">
+            <svg
+              className="mx-auto h-12 w-12 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
             >
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                const pageNum = i + 1;
-                const isActive = pageNum === currentPage;
-                return (
-                  <Button
-                    key={pageNum}
-                    variant={isActive ? "primary" : "secondary"}
-                    size="sm"
-                    onClick={() => setCurrentPage(pageNum)}
-                    className="w-10"
-                  >
-                    {pageNum}
-                  </Button>
-                );
-              })}
-            </div>
-
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setCurrentPage(currentPage + 1)}
-              disabled={currentPage === totalPages}
-              className={isRTL ? "flex-row-reverse" : "flex-row"}
-            >
-              {isRTL ? "التالي" : "Next"}
-              <svg
-                className={`w-4 h-4 ${isRTL ? "mr-1" : "ml-1"}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 5l7 7-7 7"
-                />
-              </svg>
-            </Button>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
+              />
+            </svg>
+            <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">
+              {isRTL ? "لا يوجد مستخدمين" : "No users"}
+            </h3>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              {isRTL
+                ? "لا يوجد مستخدمين في النظام"
+                : "No users found in the system"}
+            </p>
           </div>
         )}
 
@@ -1539,9 +1646,9 @@ export default function UsersPage() {
           onUserAdded={() => {
             // Refresh users data
             if (searchTerm || roleFilter !== "ALL" || statusFilter !== "ALL") {
-              searchUsers();
+              searchUsers(1, false);
             } else {
-              fetchUsers();
+              fetchUsers(1, false);
             }
           }}
         />

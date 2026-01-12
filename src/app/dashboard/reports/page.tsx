@@ -70,12 +70,14 @@ export default function ReportsPage() {
   const [totalOrders, setTotalOrders] = useState(0);
   const ordersPerPage = 25; // 25 طلب لكل صفحة
   const observerTarget = useRef<HTMLDivElement>(null);
+  const currentPageRef = useRef(1); // لتتبع الصفحة الحالية بشكل دقيق
 
   useEffect(() => {
     const initCurrency = async () => {
       const currency = await fetchRestaurantCurrency();
       // بعد جلب العملة، جلب التقارير مع تمرير العملة مباشرة
       setCurrentPage(1);
+      currentPageRef.current = 1;
       setHasMoreOrders(true);
       // Pass currency directly to fetchReports to avoid race condition
       fetchReports(1, false, currency);
@@ -86,9 +88,10 @@ export default function ReportsPage() {
   // دالة جلب المزيد من الطلبات
   const loadMoreOrders = useCallback(() => {
     if (!isLoadingMore && hasMoreOrders) {
-      fetchReports(currentPage + 1, true);
+      const nextPage = currentPageRef.current + 1;
+      fetchReports(nextPage, true);
     }
-  }, [currentPage, hasMoreOrders, isLoadingMore]);
+  }, [hasMoreOrders, isLoadingMore]);
 
   // useEffect للـ Intersection Observer (Infinite Scroll)
   useEffect(() => {
@@ -118,6 +121,7 @@ export default function ReportsPage() {
     // فقط إذا كانت العملة قد تم جلبها بالفعل
     if (restaurantCurrency !== null) {
       setCurrentPage(1);
+      currentPageRef.current = 1;
       setHasMoreOrders(true);
       fetchReports(1, false);
     }
@@ -243,11 +247,17 @@ export default function ReportsPage() {
             page: currentPageNum,
           } = response.data.data.pagination;
           setTotalOrders(total);
-          setHasMoreOrders(currentPageNum < pages);
+          // التحقق من وجود المزيد من الصفحات
+          setHasMoreOrders(
+            currentPageNum < pages && fetchedOrders.length === ordersPerPage
+          );
           setCurrentPage(currentPageNum);
+          currentPageRef.current = currentPageNum;
         } else {
           // إذا لم يكن هناك pagination، تحقق من عدد الطلبات
+          // إذا كان عدد الطلبات أقل من ordersPerPage، فلا يوجد المزيد
           setHasMoreOrders(fetchedOrders.length === ordersPerPage);
+          currentPageRef.current = page;
         }
 
         // Try to get currency from response if available
@@ -334,6 +344,155 @@ export default function ReportsPage() {
       : statusTranslations[status]?.en || status;
   };
 
+  const [isExporting, setIsExporting] = useState(false);
+  const [showCustomReportModal, setShowCustomReportModal] = useState(false);
+  const [customStartDateTime, setCustomStartDateTime] = useState("");
+  const [customEndDateTime, setCustomEndDateTime] = useState("");
+  const [isExportingCustom, setIsExportingCustom] = useState(false);
+
+  const handleExportDailyReport = async () => {
+    try {
+      setIsExporting(true);
+      const lang = isRTL ? "ar" : "en";
+      const response = await api.get(
+        `/order/export-daily-report?lang=${lang}`,
+        {
+          responseType: "blob",
+        }
+      );
+
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+
+      // Get filename from Content-Disposition header or use default
+      const contentDisposition = response.headers["content-disposition"];
+      let filename = `daily_report_${new Date().toISOString().split("T")[0]}.xlsx`;
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(
+          /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/
+        );
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/['"]/g, "");
+          // Decode URI if needed
+          try {
+            filename = decodeURIComponent(filename);
+          } catch (e) {
+            // If decoding fails, use as is
+          }
+        }
+      }
+
+      link.setAttribute("download", filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      showToast(
+        isRTL ? "تم تصدير التقرير بنجاح" : "Report exported successfully",
+        "success"
+      );
+    } catch (error: any) {
+      console.error("Error exporting daily report:", error);
+      showToast(
+        error.response?.data?.message ||
+          (isRTL ? "حدث خطأ أثناء تصدير التقرير" : "Error exporting report"),
+        "error"
+      );
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportCustomReport = async () => {
+    if (!customStartDateTime || !customEndDateTime) {
+      showToast(
+        isRTL
+          ? "يرجى تحديد تاريخ ووقت البداية والنهاية"
+          : "Please select start and end date/time",
+        "error"
+      );
+      return;
+    }
+
+    const startDate = new Date(customStartDateTime);
+    const endDate = new Date(customEndDateTime);
+
+    if (startDate >= endDate) {
+      showToast(
+        isRTL
+          ? "تاريخ البداية يجب أن يكون قبل تاريخ النهاية"
+          : "Start date must be before end date",
+        "error"
+      );
+      return;
+    }
+
+    try {
+      setIsExportingCustom(true);
+      const lang = isRTL ? "ar" : "en";
+      const response = await api.post(
+        `/order/export-custom-report`,
+        {
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+          lang,
+        },
+        {
+          responseType: "blob",
+        }
+      );
+
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+
+      // Get filename from Content-Disposition header or use default
+      const contentDisposition = response.headers["content-disposition"];
+      let filename = `custom_report_${startDate.toISOString().split("T")[0]}.xlsx`;
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(
+          /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/
+        );
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/['"]/g, "");
+          // Decode URI if needed
+          try {
+            filename = decodeURIComponent(filename);
+          } catch (e) {
+            // If decoding fails, use as is
+          }
+        }
+      }
+
+      link.setAttribute("download", filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      showToast(
+        isRTL ? "تم تصدير التقرير بنجاح" : "Report exported successfully",
+        "success"
+      );
+      setShowCustomReportModal(false);
+      setCustomStartDateTime("");
+      setCustomEndDateTime("");
+    } catch (error: any) {
+      console.error("Error exporting custom report:", error);
+      showToast(
+        error.response?.data?.message ||
+          (isRTL ? "حدث خطأ أثناء تصدير التقرير" : "Error exporting report"),
+        "error"
+      );
+    } finally {
+      setIsExportingCustom(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -409,23 +568,99 @@ export default function ReportsPage() {
                 </button>
               </div>
 
-              {/* Custom Date Range */}
-              <div className="flex gap-2 items-center">
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-                  placeholder={isRTL ? "من" : "From"}
-                />
-                <span className="text-gray-500 dark:text-gray-400">-</span>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-                  placeholder={isRTL ? "إلى" : "To"}
-                />
+              <div className="flex flex-col md:flex-row gap-3 md:gap-2 items-stretch md:items-center w-full md:w-auto">
+                {/* Custom Date Range */}
+                <div className="flex gap-2 items-center w-full md:w-auto">
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="flex-1 md:flex-none px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                    placeholder={isRTL ? "من" : "From"}
+                  />
+                  <span className="text-gray-500 dark:text-gray-400 hidden sm:inline">
+                    -
+                  </span>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="flex-1 md:flex-none px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                    placeholder={isRTL ? "إلى" : "To"}
+                  />
+                </div>
+
+                {/* Export Buttons */}
+                <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                  {/* Export Daily Report Button */}
+                  <Button
+                    onClick={handleExportDailyReport}
+                    disabled={isExporting}
+                    className="flex items-center justify-center gap-2 w-full sm:w-auto"
+                  >
+                    {isExporting ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        <span className="hidden sm:inline">
+                          {isRTL ? "جاري التصدير..." : "Exporting..."}
+                        </span>
+                        <span className="sm:hidden">
+                          {isRTL ? "جاري..." : "Exporting..."}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <svg
+                          className="w-5 h-5 flex-shrink-0"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                          />
+                        </svg>
+                        <span className="hidden sm:inline">
+                          {isRTL ? "تصدير تقرير يومي" : "Export Daily Report"}
+                        </span>
+                        <span className="sm:hidden">
+                          {isRTL ? "تقرير يومي" : "Daily Report"}
+                        </span>
+                      </>
+                    )}
+                  </Button>
+
+                  {/* Export Custom Report Button */}
+                  <Button
+                    onClick={() => setShowCustomReportModal(true)}
+                    disabled={isExportingCustom}
+                    variant="outline"
+                    className="flex items-center justify-center gap-2 w-full sm:w-auto"
+                  >
+                    <svg
+                      className="w-5 h-5 flex-shrink-0"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
+                    </svg>
+                    <span className="hidden sm:inline">
+                      {isRTL ? "تصدير تقرير مخصص" : "Export Custom Report"}
+                    </span>
+                    <span className="sm:hidden">
+                      {isRTL ? "تقرير مخصص" : "Custom Report"}
+                    </span>
+                  </Button>
+                </div>
               </div>
             </div>
           </Card>
@@ -695,6 +930,123 @@ export default function ReportsPage() {
           </Card>
         </div>
       </div>
+
+      {/* Custom Report Modal */}
+      {showCustomReportModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-4 sm:p-6 my-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">
+                {isRTL ? "تصدير تقرير مخصص" : "Export Custom Report"}
+              </h3>
+              <button
+                onClick={() => {
+                  setShowCustomReportModal(false);
+                  setCustomStartDateTime("");
+                  setCustomEndDateTime("");
+                }}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-1"
+              >
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {isRTL ? "من" : "From"}
+                </label>
+                <input
+                  type="datetime-local"
+                  value={customStartDateTime}
+                  onChange={(e) => setCustomStartDateTime(e.target.value)}
+                  className="w-full px-3 py-2 text-sm sm:text-base border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {isRTL ? "إلى" : "To"}
+                </label>
+                <input
+                  type="datetime-local"
+                  value={customEndDateTime}
+                  onChange={(e) => setCustomEndDateTime(e.target.value)}
+                  className="w-full px-3 py-2 text-sm sm:text-base border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  required
+                />
+              </div>
+
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                {isRTL
+                  ? "سيتم تصدير جميع الطلبات المكتملة في الفترة المحددة"
+                  : "All completed orders in the selected time range will be exported"}
+              </p>
+
+              <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowCustomReportModal(false);
+                    setCustomStartDateTime("");
+                    setCustomEndDateTime("");
+                  }}
+                  className="w-full sm:w-auto"
+                >
+                  {isRTL ? "إلغاء" : "Cancel"}
+                </Button>
+                <Button
+                  onClick={handleExportCustomReport}
+                  disabled={
+                    isExportingCustom ||
+                    !customStartDateTime ||
+                    !customEndDateTime
+                  }
+                  className="w-full sm:w-auto"
+                >
+                  {isExportingCustom ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      {isRTL ? "جاري التصدير..." : "Exporting..."}
+                    </>
+                  ) : (
+                    <>
+                      <svg
+                        className="w-5 h-5 mr-2"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
+                      </svg>
+                      {isRTL ? "تصدير" : "Export"}
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

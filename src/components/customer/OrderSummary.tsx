@@ -7,6 +7,13 @@ import { Input } from "@/components/ui/Input";
 import { formatCurrencyWithLanguage } from "@/lib/utils";
 import { useLanguage } from "@/contexts/LanguageContext";
 
+interface CurrencyExchange {
+  id: string;
+  currency: string;
+  exchangeRate: number;
+  isActive: boolean;
+}
+
 interface OrderSummaryProps {
   orderItems: Array<{
     menuItemId: string;
@@ -43,6 +50,9 @@ interface OrderSummaryProps {
     accentColor?: string;
   } | null;
   findMenuItemById?: (id: string) => any; // Function to find original menu item data
+  currencyExchanges?: CurrencyExchange[];
+  selectedPaymentCurrency?: string | null;
+  setSelectedPaymentCurrency?: (currency: string | null) => void;
 }
 
 export function OrderSummary({
@@ -66,8 +76,49 @@ export function OrderSummary({
   onClose,
   theme,
   findMenuItemById,
+  currencyExchanges = [],
+  selectedPaymentCurrency,
+  setSelectedPaymentCurrency,
 }: OrderSummaryProps) {
   const { language } = useLanguage();
+
+  // Calculate total in selected currency
+  const calculateTotalInCurrency = (
+    totalInBaseCurrency: number,
+    selectedCurrency: string | null | undefined
+  ): { amount: number; currency: string } => {
+    if (!selectedCurrency || selectedCurrency === currency) {
+      return { amount: totalInBaseCurrency, currency };
+    }
+
+    const currencyExchange = currencyExchanges.find(
+      (ce) =>
+        ce.currency.toUpperCase() === selectedCurrency.toUpperCase() &&
+        ce.isActive
+    );
+
+    if (!currencyExchange) {
+      return { amount: totalInBaseCurrency, currency };
+    }
+
+    // Convert from base currency to selected currency
+    // exchangeRate interpretation depends on its value:
+    // - If exchangeRate >= 1: represents how many units of base currency equal 1 unit of selected currency
+    //   Example: exchangeRate = 12100 means 1 USD = 12100 SYP → use division
+    // - If exchangeRate < 1: represents how many units of selected currency equal 1 unit of base currency
+    //   Example: exchangeRate = 0.01 means 1 SYP = 0.01 NEW → use multiplication
+    const exchangeRate = Number(currencyExchange.exchangeRate);
+    const convertedAmount =
+      exchangeRate >= 1
+        ? totalInBaseCurrency / exchangeRate
+        : totalInBaseCurrency * exchangeRate;
+    return {
+      amount: convertedAmount,
+      currency: selectedCurrency,
+    };
+  };
+
+  const displayTotal = calculateTotalInCurrency(total, selectedPaymentCurrency);
   if (orderItems.length === 0) {
     return (
       <Card className="sticky top-8">
@@ -191,20 +242,56 @@ export function OrderSummary({
         />
       </div>
 
+      {/* Currency Selector */}
+      {currencyExchanges.length > 0 && setSelectedPaymentCurrency && (
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-black mb-1">
+            {isRTL ? "عملة الدفع:" : "Payment Currency:"}
+          </label>
+          <select
+            value={selectedPaymentCurrency || currency}
+            onChange={(e) =>
+              setSelectedPaymentCurrency(
+                e.target.value === currency ? null : e.target.value
+              )
+            }
+            className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-black focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+          >
+            <option value={currency}>
+              {currency} ({isRTL ? "أساسي" : "Base"})
+            </option>
+            {currencyExchanges.map((ce) => (
+              <option key={ce.id} value={ce.currency}>
+                {ce.currency}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* Total */}
       <div className="border-t border-gray-200 pt-4 mb-6">
         <div className="flex justify-between items-center">
           <span className="text-lg font-semibold text-black">
             {isRTL ? "المجموع:" : "Total:"}
           </span>
-          <span
-            className="text-xl font-bold"
-            style={{
-              color: theme?.primaryColor || "var(--theme-primary)",
-            }}
-          >
-            {formatCurrencyWithLanguage(total, currency, language)}
-          </span>
+          <div className="text-right">
+            <span
+              className="text-xl font-bold block"
+              style={{
+                color: theme?.primaryColor || "var(--theme-primary)",
+              }}
+            >
+              {formatCurrencyWithLanguage(displayTotal.amount, displayTotal.currency, language)}
+            </span>
+            {selectedPaymentCurrency &&
+              selectedPaymentCurrency !== currency && (
+                <div className="text-xs text-gray-500 mt-1">
+                  {isRTL ? "المجموع الأصلي:" : "Original:"}{" "}
+                  {formatCurrencyWithLanguage(total, currency, language)}
+                </div>
+              )}
+          </div>
         </div>
       </div>
 

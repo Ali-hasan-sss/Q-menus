@@ -2,8 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url("https://fonts.googleapis.com/css2?family=Cairo:wght@200;300;400;500;600;700;800;900&display=swap");
-
 /* Custom animations for hero section */
 @keyframes fade-in-up {
   0% {
@@ -52,7 +50,6 @@ html {
 }
 
 body {
-  font-family: var(--font-inter), system-ui, sans-serif;
   line-height: 1.6;
   color: #1f2937;
   background-color: #ffffff;
@@ -61,17 +58,27 @@ body {
     color 0.3s ease;
 }
 
+/* Apply Cairo font for Arabic (RTL) */
+html[dir="rtl"],
+html[lang="ar"],
+[dir="rtl"],
+[lang="ar"] {
+  font-family: var(--font-cairo), Arial, sans-serif;
+}
+
+/* Apply Inter font for English (LTR) */
+html[dir="ltr"],
+html[lang="en"],
+[dir="ltr"],
+[lang="en"] {
+  font-family: var(--font-inter), system-ui, sans-serif;
+}
+
 .dark body {
   color: #f9fafb;
   background-color: #111827;
 }
 
-/* Arabic text styling */
-.arabic {
-  font-family: var(--font-cairo), Arial, sans-serif;
-  direction: rtl;
-  text-align: right;
-}
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {

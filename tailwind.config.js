@@ -48,9 +48,15 @@ module.exports = {
         "tm-gray": "#2a2a2a",
       },
       fontFamily: {
-        sans: ["Poppins", "Inter", "system-ui", "sans-serif"],
-        arabic: ["Cairo", "Arial", "sans-serif"],
-        poppins: ["Poppins", "sans-serif"],
+        sans: [
+          "var(--font-inter)",
+          "var(--font-cairo)",
+          "system-ui",
+          "sans-serif",
+        ],
+        inter: ["var(--font-inter)", "system-ui", "sans-serif"],
+        cairo: ["var(--font-cairo)", "Arial", "sans-serif"],
+        arabic: ["var(--font-cairo)", "Arial", "sans-serif"],
       },
       animation: {
         "fade-in": "fadeIn 0.5s ease-in-out",

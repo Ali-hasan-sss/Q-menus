@@ -158,6 +158,16 @@ export function ItemFormModal({
     }
   }, [item, categories, isOpen, categoryId]);
 
+  // Ensure categoryId is always set from props when adding new item
+  useEffect(() => {
+    if (!item && categoryId) {
+      setFormData((prev) => ({
+        ...prev,
+        categoryId: categoryId,
+      }));
+    }
+  }, [categoryId, item]);
+
   // Add extra function
   const addExtra = () => {
     if (newExtra.name.trim()) {
@@ -194,6 +204,7 @@ export function ItemFormModal({
 
       const submitData = {
         ...formData,
+        categoryId: categoryId || formData.categoryId, // Use categoryId from props if available
         sortOrder: item?.sortOrder || 0,
         extras: JSON.stringify(extrasJson),
         kitchenSectionId: formData.kitchenSectionId || null,
@@ -209,7 +220,7 @@ export function ItemFormModal({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title} size="lg">
-      <div className="max-h-[70vh] overflow-y-auto pr-2">
+      <div className="max-h-[70vh] overflow-y-auto ">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -292,9 +303,6 @@ export function ItemFormModal({
                 required
               />
             </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 {isRTL ? "الخصم (%)" : "Discount (%)"}{" "}
@@ -317,25 +325,6 @@ export function ItemFormModal({
                 onFocus={(e) => e.target.select()}
                 placeholder="0"
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                {isRTL ? "الفئة" : "Category"}
-              </label>
-              <select
-                value={formData.categoryId}
-                onChange={(e) =>
-                  setFormData({ ...formData, categoryId: e.target.value })
-                }
-                className="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                required
-              >
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {isRTL ? category.nameAr || category.name : category.name}
-                  </option>
-                ))}
-              </select>
             </div>
           </div>
 
@@ -485,7 +474,7 @@ export function ItemFormModal({
               {loading
                 ? t("common.loading")
                 : item
-                  ? t("common.edit")
+                  ? t("common.save")
                   : t("common.add")}
             </Button>
           </div>

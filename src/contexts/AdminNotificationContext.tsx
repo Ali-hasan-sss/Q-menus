@@ -126,7 +126,9 @@ export const AdminNotificationProvider: React.FC<{
         const response = await api.get("/admin/notifications");
         if (response.data.success) {
           console.log("📬 Admin notifications fetched:", response.data.data);
-          setNotifications(response.data.data);
+          // Handle pagination response structure
+          const notificationsData = response.data.data.notifications || response.data.data;
+          setNotifications(Array.isArray(notificationsData) ? notificationsData : []);
 
           // Fetch accurate unread count from API
           await fetchUnreadCount();

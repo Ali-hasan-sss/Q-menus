@@ -12,6 +12,7 @@ import Navbar from "@/components/dashboard/Navbar";
 import { api, publicApi, endpoints } from "@/lib/api";
 import { formatCurrencyWithLanguage } from "@/lib/utils";
 import { MenuItem } from "@/components/customer/MenuItem";
+import { FloatingOrderSummary } from "@/components/customer/FloatingOrderSummary";
 
 interface Order {
   id: string;
@@ -119,11 +120,13 @@ export default function OrdersPage() {
     Array<{
       menuItemId: string;
       quantity: number;
-      price: number;
+      price: string; // Changed to string to match FloatingOrderSummary
+      currency: string; // Added currency
       notes?: string;
       extras?: any;
       name?: string;
       nameAr?: string;
+      originalMenuItem?: any; // Store original menu item data for extras
     }>
   >([]);
   const [quickOrderCategories, setQuickOrderCategories] = useState<any[]>([]);
@@ -134,11 +137,73 @@ export default function OrdersPage() {
     useState(false);
   const [quickOrderLoadingItems, setQuickOrderLoadingItems] = useState(false);
   const [isCreatingQuickOrder, setIsCreatingQuickOrder] = useState(false);
+  const [quickOrderSearchQuery, setQuickOrderSearchQuery] = useState("");
+  const [quickOrderCategorySearchQuery, setQuickOrderCategorySearchQuery] =
+    useState("");
+  const [expandedExtrasItems, setExpandedExtrasItems] = useState<Set<number>>(
+    new Set()
+  );
   const [selectedDeliveryOrderIndex, setSelectedDeliveryOrderIndex] =
     useState(0);
   const [quickOrders, setQuickOrders] = useState<Order[]>([]);
   const [selectedQuickOrderIndex, setSelectedQuickOrderIndex] = useState(0);
+  const [quickOrderCustomerName, setQuickOrderCustomerName] = useState("");
+  const [quickOrderCustomerPhone, setQuickOrderCustomerPhone] = useState("");
+  const [quickOrderCustomerAddress, setQuickOrderCustomerAddress] =
+    useState("");
+  const [quickOrderNotes, setQuickOrderNotes] = useState("");
+  const [quickOrderShowOrderSummary, setQuickOrderShowOrderSummary] =
+    useState(false);
   const menuItemsFetchedRef = useRef(false);
+  const [currencyExchanges, setCurrencyExchanges] = useState<any[]>([]);
+  const [selectedPaymentCurrency, setSelectedPaymentCurrency] = useState<
+    string | null
+  >(null);
+
+  // Popular currencies list with translations
+  const popularCurrencies = [
+    { code: "USD", nameAr: "دولار", nameEn: "US Dollar" },
+    { code: "EUR", nameAr: "يورو", nameEn: "Euro" },
+    { code: "GBP", nameAr: "جنيه إسترليني", nameEn: "British Pound" },
+    { code: "SYP", nameAr: "ليرة سورية", nameEn: "Syrian Pound" },
+    { code: "TRY", nameAr: "ليرة تركية", nameEn: "Turkish Lira" },
+    { code: "SAR", nameAr: "ريال سعودي", nameEn: "Saudi Riyal" },
+    { code: "AED", nameAr: "درهم إماراتي", nameEn: "UAE Dirham" },
+    { code: "JOD", nameAr: "دينار أردني", nameEn: "Jordanian Dinar" },
+    { code: "EGP", nameAr: "جنيه مصري", nameEn: "Egyptian Pound" },
+    { code: "KWD", nameAr: "دينار كويتي", nameEn: "Kuwaiti Dinar" },
+    { code: "QAR", nameAr: "ريال قطري", nameEn: "Qatari Riyal" },
+    { code: "OMR", nameAr: "ريال عماني", nameEn: "Omani Rial" },
+    { code: "BHD", nameAr: "دينار بحريني", nameEn: "Bahraini Dinar" },
+    { code: "LBP", nameAr: "ليرة لبنانية", nameEn: "Lebanese Pound" },
+    { code: "IQD", nameAr: "دينار عراقي", nameEn: "Iraqi Dinar" },
+    { code: "JPY", nameAr: "ين ياباني", nameEn: "Japanese Yen" },
+    { code: "CNY", nameAr: "يوان صيني", nameEn: "Chinese Yuan" },
+    { code: "INR", nameAr: "روبية هندية", nameEn: "Indian Rupee" },
+    { code: "CAD", nameAr: "دولار كندي", nameEn: "Canadian Dollar" },
+    { code: "AUD", nameAr: "دولار أسترالي", nameEn: "Australian Dollar" },
+    { code: "CHF", nameAr: "فرنك سويسري", nameEn: "Swiss Franc" },
+    { code: "RUB", nameAr: "روبل روسي", nameEn: "Russian Ruble" },
+    {
+      code: "SYP_NEW",
+      nameAr: "ليرة سورية جديدة",
+      nameEn: "Syrian Pound (New)",
+    },
+    {
+      code: "SYP_OLD",
+      nameAr: "ليرة سورية قديمة",
+      nameEn: "Syrian Pound (Old)",
+    },
+  ];
+
+  // Helper function to get currency name
+  const getCurrencyName = (currencyCode: string) => {
+    const currency = popularCurrencies.find((c) => c.code === currencyCode);
+    if (currency) {
+      return isRTL ? currency.nameAr : currency.nameEn;
+    }
+    return currencyCode;
+  };
   const [statistics, setStatistics] = useState<{
     revenue: number;
     totalOrders: number;
@@ -202,6 +267,22 @@ export default function OrdersPage() {
     };
   }, [hasMoreOrders, isLoadingMore, loadMoreOrders]);
 
+  // Fetch currency exchanges
+  const fetchCurrencyExchanges = async () => {
+    try {
+      const response = await api.get("/restaurant/currency-exchanges");
+      if (response.data.success) {
+        // Filter only active currencies
+        const activeCurrencies = response.data.data.filter(
+          (ce: any) => ce.isActive === true
+        );
+        setCurrencyExchanges(activeCurrencies);
+      }
+    } catch (error) {
+      console.error("Error fetching currency exchanges:", error);
+    }
+  };
+
   useEffect(() => {
     const loadData = async () => {
       // First fetch currency to ensure it's available
@@ -210,6 +291,7 @@ export default function OrdersPage() {
       await fetchOrders(1, false); // جلب الصفحة الأولى
       await fetchAvailableTables();
       await fetchStatistics();
+      await fetchCurrencyExchanges();
     };
     loadData();
   }, [statisticsPeriod]);
@@ -232,6 +314,8 @@ export default function OrdersPage() {
             );
             setQuickOrderCategories(categories);
           }
+          // Also fetch currency exchanges when modal opens
+          await fetchCurrencyExchanges();
         } catch (error) {
           console.error("Error loading menu categories:", error);
           showToast(
@@ -288,6 +372,237 @@ export default function OrdersPage() {
     }
   }, [quickOrderSelectedCategory, user?.restaurant?.id]);
 
+  // Quick Order Helper Functions
+  const quickOrderAddItemToOrder = (
+    menuItem: any,
+    quantity: number = 1,
+    notes?: string,
+    extras?: any
+  ) => {
+    setQuickOrderItems((prev) => {
+      const existingItem = prev.find((item) => item.menuItemId === menuItem.id);
+
+      // Calculate final price with discount
+      let finalPrice =
+        typeof menuItem.price === "string"
+          ? parseFloat(menuItem.price)
+          : menuItem.price;
+      if (menuItem.discount && menuItem.discount > 0) {
+        finalPrice = finalPrice * (1 - menuItem.discount / 100);
+      }
+
+      // Calculate extras price
+      let extrasPrice = 0;
+      if (extras && Object.keys(extras).length > 0) {
+        Object.values(extras).forEach((extraGroup: any) => {
+          if (Array.isArray(extraGroup)) {
+            extraGroup.forEach((extraId: string) => {
+              // Find the extra option in menuItem.extras
+              if (menuItem.extras) {
+                Object.values(menuItem.extras).forEach((group: any) => {
+                  if (group.options) {
+                    const option = group.options.find(
+                      (opt: any) => opt.id === extraId
+                    );
+                    if (option && option.price) {
+                      extrasPrice += option.price;
+                    }
+                  }
+                });
+              }
+            });
+          }
+        });
+      }
+
+      // Total price including extras
+      const totalPrice = finalPrice + extrasPrice;
+
+      let newItems;
+      if (existingItem) {
+        // For existing items, we need to handle extras properly
+        // If the extras are different, treat as a new item
+        const existingExtras = JSON.stringify(existingItem.extras || {});
+        const newExtras = JSON.stringify(extras || {});
+
+        if (existingExtras === newExtras) {
+          // Same extras, just increase quantity
+          newItems = prev.map((item) =>
+            item.menuItemId === menuItem.id
+              ? {
+                  ...item,
+                  quantity: item.quantity + quantity,
+                  notes: notes || item.notes,
+                }
+              : item
+          );
+        } else {
+          // Different extras, add as new item
+          newItems = [
+            ...prev,
+            {
+              menuItemId: menuItem.id,
+              name: menuItem.name,
+              nameAr: menuItem.nameAr,
+              price: totalPrice.toString(),
+              currency: restaurantCurrency || "USD",
+              quantity,
+              notes,
+              extras,
+              originalMenuItem: menuItem,
+            },
+          ];
+        }
+      } else {
+        newItems = [
+          ...prev,
+          {
+            menuItemId: menuItem.id,
+            name: menuItem.name,
+            nameAr: menuItem.nameAr,
+            price: totalPrice.toString(),
+            currency: restaurantCurrency || "USD",
+            quantity,
+            notes,
+            extras,
+            originalMenuItem: menuItem,
+          },
+        ];
+      }
+
+      return newItems;
+    });
+
+    // Show order summary when items are added
+    setQuickOrderShowOrderSummary(true);
+  };
+
+  const quickOrderRemoveFromOrder = (menuItemId: string) => {
+    setQuickOrderItems((prev) => {
+      const newItems = prev.filter((item) => item.menuItemId !== menuItemId);
+      // Hide order summary if no items left
+      if (newItems.length === 0) {
+        setQuickOrderShowOrderSummary(false);
+      }
+      return newItems;
+    });
+  };
+
+  const quickOrderUpdateQuantity = (menuItemId: string, quantity: number) => {
+    if (quantity <= 0) {
+      quickOrderRemoveFromOrder(menuItemId);
+      return;
+    }
+
+    setQuickOrderItems((prev) =>
+      prev.map((item) =>
+        item.menuItemId === menuItemId ? { ...item, quantity } : item
+      )
+    );
+  };
+
+  const quickOrderCalculateTotal = () => {
+    return quickOrderItems.reduce((total, item) => {
+      const itemPrice = parseFloat(item.price);
+      return total + itemPrice * item.quantity;
+    }, 0);
+  };
+
+  const quickOrderFindMenuItemById = (id: string): any | null => {
+    // Check selected category first
+    if (quickOrderSelectedCategory && quickOrderSelectedCategory.items) {
+      const item = quickOrderSelectedCategory.items.find(
+        (item: any) => item.id === id
+      );
+      if (item) return item;
+    }
+
+    // Check all categories
+    for (const category of quickOrderCategories) {
+      if (category.items) {
+        const item = category.items.find((item: any) => item.id === id);
+        if (item) return item;
+      }
+    }
+    return null;
+  };
+
+  const quickOrderHandlePlaceOrder = async () => {
+    if (quickOrderItems.length === 0) {
+      showToast(
+        isRTL
+          ? "الرجاء إضافة عنصر واحد على الأقل"
+          : "Please add at least one item",
+        "error"
+      );
+      return;
+    }
+
+    if (!user?.restaurant?.id) {
+      showToast(
+        isRTL ? "لم يتم العثور على معرف المطعم" : "Restaurant ID not found",
+        "error"
+      );
+      return;
+    }
+
+    try {
+      setIsCreatingQuickOrder(true);
+
+      // Create order with menu items
+      // Use "QUICK" as special table number for quick orders
+      const response = await api.post("/order/create", {
+        restaurantId: user.restaurant.id,
+        orderType: "DINE_IN",
+        tableNumber: "QUICK", // Special table number for quick orders
+        items: quickOrderItems.map((item) => ({
+          menuItemId: item.menuItemId,
+          quantity: item.quantity,
+          notes: item.notes || "",
+          extras: item.extras,
+        })),
+        notes: quickOrderNotes || "", // Add order notes
+        customerName: quickOrderCustomerName || undefined,
+        customerPhone: quickOrderCustomerPhone || undefined,
+        customerAddress: quickOrderCustomerAddress || undefined,
+      });
+
+      if (response.data.success) {
+        showToast(
+          isRTL
+            ? "تم إنشاء الطلب السريع بنجاح"
+            : "Quick order created successfully",
+          "success"
+        );
+        setShowQuickOrderModal(false);
+        setQuickOrderItems([]);
+        setQuickOrderSelectedCategory(null);
+        setQuickOrderCategories([]);
+        setQuickOrderSearchQuery("");
+        setQuickOrderCategorySearchQuery("");
+        setQuickOrderCustomerName("");
+        setQuickOrderCustomerPhone("");
+        setQuickOrderCustomerAddress("");
+        setQuickOrderNotes("");
+        setQuickOrderShowOrderSummary(false);
+        setExpandedExtrasItems(new Set());
+        // Refresh orders
+        await fetchOrders(1, false);
+      }
+    } catch (error: any) {
+      console.error("Error creating quick order:", error);
+      showToast(
+        error.response?.data?.message ||
+          (isRTL
+            ? "فشل في إنشاء الطلب السريع"
+            : "Failed to create quick order"),
+        "error"
+      );
+    } finally {
+      setIsCreatingQuickOrder(false);
+    }
+  };
+
   // Listen for QR codes updates from MenuContext
   useEffect(() => {
     const handleQRCodesUpdate = () => {
@@ -301,6 +616,42 @@ export default function OrdersPage() {
       window.removeEventListener("qrCodesUpdated", handleQRCodesUpdate);
     };
   }, []);
+
+  // Calculate total in selected currency
+  const calculateTotalInCurrency = (
+    totalInBaseCurrency: number,
+    selectedCurrency: string | null
+  ): { amount: number; currency: string } => {
+    if (!selectedCurrency || selectedCurrency === restaurantCurrency) {
+      return { amount: totalInBaseCurrency, currency: restaurantCurrency };
+    }
+
+    const currencyExchange = currencyExchanges.find(
+      (ce) =>
+        ce.currency.toUpperCase() === selectedCurrency.toUpperCase() &&
+        ce.isActive
+    );
+
+    if (!currencyExchange) {
+      return { amount: totalInBaseCurrency, currency: restaurantCurrency };
+    }
+
+    // Convert from base currency to selected currency
+    // exchangeRate interpretation depends on its value:
+    // - If exchangeRate >= 1: represents how many units of base currency equal 1 unit of selected currency
+    //   Example: exchangeRate = 12100 means 1 USD = 12100 SYP → use division
+    // - If exchangeRate < 1: represents how many units of selected currency equal 1 unit of base currency
+    //   Example: exchangeRate = 0.01 means 1 SYP = 0.01 NEW → use multiplication
+    const exchangeRate = Number(currencyExchange.exchangeRate);
+    const convertedAmount =
+      exchangeRate >= 1
+        ? totalInBaseCurrency / exchangeRate
+        : totalInBaseCurrency * exchangeRate;
+    return {
+      amount: convertedAmount,
+      currency: selectedCurrency,
+    };
+  };
 
   // Fetch restaurant currency and name
   const fetchRestaurantCurrency = async () => {
@@ -400,6 +751,13 @@ export default function OrdersPage() {
       menuItemsFetchedRef.current = true;
     }
   }, [showAddItemModal, addItemTab]);
+
+  // Fetch currency exchanges when order modal opens
+  useEffect(() => {
+    if (showOrderModal) {
+      fetchCurrencyExchanges();
+    }
+  }, [showOrderModal]);
 
   // Apply visual effects to recent orders every time orders are loaded
   useEffect(() => {
@@ -750,12 +1108,12 @@ export default function OrdersPage() {
         const qrCodesData = response.data.data.qrCodes.filter(
           (qr: any) => qr.tableNumber && qr.tableNumber !== "ROOT"
         );
-        
+
         const tableNumbers = qrCodesData
           .map((qr: any) => qr.tableNumber)
           .sort((a: string, b: string) => parseInt(a) - parseInt(b));
         setAvailableTables(tableNumbers);
-        
+
         // Store QR codes with their IDs and occupied status
         const qrCodesMap: Record<string, { id: string; isOccupied: boolean }> =
           {};
@@ -880,6 +1238,7 @@ export default function OrdersPage() {
     setSelectedDeliveryOrderIndex(0);
     setQuickOrders([]);
     setSelectedQuickOrderIndex(0);
+    setSelectedPaymentCurrency(null);
   };
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
@@ -1147,8 +1506,85 @@ export default function OrdersPage() {
 
   // Function to print invoice directly (thermal printer compatible)
   const handlePrintInvoice = (order: Order) => {
-    // Use restaurant currency or fallback to order currency
-    const currency = restaurantCurrency || order.currency || "USD";
+    // Calculate all prices in selected currency before building HTML
+    const itemsHtml = order.items
+      .map((item) => {
+        const baseItemPrice = Number(item.price);
+        const baseItemTotal = baseItemPrice * item.quantity;
+        const convertedItemPrice = calculateTotalInCurrency(
+          baseItemPrice,
+          selectedPaymentCurrency
+        );
+        const convertedItemTotal = calculateTotalInCurrency(
+          baseItemTotal,
+          selectedPaymentCurrency
+        );
+
+        return `
+          <div style="margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px dotted #ccc;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+              <span style="font-weight: bold; flex: 1; color: #000;">${getItemName(item)}</span>
+              <span style="white-space: nowrap; margin-left: 4px; color: #000;">${item.quantity}x</span>
+            </div>
+            ${item.notes ? `<div style="font-size: 9px; color: #000; margin-top: 2px;">${isRTL ? "ملاحظات:" : "Note:"} ${item.notes}</div>` : ""}
+            ${
+              item.extras &&
+              getExtrasNames(item.extras, item.menuItem).length > 0
+                ? `<div style="font-size: 9px; color: #000; margin-top: 2px;">${getExtrasNames(item.extras, item.menuItem).join(", ")}</div>`
+                : ""
+            }
+            <div style="display: flex; justify-content: space-between; margin-top: 2px; font-size: 10px; color: #000;">
+              <span>${formatCurrencyWithLanguage(convertedItemPrice.amount, convertedItemPrice.currency, language)}</span>
+              <span style="font-weight: bold;">${formatCurrencyWithLanguage(convertedItemTotal.amount, convertedItemTotal.currency, language)}</span>
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+
+    const subtotalHtml =
+      order.subtotal !== undefined
+        ? (() => {
+            const baseSubtotal = Number(order.subtotal);
+            const converted = calculateTotalInCurrency(
+              baseSubtotal,
+              selectedPaymentCurrency
+            );
+            return `<div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+          <span>${isRTL ? "المجموع الفرعي:" : "Subtotal:"}</span>
+          <span>${formatCurrencyWithLanguage(converted.amount, converted.currency, language)}</span>
+        </div>`;
+          })()
+        : "";
+
+    const taxesHtml =
+      order.taxes && order.taxes.length > 0
+        ? order.taxes
+            .map((tax: any) => {
+              const baseTaxAmount = tax.amount;
+              const converted = calculateTotalInCurrency(
+                baseTaxAmount,
+                selectedPaymentCurrency
+              );
+              return `
+          <div style="display: flex; justify-content: space-between; margin-bottom: 2px; font-size: 10px;">
+                      <span>${isRTL ? tax.nameAr || tax.name : tax.name} (${tax.percentage}%)</span>
+                      <span>${formatCurrencyWithLanguage(converted.amount, converted.currency, language)}</span>
+                    </div>
+                  `;
+            })
+            .join("")
+        : "";
+
+    const baseTotal = Number(order.totalPrice);
+    const convertedTotal = calculateTotalInCurrency(
+      baseTotal,
+      selectedPaymentCurrency
+    );
+    const totalHtml = `<div style="display: flex; justify-content: space-between; margin-top: 6px; padding-top: 6px; border-top: 2px solid #000; font-size: 14px; font-weight: bold;">
+          <span>${isRTL ? "المجموع الكلي:" : "TOTAL:"}</span>
+          <span>${formatCurrencyWithLanguage(convertedTotal.amount, convertedTotal.currency, language)}</span>
+        </div>`;
 
     // Remove any existing print container
     const existingContainer = document.getElementById(
@@ -1160,7 +1596,7 @@ export default function OrdersPage() {
     const existingStyles = document.getElementById("print-invoice-styles");
     if (existingStyles) {
       existingStyles.remove();
-            }
+    }
 
     // Create print container
     const printContainer = document.createElement("div");
@@ -1177,13 +1613,13 @@ export default function OrdersPage() {
       <div style="margin-bottom: 8px; font-size: 10px; color: #000;">
         <div style="margin-bottom: 4px;"><strong>${isRTL ? "رقم الطلب:" : "Order:"}</strong> #${order.id.slice(-8)}</div>
         <div style="margin-bottom: 4px;"><strong>${isRTL ? "النوع:" : "Type:"}</strong> ${
-                order.orderType === "DINE_IN"
-                  ? isRTL
-                    ? "داخل المطعم"
-                    : "Dine-in"
-                  : isRTL
-                    ? "توصيل"
-                    : "Delivery"
+          order.orderType === "DINE_IN"
+            ? isRTL
+              ? "داخل المطعم"
+              : "Dine-in"
+            : isRTL
+              ? "توصيل"
+              : "Delivery"
         }</div>
         ${order.tableNumber ? `<div style="margin-bottom: 4px;"><strong>${isRTL ? "طاولة:" : "Table:"}</strong> ${getDisplayTableNumber(order.tableNumber)}</div>` : ""}
         <div style="margin-bottom: 4px;"><strong>${isRTL ? "التاريخ:" : "Date:"}</strong> ${new Date(order.createdAt).toLocaleString()}</div>
@@ -1191,7 +1627,7 @@ export default function OrdersPage() {
             
             ${
               order.customerName || order.customerPhone || order.customerAddress
-          ? `<div style="margin-bottom: 8px; padding-top: 8px; border-top: 1px dashed #ccc; font-size: 10px; color: #000;">
+                ? `<div style="margin-bottom: 8px; padding-top: 8px; border-top: 1px dashed #ccc; font-size: 10px; color: #000;">
         ${order.customerName ? `<div style="margin-bottom: 2px;"><strong>${isRTL ? "الاسم:" : "Name:"}</strong> ${order.customerName}</div>` : ""}
         ${order.customerPhone ? `<div style="margin-bottom: 2px;"><strong>${isRTL ? "الهاتف:" : "Phone:"}</strong> ${order.customerPhone}</div>` : ""}
         ${order.customerAddress ? `<div style="margin-bottom: 2px;"><strong>${isRTL ? "العنوان:" : "Address:"}</strong> ${order.customerAddress}</div>` : ""}
@@ -1200,63 +1636,18 @@ export default function OrdersPage() {
             }
       
       <div style="margin: 8px 0; border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 4px 0;">
-              ${order.items
-                .map(
-                  (item) => `
-          <div style="margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px dotted #ccc;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
-              <span style="font-weight: bold; flex: 1; color: #000;">${getItemName(item)}</span>
-              <span style="white-space: nowrap; margin-left: 4px; color: #000;">${item.quantity}x</span>
-            </div>
-            ${item.notes ? `<div style="font-size: 9px; color: #000; margin-top: 2px;">${isRTL ? "ملاحظات:" : "Note:"} ${item.notes}</div>` : ""}
-                    ${
-                      item.extras &&
-                      getExtrasNames(item.extras, item.menuItem).length > 0
-                ? `<div style="font-size: 9px; color: #000; margin-top: 2px;">${getExtrasNames(item.extras, item.menuItem).join(", ")}</div>`
-                        : ""
-                    }
-            <div style="display: flex; justify-content: space-between; margin-top: 2px; font-size: 10px; color: #000;">
-              <span>${formatCurrencyWithLanguage(Number(item.price), currency, language)}</span>
-              <span style="font-weight: bold;">${formatCurrencyWithLanguage(Number(item.price) * item.quantity, currency, language)}</span>
-            </div>
-          </div>
-              `
-                )
-                .join("")}
+              ${itemsHtml}
       </div>
       
       <div style="margin-top: 8px; font-size: 11px; color: #000;">
-              ${
-                order.subtotal !== undefined
-            ? `<div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-          <span>${isRTL ? "المجموع الفرعي:" : "Subtotal:"}</span>
-          <span>${formatCurrencyWithLanguage(Number(order.subtotal), currency, language)}</span>
-        </div>`
-                  : ""
-              }
-              ${
-                order.taxes && order.taxes.length > 0
-            ? order.taxes
-                    .map(
-                      (tax: any) => `
-          <div style="display: flex; justify-content: space-between; margin-bottom: 2px; font-size: 10px;">
-                      <span>${isRTL ? tax.nameAr || tax.name : tax.name} (${tax.percentage}%)</span>
-                      <span>${formatCurrencyWithLanguage(tax.amount, currency, language)}</span>
-                    </div>
-                  `
-                    )
-                .join("")
-                  : ""
-              }
-        <div style="display: flex; justify-content: space-between; margin-top: 6px; padding-top: 6px; border-top: 2px solid #000; font-size: 14px; font-weight: bold;">
-          <span>${isRTL ? "المجموع الكلي:" : "TOTAL:"}</span>
-          <span>${formatCurrencyWithLanguage(Number(order.totalPrice), currency, language)}</span>
-        </div>
+              ${subtotalHtml}
+              ${taxesHtml}
+        ${totalHtml}
       </div>
           
           ${
             order.notes
-          ? `<div style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed #ccc; font-size: 10px; color: #000;">
+              ? `<div style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed #ccc; font-size: 10px; color: #000;">
         <div style="font-weight: bold; margin-bottom: 4px;">${isRTL ? "ملاحظات:" : "Notes:"}</div>
         <div>${order.notes}</div>
             </div>`
@@ -1756,13 +2147,19 @@ export default function OrdersPage() {
                                   </div>
                                 </td>
                                 <td className="py-1 px-1 text-right font-medium text-gray-900 dark:text-white">
-                                  {formatCurrencyWithLanguage(
-                                    Number(item.price) * item.quantity,
-                                    restaurantCurrency ||
-                                      order.currency ||
-                                      "USD",
-                                    language
-                                  )}
+                                  {(() => {
+                                    const basePrice =
+                                      Number(item.price) * item.quantity;
+                                    const converted = calculateTotalInCurrency(
+                                      basePrice,
+                                      selectedPaymentCurrency
+                                    );
+                                    return formatCurrencyWithLanguage(
+                                      converted.amount,
+                                      converted.currency,
+                                      language
+                                    );
+                                  })()}
                                 </td>
                               </tr>
                             );
@@ -1798,11 +2195,18 @@ export default function OrdersPage() {
                         {isRTL ? "عنصر" : "items"}
                       </span>
                       <span className="text-sm font-bold text-gray-900 dark:text-white">
-                        {formatCurrencyWithLanguage(
-                          Number(order.totalPrice),
-                          restaurantCurrency || order.currency || "USD",
-                          language
-                        )}
+                        {(() => {
+                          const baseTotal = Number(order.totalPrice);
+                          const converted = calculateTotalInCurrency(
+                            baseTotal,
+                            selectedPaymentCurrency
+                          );
+                          return formatCurrencyWithLanguage(
+                            converted.amount,
+                            converted.currency,
+                            language
+                          );
+                        })()}
                       </span>
                     </div>
                   </div>
@@ -2249,28 +2653,7 @@ export default function OrdersPage() {
 
               {/* Quick Orders Card */}
               <div
-                className={`relative p-4 border-2 rounded-lg transition-all duration-300 ${(() => {
-                  const quickOrder = orders.find(
-                    (order) =>
-                      order.orderType === "DINE_IN" &&
-                      order.tableNumber === "QUICK" &&
-                      order.status !== "COMPLETED" &&
-                      order.status !== "CANCELLED"
-                  );
-                  const isNew = quickOrder && newOrderIds.has(quickOrder.id);
-                  const isModified =
-                    quickOrder && modifiedOrderIds.has(quickOrder.id);
-
-                  if (isNew) {
-                    return "border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-lg animate-pulse cursor-pointer hover:shadow-lg";
-                  } else if (isModified) {
-                    return "border-orange-500 bg-orange-50 dark:bg-orange-900/20 shadow-lg animate-pulse cursor-pointer hover:shadow-lg";
-                  } else if (quickOrder) {
-                    return "border-purple-500 bg-purple-50 dark:bg-purple-900/20 cursor-pointer hover:shadow-lg";
-                  } else {
-                    return "border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:shadow-lg";
-                  }
-                })()}`}
+                className="relative p-4 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 cursor-pointer"
                 onClick={() => {
                   handleOrderClick({} as Order, false, true); // isQuickOrderCard = true
                 }}
@@ -2279,45 +2662,7 @@ export default function OrdersPage() {
                   <div className="text-lg font-bold text-gray-900 dark:text-white mb-2">
                     ⚡ {isRTL ? "طلب سريع" : "Quick Order"}
                   </div>
-                  <div
-                    className={`w-4 h-4 rounded-full mx-auto ${(() => {
-                      const quickOrder = orders.find(
-                        (order) =>
-                          order.orderType === "DINE_IN" &&
-                          order.tableNumber === "QUICK" &&
-                          order.status !== "COMPLETED" &&
-                          order.status !== "CANCELLED"
-                      );
-                      return quickOrder ? "bg-purple-500" : "bg-green-500";
-                    })()}`}
-                  />
-                  {(() => {
-                    const quickOrder = orders.find(
-                      (order) =>
-                        order.orderType === "DINE_IN" &&
-                        order.tableNumber === "QUICK" &&
-                        order.status !== "COMPLETED" &&
-                        order.status !== "CANCELLED"
-                    );
-                    const isNew = quickOrder && newOrderIds.has(quickOrder.id);
-                    const isModified =
-                      quickOrder && modifiedOrderIds.has(quickOrder.id);
-
-                    if (isNew) {
-                      return (
-                        <span className="absolute -top-2 -right-2 bg-blue-500 text-white text-xs px-2 py-1 rounded-full font-medium animate-bounce">
-                          {isRTL ? "جديد" : "NEW"}
-                        </span>
-                      );
-                    } else if (isModified) {
-                      return (
-                        <span className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full font-medium animate-bounce">
-                          {isRTL ? "معدل" : "MODIFIED"}
-                        </span>
-                      );
-                    }
-                    return null;
-                  })()}
+                  <div className="w-4 h-4 rounded-full mx-auto bg-green-500" />
                 </div>
               </div>
 
@@ -2385,7 +2730,6 @@ export default function OrdersPage() {
                         {/* Session Toggle Switch */}
                         <div
                           className={`flex items-center gap-2 ${isRTL ? "flex-row-reverse" : ""}`}
-                          onClick={handleToggleSession}
                         >
                           <span className="text-xs text-gray-600 dark:text-gray-400">
                             {isRTL ? "جلسة نشطة" : "Active Session"}
@@ -2395,12 +2739,12 @@ export default function OrdersPage() {
                             className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 ${
                               hasActiveSession
                                 ? "bg-green-600"
-                                : "bg-gray-200 dark:bg-gray-700"
+                                : "bg-gray-200 dark:bg-gray-600"
                             }`}
                             dir="ltr"
                           >
                             <span
-                              className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                              className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform shadow-sm ${
                                 hasActiveSession
                                   ? "translate-x-5"
                                   : "translate-x-1"
@@ -2623,13 +2967,18 @@ export default function OrdersPage() {
                           {isRTL ? "المجموع الفرعي:" : "Subtotal:"}
                         </span>
                         <span className="font-medium text-gray-900 dark:text-white">
-                          {formatCurrencyWithLanguage(
-                            Number(selectedOrder.subtotal),
-                            restaurantCurrency ||
-                              selectedOrder.currency ||
-                              "USD",
-                            language
-                          )}
+                          {(() => {
+                            const baseSubtotal = Number(selectedOrder.subtotal);
+                            const converted = calculateTotalInCurrency(
+                              baseSubtotal,
+                              selectedPaymentCurrency
+                            );
+                            return formatCurrencyWithLanguage(
+                              converted.amount,
+                              converted.currency,
+                              language
+                            );
+                          })()}
                         </span>
                       </div>
                     )}
@@ -2642,29 +2991,87 @@ export default function OrdersPage() {
                               {tax.percentage}%):
                             </span>
                             <span className="font-medium text-gray-900 dark:text-white">
-                              {formatCurrencyWithLanguage(
-                                tax.amount,
-                                restaurantCurrency ||
-                                  selectedOrder.currency ||
-                                  "USD",
-                                language
-                              )}
+                              {(() => {
+                                const baseTaxAmount = tax.amount;
+                                const converted = calculateTotalInCurrency(
+                                  baseTaxAmount,
+                                  selectedPaymentCurrency
+                                );
+                                return formatCurrencyWithLanguage(
+                                  converted.amount,
+                                  converted.currency,
+                                  language
+                                );
+                              })()}
                             </span>
                           </div>
                         ))}
                       </>
                     )}
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">
-                        {isRTL ? "المجموع:" : "Total:"}
-                      </span>
-                      <span className="font-medium text-gray-900 dark:text-white">
-                        {formatCurrencyWithLanguage(
-                          Number(selectedOrder.totalPrice),
-                          restaurantCurrency || selectedOrder.currency || "USD",
-                          language
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-600 dark:text-gray-400">
+                          {isRTL ? "المجموع:" : "Total:"}
+                        </span>
+                        {/* Currency Selector */}
+                        {currencyExchanges.length > 0 && (
+                          <select
+                            value={
+                              selectedPaymentCurrency || restaurantCurrency
+                            }
+                            onChange={(e) =>
+                              setSelectedPaymentCurrency(
+                                e.target.value === restaurantCurrency
+                                  ? null
+                                  : e.target.value
+                              )
+                            }
+                            className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <option value={restaurantCurrency}>
+                              {restaurantCurrency} ({isRTL ? "أساسي" : "Base"})
+                            </option>
+                            {currencyExchanges.map((ce) => {
+                              const currencyName = getCurrencyName(ce.currency);
+                              return (
+                                <option key={ce.id} value={ce.currency}>
+                                  {ce.currency} - {currencyName}
+                                </option>
+                              );
+                            })}
+                          </select>
                         )}
-                      </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {(() => {
+                            const baseTotal = Number(selectedOrder.totalPrice);
+                            const converted = calculateTotalInCurrency(
+                              baseTotal,
+                              selectedPaymentCurrency
+                            );
+                            return formatCurrencyWithLanguage(
+                              converted.amount,
+                              converted.currency,
+                              language
+                            );
+                          })()}
+                        </span>
+                        {selectedPaymentCurrency &&
+                          selectedPaymentCurrency !== restaurantCurrency && (
+                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                              {isRTL ? "المجموع الأصلي:" : "Original:"}{" "}
+                              {formatCurrencyWithLanguage(
+                                Number(selectedOrder.totalPrice),
+                                restaurantCurrency ||
+                                  selectedOrder.currency ||
+                                  "USD",
+                                language
+                              )}
+                            </div>
+                          )}
+                      </div>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600 dark:text-gray-400">
@@ -2837,13 +3244,19 @@ export default function OrdersPage() {
                               </div>
                             </td>
                             <td className="text-center py-3 px-3 font-medium text-gray-900 dark:text-white">
-                              {formatCurrencyWithLanguage(
-                                Number(item.price) * item.quantity,
-                                restaurantCurrency ||
-                                  selectedOrder.currency ||
-                                  "USD",
-                                language
-                              )}
+                              {(() => {
+                                const basePrice =
+                                  Number(item.price) * item.quantity;
+                                const converted = calculateTotalInCurrency(
+                                  basePrice,
+                                  selectedPaymentCurrency
+                                );
+                                return formatCurrencyWithLanguage(
+                                  converted.amount,
+                                  converted.currency,
+                                  language
+                                );
+                              })()}
                             </td>
                           </tr>
                         );
@@ -2859,13 +3272,20 @@ export default function OrdersPage() {
                             {isRTL ? "المجموع الفرعي:" : "Subtotal:"}
                           </td>
                           <td className="text-right py-2 px-3 text-sm text-gray-700 dark:text-gray-300">
-                            {formatCurrencyWithLanguage(
-                              Number(selectedOrder.subtotal),
-                              restaurantCurrency ||
-                                selectedOrder.currency ||
-                                "USD",
-                              language
-                            )}
+                            {(() => {
+                              const baseSubtotal = Number(
+                                selectedOrder.subtotal
+                              );
+                              const converted = calculateTotalInCurrency(
+                                baseSubtotal,
+                                selectedPaymentCurrency
+                              );
+                              return formatCurrencyWithLanguage(
+                                converted.amount,
+                                converted.currency,
+                                language
+                              );
+                            })()}
                           </td>
                         </tr>
                       )}
@@ -2885,13 +3305,18 @@ export default function OrdersPage() {
                                   {tax.percentage}%):
                                 </td>
                                 <td className="text-right py-2 px-3 text-sm text-gray-600 dark:text-gray-400">
-                                  {formatCurrencyWithLanguage(
-                                    tax.amount,
-                                    restaurantCurrency ||
-                                      selectedOrder.currency ||
-                                      "USD",
-                                    language
-                                  )}
+                                  {(() => {
+                                    const baseTaxAmount = tax.amount;
+                                    const converted = calculateTotalInCurrency(
+                                      baseTaxAmount,
+                                      selectedPaymentCurrency
+                                    );
+                                    return formatCurrencyWithLanguage(
+                                      converted.amount,
+                                      converted.currency,
+                                      language
+                                    );
+                                  })()}
                                 </td>
                               </tr>
                             ))}
@@ -2902,16 +3327,69 @@ export default function OrdersPage() {
                           colSpan={3}
                           className="py-3 px-3 font-semibold text-gray-900 dark:text-white"
                         >
-                          {isRTL ? "المجموع:" : "Total:"}
+                          <div className="flex items-center gap-2">
+                            <span>{isRTL ? "المجموع:" : "Total:"}</span>
+                            {/* Currency Selector */}
+                            {currencyExchanges.length > 0 && (
+                              <select
+                                value={
+                                  selectedPaymentCurrency || restaurantCurrency
+                                }
+                                onChange={(e) =>
+                                  setSelectedPaymentCurrency(
+                                    e.target.value === restaurantCurrency
+                                      ? null
+                                      : e.target.value
+                                  )
+                                }
+                                className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <option value={restaurantCurrency}>
+                                  {restaurantCurrency} (
+                                  {isRTL ? "أساسي" : "Base"})
+                                </option>
+                                {currencyExchanges.map((ce) => {
+                                  const currencyName = getCurrencyName(
+                                    ce.currency
+                                  );
+                                  return (
+                                    <option key={ce.id} value={ce.currency}>
+                                      {ce.currency} - {currencyName}
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                            )}
+                          </div>
                         </td>
                         <td className="text-right py-3 px-3 font-bold text-lg text-gray-900 dark:text-white">
-                          {formatCurrencyWithLanguage(
-                            Number(selectedOrder.totalPrice),
-                            restaurantCurrency ||
-                              selectedOrder.currency ||
-                              "USD",
-                            language
-                          )}
+                          {(() => {
+                            const baseTotal = Number(selectedOrder.totalPrice);
+                            const converted = calculateTotalInCurrency(
+                              baseTotal,
+                              selectedPaymentCurrency
+                            );
+                            return formatCurrencyWithLanguage(
+                              converted.amount,
+                              converted.currency,
+                              language
+                            );
+                          })()}
+                          {selectedPaymentCurrency &&
+                            selectedPaymentCurrency !== restaurantCurrency && (
+                              <div className="text-xs font-normal text-gray-500 dark:text-gray-400 mt-1">
+                                (
+                                {formatCurrencyWithLanguage(
+                                  Number(selectedOrder.totalPrice),
+                                  restaurantCurrency ||
+                                    selectedOrder.currency ||
+                                    "USD",
+                                  language
+                                )}
+                                )
+                              </div>
+                            )}
                         </td>
                       </tr>
                     </tfoot>
@@ -3117,6 +3595,7 @@ export default function OrdersPage() {
                         onChange={(e) =>
                           setNewItemQuantity(parseInt(e.target.value) || 1)
                         }
+                        onFocus={(e) => e.target.select()}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       />
                     </div>
@@ -3222,6 +3701,7 @@ export default function OrdersPage() {
                       onChange={(e) =>
                         setNewItemQuantity(parseInt(e.target.value) || 1)
                       }
+                      onFocus={(e) => e.target.select()}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     />
                   </div>
@@ -3313,7 +3793,7 @@ export default function OrdersPage() {
       {/* Quick Order Modal */}
       {showQuickOrderModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full h-[90vh] max-w-7xl flex flex-col relative overflow-hidden">
             {/* Header - Fixed */}
             <div className="p-6 flex-shrink-0 border-b border-gray-200 dark:border-gray-700">
               <div className="flex justify-between items-center">
@@ -3326,6 +3806,14 @@ export default function OrdersPage() {
                     setQuickOrderItems([]);
                     setQuickOrderSelectedCategory(null);
                     setQuickOrderCategories([]);
+                    setQuickOrderSearchQuery("");
+                    setQuickOrderCategorySearchQuery("");
+                    setQuickOrderCustomerName("");
+                    setQuickOrderCustomerPhone("");
+                    setQuickOrderCustomerAddress("");
+                    setQuickOrderNotes("");
+                    setQuickOrderShowOrderSummary(false);
+                    setExpandedExtrasItems(new Set());
                   }}
                   className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                 >
@@ -3343,12 +3831,12 @@ export default function OrdersPage() {
                     />
                   </svg>
                 </button>
-    </div>
+              </div>
             </div>
 
             {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto p-6">
-              {/* Menu Display - Categories and Items */}
+            <div className="flex-1 overflow-y-auto p-6 pb-24">
+              {/* Categories View */}
               {quickOrderLoadingCategories ? (
                 <div className="text-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
@@ -3365,63 +3853,148 @@ export default function OrdersPage() {
                   </p>
                 </div>
               ) : !quickOrderSelectedCategory ? (
-                /* Categories List */
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-4">
-                  {quickOrderCategories.map((category) => (
-                    <button
-                      key={category.id}
-                      onClick={() => setQuickOrderSelectedCategory(category)}
-                      className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors text-left"
-                    >
-                      <h3 className="font-semibold text-gray-900 dark:text-white">
-                        {isRTL
-                          ? category.nameAr || category.name
-                          : category.name}
-                      </h3>
-                      {category.description && (
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                          {isRTL
-                            ? category.descriptionAr || category.description
-                            : category.description}
-                        </p>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                /* Items in Selected Category */
-                <div className="mb-4">
-                  {/* Sticky Back Button and Category Name */}
-                  <div className="sticky top-0 z-10 bg-white dark:bg-gray-800 pb-2 mb-4 -mx-6 px-6 pt-2 border-b border-gray-200 dark:border-gray-700 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => setQuickOrderSelectedCategory(null)}
-                          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                        >
-                          <svg
-                            className="w-5 h-5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M15 19l-7-7 7-7"
-                            />
-                          </svg>
-                        </button>
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                          {isRTL
-                            ? quickOrderSelectedCategory.nameAr ||
-                              quickOrderSelectedCategory.name
-                            : quickOrderSelectedCategory.name}
-                        </h3>
-                      </div>
+                /* Categories Grid */
+                <div>
+                  {/* Category Search Bar */}
+                  <div className="mb-6 max-w-2xl mx-auto">
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={quickOrderCategorySearchQuery}
+                        onChange={(e) =>
+                          setQuickOrderCategorySearchQuery(e.target.value)
+                        }
+                        placeholder={
+                          isRTL ? "ابحث عن الفئات..." : "Search categories..."
+                        }
+                        className="w-full text-black px-4 py-3 ltr:pr-12 rtl:pl-12 rounded-lg border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                      />
                     </div>
                   </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                    {quickOrderCategories
+                      .filter((category) => {
+                        if (!quickOrderCategorySearchQuery.trim()) return true;
+                        const searchLower = quickOrderCategorySearchQuery
+                          .toLowerCase()
+                          .trim();
+                        const nameMatch = category.name
+                          ?.toLowerCase()
+                          .includes(searchLower);
+                        const nameArMatch = category.nameAr
+                          ?.toLowerCase()
+                          .includes(searchLower);
+                        const descriptionMatch = category.description
+                          ?.toLowerCase()
+                          .includes(searchLower);
+                        const descriptionArMatch = category.descriptionAr
+                          ?.toLowerCase()
+                          .includes(searchLower);
+                        return (
+                          nameMatch ||
+                          nameArMatch ||
+                          descriptionMatch ||
+                          descriptionArMatch
+                        );
+                      })
+                      .map((category) => (
+                        <div
+                          key={category.id}
+                          className="shadow-sm border cursor-pointer hover:shadow-md transition-shadow rounded-lg p-4 bg-white dark:bg-gray-700"
+                          onClick={() =>
+                            setQuickOrderSelectedCategory(category)
+                          }
+                        >
+                          <div className="text-center">
+                            <div className="w-20 h-20 mx-auto mb-3 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-600">
+                              {category.image ? (
+                                <img
+                                  src={category.image}
+                                  alt={
+                                    isRTL
+                                      ? category.nameAr || category.name
+                                      : category.name
+                                  }
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                  <svg
+                                    className="w-8 h-8"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                    />
+                                  </svg>
+                                </div>
+                              )}
+                            </div>
+                            <h3 className="text-sm font-medium text-gray-900 dark:text-white">
+                              {isRTL
+                                ? category.nameAr || category.name
+                                : category.name}
+                            </h3>
+                            <p className="text-xs mt-1 text-gray-500 dark:text-gray-400">
+                              {category._count?.items || 0}{" "}
+                              {isRTL ? "عنصر" : "items"}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              ) : (
+                /* Items View */
+                <div>
+                  {/* Category Header */}
+                  <div className="mb-8">
+                    <div className="text-center">
+                      <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                        {isRTL
+                          ? quickOrderSelectedCategory.nameAr ||
+                            quickOrderSelectedCategory.name
+                          : quickOrderSelectedCategory.name}
+                      </h2>
+                      {quickOrderSelectedCategory.description && (
+                        <p className="text-gray-600 dark:text-gray-400">
+                          {isRTL
+                            ? quickOrderSelectedCategory.descriptionAr ||
+                              quickOrderSelectedCategory.description
+                            : quickOrderSelectedCategory.description}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Category Search Bar */}
+                  {quickOrderSelectedCategory.items &&
+                    quickOrderSelectedCategory.items.length > 0 && (
+                      <div className="mb-6 max-w-2xl mx-auto">
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={quickOrderSearchQuery}
+                            onChange={(e) =>
+                              setQuickOrderSearchQuery(e.target.value)
+                            }
+                            placeholder={
+                              isRTL
+                                ? "ابحث عن العناصر في هذه الفئة..."
+                                : "Search items in this category..."
+                            }
+                            className="w-full !text-black px-4 py-3 ltr:pr-12 rtl:pl-12 rounded-lg border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                  {/* Items Grid */}
                   {quickOrderLoadingItems ? (
                     <div className="text-center py-8">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
@@ -3431,220 +4004,157 @@ export default function OrdersPage() {
                     </div>
                   ) : quickOrderSelectedCategory.items &&
                     quickOrderSelectedCategory.items.length > 0 ? (
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                      {quickOrderSelectedCategory.items.map((item: any) => (
-                        <MenuItem
-                          key={item.id}
-                          item={item}
-                          currency={restaurantCurrency || "USD"}
-                          onAddToOrder={(item, quantity, notes, extras) => {
-                            setQuickOrderItems([
-                              ...quickOrderItems,
-                              {
-                                menuItemId: item.id,
-                                quantity: quantity,
-                                price: parseFloat(item.price),
-                                notes: notes,
-                                extras: extras,
-                                name: isRTL
-                                  ? item.nameAr || item.name
-                                  : item.name,
-                              },
-                            ]);
-                          }}
-                          isRTL={isRTL}
-                        />
-                      ))}
-                    </div>
+                    (() => {
+                      // Filter items based on search query
+                      const filteredItems =
+                        quickOrderSelectedCategory.items.filter((item: any) => {
+                          if (!quickOrderSearchQuery.trim()) return true;
+                          const searchLower = quickOrderSearchQuery
+                            .toLowerCase()
+                            .trim();
+                          const nameMatch = item.name
+                            ?.toLowerCase()
+                            .includes(searchLower);
+                          const nameArMatch = item.nameAr
+                            ?.toLowerCase()
+                            .includes(searchLower);
+                          const descriptionMatch = item.description
+                            ?.toLowerCase()
+                            .includes(searchLower);
+                          const descriptionArMatch = item.descriptionAr
+                            ?.toLowerCase()
+                            .includes(searchLower);
+                          return (
+                            nameMatch ||
+                            nameArMatch ||
+                            descriptionMatch ||
+                            descriptionArMatch
+                          );
+                        });
+
+                      return filteredItems.length > 0 ? (
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+                          {filteredItems.map((item: any) => (
+                            <MenuItem
+                              key={item.id}
+                              item={item}
+                              currency={restaurantCurrency}
+                              onAddToOrder={quickOrderAddItemToOrder}
+                              onItemClick={() => {}}
+                              isRTL={isRTL}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-12">
+                          <p className="text-gray-600 dark:text-gray-400">
+                            {isRTL
+                              ? "لا توجد نتائج للبحث"
+                              : "No search results found"}
+                          </p>
+                        </div>
+                      );
+                    })()
                   ) : (
-                    <div className="text-center py-8">
+                    <div className="text-center py-12">
                       <p className="text-gray-600 dark:text-gray-400">
                         {isRTL
                           ? "لا توجد عناصر في هذه الفئة"
-                          : "No items in this category"}
+                          : "No items available in this category"}
                       </p>
                     </div>
                   )}
                 </div>
               )}
+            </div>
 
-              {/* Order Items Summary */}
-              {quickOrderItems.length > 0 && (
-                <div className="mb-4 border-t border-gray-200 dark:border-gray-700 pt-4">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                    {isRTL ? "عناصر الطلب" : "Order Items"} (
-                    {quickOrderItems.length})
-                  </h3>
-                  <div className="space-y-2 max-h-40 overflow-y-auto">
-                    {quickOrderItems.map((item, index) => (
-                      <div
-                        key={index}
-                        className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-700 rounded"
-                      >
-                        <div className="flex-1">
-                          <p className="font-medium text-gray-900 dark:text-white">
-                            {item.name} x {item.quantity}
-                          </p>
-                          {item.extras &&
-                            Object.keys(item.extras).length > 0 && (
-                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                {isRTL ? "إضافات" : "Extras"}
-                              </p>
-                            )}
-                          {item.notes && (
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                              {item.notes}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-gray-900 dark:text-white">
-                            {formatCurrencyWithLanguage(
-                              item.price * item.quantity,
-                              restaurantCurrency || "USD",
-                              language
-                            )}
-                          </span>
-                          <button
-                            onClick={() => {
-                              setQuickOrderItems(
-                                quickOrderItems.filter((_, i) => i !== index)
-                              );
-                            }}
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <svg
-                              className="w-5 h-5"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M6 18L18 6M6 6l12 12"
-                              />
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                    <div className="flex justify-between items-center">
-                      <span className="text-lg font-semibold text-gray-900 dark:text-white">
-                        {isRTL ? "المجموع:" : "Total:"}
-                      </span>
-                      <span className="text-lg font-bold text-gray-900 dark:text-white">
-                        {formatCurrencyWithLanguage(
-                          quickOrderItems.reduce(
-                            (sum, item) => sum + item.price * item.quantity,
-                            0
-                          ),
-                          restaurantCurrency || "USD",
-                          language
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="flex justify-end gap-3 mt-6">
-                <button
-                  onClick={() => {
-                    setShowQuickOrderModal(false);
-                    setQuickOrderItems([]);
-                    setQuickOrderSelectedCategory(null);
-                    setQuickOrderCategories([]);
-                  }}
-                  className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
-                >
-                  {isRTL ? "إلغاء" : "Cancel"}
-                </button>
-                <button
-                  onClick={async () => {
-                    if (quickOrderItems.length === 0) {
-                      showToast(
-                        isRTL
-                          ? "الرجاء إضافة عنصر واحد على الأقل"
-                          : "Please add at least one item",
-                        "error"
-                      );
-                      return;
-                    }
-
-                    if (!user?.restaurant?.id) {
-                      showToast(
-                        isRTL
-                          ? "لم يتم العثور على معرف المطعم"
-                          : "Restaurant ID not found",
-                        "error"
-                      );
-                      return;
-                    }
-
-                    try {
-                      setIsCreatingQuickOrder(true);
-
-                      // Create order with menu items
-                      // Use "QUICK" as special table number for quick orders
-                      const response = await api.post("/order/create", {
-                        restaurantId: user.restaurant.id,
-                        orderType: "DINE_IN",
-                        tableNumber: "QUICK", // Special table number for quick orders
-                        items: quickOrderItems.map((item) => ({
-                          menuItemId: item.menuItemId,
-                          quantity: item.quantity,
-                          notes: item.notes,
-                          extras: item.extras,
-                        })),
-                      });
-
-                      if (response.data.success) {
-                        showToast(
-                          isRTL
-                            ? "تم إنشاء الطلب السريع بنجاح"
-                            : "Quick order created successfully",
-                          "success"
-                        );
-                        setShowQuickOrderModal(false);
-                        setQuickOrderItems([]);
-                        setQuickOrderSelectedCategory(null);
-                        setQuickOrderCategories([]);
-                        // Refresh orders
-                        await fetchOrders(1, false);
-                      }
-                    } catch (error: any) {
-                      console.error("Error creating quick order:", error);
-                      showToast(
-                        error.response?.data?.message ||
-                          (isRTL
-                            ? "فشل في إنشاء الطلب السريع"
-                            : "Failed to create quick order"),
-                        "error"
-                      );
-                    } finally {
-                      setIsCreatingQuickOrder(false);
-                    }
-                  }}
-                  disabled={
-                    isCreatingQuickOrder || quickOrderItems.length === 0
-                  }
-                  className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isCreatingQuickOrder
+            {/* Floating Back Button - Inside Modal */}
+            {quickOrderSelectedCategory && (
+              <div
+                className={`absolute z-50 ${
+                  quickOrderItems.length > 0
                     ? isRTL
-                      ? "جاري الإنشاء..."
-                      : "Creating..."
+                      ? "bottom-20 right-6"
+                      : "bottom-20 left-6"
                     : isRTL
-                      ? "إنشاء الطلب"
-                      : "Create Order"}
+                      ? "bottom-6 right-6"
+                      : "bottom-6 left-6"
+                }`}
+              >
+                <button
+                  onClick={() => setQuickOrderSelectedCategory(null)}
+                  className="shadow-lg hover:shadow-xl rounded-full w-14 h-14 flex items-center justify-center transition-all duration-200 bg-primary-600 hover:bg-primary-700 text-white"
+                >
+                  {isRTL ? (
+                    <svg
+                      className="w-6 h-6"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5l7 7-7 7"
+                      />
+                    </svg>
+                  ) : (
+                    <svg
+                      className="w-6 h-6"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 19l-7-7 7-7"
+                      />
+                    </svg>
+                  )}
                 </button>
               </div>
-            </div>
+            )}
+
+            {/* Floating Order Summary */}
+            {quickOrderShowOrderSummary && quickOrderItems.length > 0 && (
+              <div className="fixed bottom-2 left-2 right-2 z-[60] max-w-7xl mx-auto">
+                <FloatingOrderSummary
+                  orderItems={
+                    quickOrderItems.filter((item) => item.name) as Array<{
+                      menuItemId: string;
+                      name: string;
+                      nameAr?: string;
+                      price: string;
+                      currency: string;
+                      quantity: number;
+                      notes?: string;
+                      extras?: any;
+                    }>
+                  }
+                  total={quickOrderCalculateTotal()}
+                  currency={restaurantCurrency || "USD"}
+                  onUpdateQuantity={quickOrderUpdateQuantity}
+                  onRemoveItem={quickOrderRemoveFromOrder}
+                  onPlaceOrder={quickOrderHandlePlaceOrder}
+                  isOrdering={isCreatingQuickOrder}
+                  customerName={quickOrderCustomerName}
+                  setCustomerName={setQuickOrderCustomerName}
+                  customerPhone={quickOrderCustomerPhone}
+                  setCustomerPhone={setQuickOrderCustomerPhone}
+                  customerAddress={quickOrderCustomerAddress}
+                  setCustomerAddress={setQuickOrderCustomerAddress}
+                  orderNotes={quickOrderNotes}
+                  setOrderNotes={setQuickOrderNotes}
+                  isDelivery={false}
+                  onHide={() => setQuickOrderShowOrderSummary(false)}
+                  findMenuItemById={quickOrderFindMenuItemById}
+                  currencyExchanges={currencyExchanges}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -3652,7 +4162,7 @@ export default function OrdersPage() {
       {/* Floating Quick Order Button */}
       <button
         onClick={() => setShowQuickOrderModal(true)}
-        className="fixed bottom-20 md:bottom-6 right-6 bg-primary-600 hover:bg-primary-700 text-white rounded-full p-4 shadow-lg z-40 transition-all duration-200 hover:scale-110"
+        className="fixed bottom-20 md:bottom-24 lg:bottom-6 right-6 bg-primary-600 hover:bg-primary-700 text-white rounded-full p-4 shadow-lg z-40 transition-all duration-200 hover:scale-110"
         title={isRTL ? "إنشاء طلب سريع" : "Create Quick Order"}
       >
         <svg

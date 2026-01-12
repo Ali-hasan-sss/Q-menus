@@ -17,6 +17,13 @@ interface OrderItem {
   extras?: any;
 }
 
+interface CurrencyExchange {
+  id: string;
+  currency: string;
+  exchangeRate: number;
+  isActive: boolean;
+}
+
 interface FloatingOrderSummaryProps {
   orderItems: OrderItem[];
   total: number;
@@ -44,6 +51,9 @@ interface FloatingOrderSummaryProps {
     accentColor?: string;
   } | null;
   findMenuItemById?: (id: string) => any;
+  currencyExchanges?: CurrencyExchange[];
+  selectedPaymentCurrency?: string | null;
+  setSelectedPaymentCurrency?: (currency: string | null) => void;
 }
 
 export function FloatingOrderSummary({
@@ -67,9 +77,60 @@ export function FloatingOrderSummary({
   isAddingToExisting = false,
   menuTheme,
   findMenuItemById,
+  currencyExchanges = [],
+  selectedPaymentCurrency: externalSelectedCurrency,
+  setSelectedPaymentCurrency: externalSetSelectedCurrency,
 }: FloatingOrderSummaryProps) {
   const { isRTL, language } = useLanguage();
   const [showDetails, setShowDetails] = useState(false);
+  // Use external currency if provided, otherwise use internal state
+  const [internalSelectedCurrency, setInternalSelectedCurrency] = useState<
+    string | null
+  >(null);
+  const selectedPaymentCurrency =
+    externalSelectedCurrency !== undefined
+      ? externalSelectedCurrency
+      : internalSelectedCurrency;
+  const setSelectedPaymentCurrency =
+    externalSetSelectedCurrency || setInternalSelectedCurrency;
+
+  // Calculate total in selected currency
+  const calculateTotalInCurrency = (
+    totalInBaseCurrency: number,
+    selectedCurrency: string | null
+  ): { amount: number; currency: string } => {
+    if (!selectedCurrency || selectedCurrency === currency) {
+      return { amount: totalInBaseCurrency, currency };
+    }
+
+    const currencyExchange = currencyExchanges.find(
+      (ce) =>
+        ce.currency.toUpperCase() === selectedCurrency.toUpperCase() &&
+        ce.isActive
+    );
+
+    if (!currencyExchange) {
+      return { amount: totalInBaseCurrency, currency };
+    }
+
+    // Convert from base currency to selected currency
+    // exchangeRate interpretation depends on its value:
+    // - If exchangeRate >= 1: represents how many units of base currency equal 1 unit of selected currency
+    //   Example: exchangeRate = 12100 means 1 USD = 12100 SYP → use division
+    // - If exchangeRate < 1: represents how many units of selected currency equal 1 unit of base currency
+    //   Example: exchangeRate = 0.01 means 1 SYP = 0.01 NEW → use multiplication
+    const exchangeRate = Number(currencyExchange.exchangeRate);
+    const convertedAmount =
+      exchangeRate >= 1
+        ? totalInBaseCurrency / exchangeRate
+        : totalInBaseCurrency * exchangeRate;
+    return {
+      amount: convertedAmount,
+      currency: selectedCurrency,
+    };
+  };
+
+  const displayTotal = calculateTotalInCurrency(total, selectedPaymentCurrency);
 
   const totalItems = orderItems.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -102,7 +163,11 @@ export function FloatingOrderSummary({
                 color: menuTheme?.textColor || "#ffffff",
               }}
             >
-              {formatCurrencyWithLanguage(total, currency, language)}
+              {formatCurrencyWithLanguage(
+                displayTotal.amount,
+                displayTotal.currency,
+                language
+              )}
             </div>
             <Button
               onClick={() => setShowDetails(!showDetails)}
@@ -182,6 +247,9 @@ export function FloatingOrderSummary({
                   onClose={() => setShowDetails(false)}
                   theme={menuTheme}
                   findMenuItemById={findMenuItemById}
+                  currencyExchanges={currencyExchanges}
+                  selectedPaymentCurrency={selectedPaymentCurrency}
+                  setSelectedPaymentCurrency={setSelectedPaymentCurrency}
                 />
               </div>
             </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -62,39 +62,133 @@ export default function SubscriptionsPage() {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [selectedSubscription, setSelectedSubscription] =
     useState<Subscription | null>(null);
+  const [hasMoreSubscriptions, setHasMoreSubscriptions] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const subscriptionsPerPage = 25;
+  const observerTarget = useRef<HTMLDivElement>(null);
+  const currentPageRef = useRef(1);
 
-  useEffect(() => {
-    fetchSubscriptions();
-    fetchPlans();
-  }, []);
-
-  useEffect(() => {
-    fetchSubscriptions();
-  }, [filter, currentPage]);
-
-  const fetchSubscriptions = async () => {
+  const fetchSubscriptions = async (
+    page: number = 1,
+    append: boolean = false
+  ) => {
     try {
-      setLoading(true);
+      if (append) {
+        setIsLoadingMore(true);
+      } else {
+        setLoading(true);
+      }
+
       const params = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: "10",
+        page: page.toString(),
+        limit: subscriptionsPerPage.toString(),
         ...(filter !== "ALL" && { status: filter }),
       });
 
       const response = await api.get(`/admin/subscriptions?${params}`);
       if (response.data.success) {
-        setSubscriptions(response.data.data.subscriptions);
-        setTotalSubscriptions(
-          response.data.data.total || response.data.data.subscriptions.length
-        );
-        setTotalPages(response.data.data.totalPages || 1);
+        const fetchedSubscriptions = response.data.data.subscriptions || [];
+
+        if (append) {
+          // إضافة الاشتراكات الجديدة للقائمة الموجودة
+          setSubscriptions((prev) => {
+            // تجنب التكرار
+            const existingIds = new Set(prev.map((s) => s.id));
+            const newSubscriptions = fetchedSubscriptions.filter(
+              (s: Subscription) => !existingIds.has(s.id)
+            );
+            return [...prev, ...newSubscriptions];
+          });
+        } else {
+          setSubscriptions(fetchedSubscriptions);
+        }
+
+        // تحديث pagination info
+        if (response.data.data.pagination) {
+          const {
+            total,
+            pages,
+            page: currentPageNum,
+          } = response.data.data.pagination;
+          setTotalSubscriptions(total);
+          setHasMoreSubscriptions(
+            currentPageNum < pages &&
+              fetchedSubscriptions.length === subscriptionsPerPage
+          );
+          setCurrentPage(currentPageNum);
+          currentPageRef.current = currentPageNum;
+        } else {
+          // Fallback
+          const total = response.data.data.total || fetchedSubscriptions.length;
+          const totalPages =
+            response.data.data.totalPages ||
+            Math.ceil(total / subscriptionsPerPage);
+          setTotalSubscriptions(total);
+          setTotalPages(totalPages);
+          setHasMoreSubscriptions(
+            fetchedSubscriptions.length === subscriptionsPerPage
+          );
+          currentPageRef.current = page;
+        }
       }
     } catch (error) {
       console.error("Error fetching subscriptions:", error);
     } finally {
       setLoading(false);
+      setIsLoadingMore(false);
     }
   };
+
+  // دالة جلب المزيد من الاشتراكات
+  const loadMoreSubscriptions = useCallback(() => {
+    if (!isLoadingMore && hasMoreSubscriptions && !loading) {
+      const nextPage = currentPageRef.current + 1;
+      fetchSubscriptions(nextPage, true);
+    }
+  }, [hasMoreSubscriptions, isLoadingMore, loading, filter]);
+
+  useEffect(() => {
+    fetchSubscriptions(1, false);
+    fetchPlans();
+  }, []);
+
+  // Reset pagination when filter changes
+  useEffect(() => {
+    if (filter !== "ALL") {
+      setCurrentPage(1);
+      currentPageRef.current = 1;
+      setHasMoreSubscriptions(true);
+      fetchSubscriptions(1, false);
+    }
+  }, [filter]);
+
+  // Infinite scroll observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (
+          entries[0].isIntersecting &&
+          hasMoreSubscriptions &&
+          !isLoadingMore &&
+          !loading
+        ) {
+          loadMoreSubscriptions();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const currentTarget = observerTarget.current;
+    if (currentTarget) {
+      observer.observe(currentTarget);
+    }
+
+    return () => {
+      if (currentTarget) {
+        observer.unobserve(currentTarget);
+      }
+    };
+  }, [hasMoreSubscriptions, isLoadingMore, loading, loadMoreSubscriptions]);
 
   const fetchPlans = async () => {
     try {
@@ -130,6 +224,8 @@ export default function SubscriptionsPage() {
               : "Subscription cancelled successfully",
             "success"
           );
+          // Refresh to update the list
+          fetchSubscriptions(1, false);
         } catch (error: any) {
           showToast(
             error.response?.data?.message ||
@@ -146,7 +242,7 @@ export default function SubscriptionsPage() {
   const handleRenewSubscription = async (subId: string) => {
     try {
       await api.put(`/admin/subscriptions/${subId}/renew`);
-      fetchSubscriptions();
+      fetchSubscriptions(1, false);
       showToast(
         isRTL ? "تم تجديد الاشتراك بنجاح" : "Subscription renewed successfully",
         "success"
@@ -174,7 +270,7 @@ export default function SubscriptionsPage() {
       await api.put(`/admin/subscriptions/${selectedSubscription.id}/upgrade`, {
         planId: planId,
       });
-      fetchSubscriptions();
+      fetchSubscriptions(1, false);
       setShowUpgradeModal(false);
       setSelectedSubscription(null);
       showToast(
@@ -194,10 +290,7 @@ export default function SubscriptionsPage() {
     }
   };
 
-  const filteredSubscriptions = subscriptions.filter((sub) => {
-    if (filter === "ALL") return true;
-    return sub.status === filter;
-  });
+  // لا نحتاج filteredSubscriptions لأن الفلترة تتم في الـ backend
 
   const getStatusBadge = (status: string) => {
     const colors = {
@@ -254,7 +347,7 @@ export default function SubscriptionsPage() {
         </div>
 
         <div className="space-y-4">
-          {filteredSubscriptions.map((sub) => {
+          {subscriptions.map((sub) => {
             const isExpired = sub.endDate && new Date(sub.endDate) < new Date();
             const daysLeft = sub.endDate
               ? Math.ceil(
@@ -404,7 +497,7 @@ export default function SubscriptionsPage() {
             );
           })}
 
-          {subscriptions.length === 0 && (
+          {subscriptions.length === 0 && !loading && (
             <Card className="p-12 text-center">
               <p className="text-gray-500 dark:text-gray-400">
                 {isRTL ? "لا توجد اشتراكات" : "No subscriptions found"}
@@ -413,70 +506,20 @@ export default function SubscriptionsPage() {
           )}
         </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex justify-center items-center mt-8 space-x-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setCurrentPage(currentPage - 1)}
-              disabled={currentPage === 1}
-            >
-              <svg
-                className="w-4 h-4 mr-1"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 19l-7-7 7-7"
-                />
-              </svg>
-              {isRTL ? "السابق" : "Previous"}
-            </Button>
-
-            <div className="flex space-x-1">
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                const pageNum = i + 1;
-                const isActive = pageNum === currentPage;
-                return (
-                  <Button
-                    key={pageNum}
-                    variant={isActive ? "primary" : "secondary"}
-                    size="sm"
-                    onClick={() => setCurrentPage(pageNum)}
-                    className="w-10"
-                  >
-                    {pageNum}
-                  </Button>
-                );
-              })}
-            </div>
-
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setCurrentPage(currentPage + 1)}
-              disabled={currentPage === totalPages}
-            >
-              {isRTL ? "التالي" : "Next"}
-              <svg
-                className="w-4 h-4 ml-1"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 5l7 7-7 7"
-                />
-              </svg>
-            </Button>
+        {/* Infinite Scroll Trigger */}
+        {hasMoreSubscriptions && (
+          <div
+            ref={observerTarget}
+            className="py-4 text-center border-t border-gray-200 dark:border-gray-700 mt-8"
+          >
+            {isLoadingMore ? (
+              <div className="flex items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+                <span className="ml-2 text-gray-600 dark:text-gray-400">
+                  {isRTL ? "جاري تحميل المزيد..." : "Loading more..."}
+                </span>
+              </div>
+            ) : null}
           </div>
         )}
 

@@ -54,10 +54,9 @@ export default function InvoicesPage() {
   const [totalInvoices, setTotalInvoices] = useState(0);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [showModal, setShowModal] = useState(false);
-
-  useEffect(() => {
-    fetchInvoices();
-  }, [filter, typeFilter, currentPage]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showSearchBar, setShowSearchBar] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
 
   const fetchInvoices = async () => {
     try {
@@ -67,6 +66,7 @@ export default function InvoicesPage() {
         limit: "10",
         ...(filter !== "ALL" && { status: filter }),
         ...(typeFilter !== "ALL" && { type: typeFilter }),
+        ...(searchTerm && { search: searchTerm }),
       });
 
       const response = await api.get(`/admin/invoices?${params}`);
@@ -79,8 +79,38 @@ export default function InvoicesPage() {
       console.error("Error fetching invoices:", error);
     } finally {
       setLoading(false);
+      setIsSearching(false);
     }
   };
+
+  const clearSearch = () => {
+    setSearchTerm("");
+    setShowSearchBar(false);
+    setCurrentPage(1);
+  };
+
+  useEffect(() => {
+    fetchInvoices();
+  }, [filter, typeFilter, currentPage]);
+
+  // Search with debounce
+  useEffect(() => {
+    if (searchTerm) {
+      setIsSearching(true);
+      const timeoutId = setTimeout(() => {
+        setCurrentPage(1);
+        fetchInvoices();
+      }, 500);
+
+      return () => {
+        clearTimeout(timeoutId);
+        setIsSearching(false);
+      };
+    } else if (searchTerm === "") {
+      // Only fetch when search is cleared, not on initial mount
+      fetchInvoices();
+    }
+  }, [searchTerm]);
 
   const handleStatusUpdate = async (invoiceId: string, newStatus: string) => {
     try {
@@ -176,8 +206,101 @@ export default function InvoicesPage() {
           </p>
         </div>
 
-        {/* Filters */}
+        {/* Search and Filters */}
         <div className="mb-6 space-y-4">
+          {/* Search Bar */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex-1 max-w-md">
+              {showSearchBar ? (
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder={
+                      isRTL
+                        ? "البحث باسم المطعم، المستخدم، أو الإيميل..."
+                        : "Search by restaurant name, user name, or email..."
+                    }
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full px-4 py-2 pl-10 pr-10 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  />
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg
+                      className="h-5 w-5 text-gray-400"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                      />
+                    </svg>
+                  </div>
+                  {searchTerm && (
+                    <button
+                      onClick={clearSearch}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    >
+                      <svg
+                        className="h-5 w-5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  )}
+                  {isSearching && (
+                    <div className="absolute inset-y-0 right-0 pr-10 flex items-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-600"></div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowSearchBar(true)}
+                  className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    searchTerm
+                      ? "bg-primary-100 text-primary-700 dark:bg-primary-900 dark:text-primary-300"
+                      : "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                  }`}
+                >
+                  <svg
+                    className="w-4 h-4 mr-2"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
+                  </svg>
+                  {isRTL ? "البحث" : "Search"}
+                </button>
+              )}
+            </div>
+            {searchTerm && (
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                {isRTL
+                  ? `نتائج البحث: ${totalInvoices}`
+                  : `Search results: ${totalInvoices}`}
+              </div>
+            )}
+          </div>
+
+          {/* Filters */}
           <div className="flex flex-wrap gap-2">
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
               {isRTL ? "الحالة:" : "Status:"}
@@ -185,7 +308,10 @@ export default function InvoicesPage() {
             {["ALL", "PENDING", "PAID", "CANCELLED"].map((status) => (
               <button
                 key={status}
-                onClick={() => setFilter(status)}
+                onClick={() => {
+                  setFilter(status);
+                  setCurrentPage(1);
+                }}
                 className={`px-3 py-2 text-sm rounded-md transition-colors whitespace-nowrap ${
                   filter === status
                     ? "bg-primary-600 text-white"
@@ -208,7 +334,10 @@ export default function InvoicesPage() {
             {["ALL", "SUBSCRIPTION", "RENEWAL", "UPGRADE"].map((type) => (
               <button
                 key={type}
-                onClick={() => setTypeFilter(type)}
+                onClick={() => {
+                  setTypeFilter(type);
+                  setCurrentPage(1);
+                }}
                 className={`px-3 py-2 text-sm rounded-md transition-colors whitespace-nowrap ${
                   typeFilter === type
                     ? "bg-primary-600 text-white"

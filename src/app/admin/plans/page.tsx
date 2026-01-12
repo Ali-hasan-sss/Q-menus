@@ -49,6 +49,7 @@ export default function PlansPage() {
     descriptionAr: "",
     type: "BASIC",
     price: 0,
+    currency: "USD",
     duration: 30,
     maxTables: 10,
     maxMenus: 1,
@@ -65,6 +66,42 @@ export default function PlansPage() {
       value: "KITCHEN_DISPLAY_SYSTEM",
       label: "Kitchen Display System",
       labelAr: "لوحة المطبخ",
+    },
+  ];
+
+  // Popular currencies list with translations
+  const popularCurrencies = [
+    { code: "USD", nameAr: "دولار", nameEn: "US Dollar" },
+    { code: "EUR", nameAr: "يورو", nameEn: "Euro" },
+    { code: "GBP", nameAr: "جنيه إسترليني", nameEn: "British Pound" },
+    { code: "SYP", nameAr: "ليرة سورية", nameEn: "Syrian Pound" },
+    { code: "TRY", nameAr: "ليرة تركية", nameEn: "Turkish Lira" },
+    { code: "SAR", nameAr: "ريال سعودي", nameEn: "Saudi Riyal" },
+    { code: "AED", nameAr: "درهم إماراتي", nameEn: "UAE Dirham" },
+    { code: "JOD", nameAr: "دينار أردني", nameEn: "Jordanian Dinar" },
+    { code: "EGP", nameAr: "جنيه مصري", nameEn: "Egyptian Pound" },
+    { code: "KWD", nameAr: "دينار كويتي", nameEn: "Kuwaiti Dinar" },
+    { code: "QAR", nameAr: "ريال قطري", nameEn: "Qatari Riyal" },
+    { code: "OMR", nameAr: "ريال عماني", nameEn: "Omani Rial" },
+    { code: "BHD", nameAr: "دينار بحريني", nameEn: "Bahraini Dinar" },
+    { code: "LBP", nameAr: "ليرة لبنانية", nameEn: "Lebanese Pound" },
+    { code: "IQD", nameAr: "دينار عراقي", nameEn: "Iraqi Dinar" },
+    { code: "JPY", nameAr: "ين ياباني", nameEn: "Japanese Yen" },
+    { code: "CNY", nameAr: "يوان صيني", nameEn: "Chinese Yuan" },
+    { code: "INR", nameAr: "روبية هندية", nameEn: "Indian Rupee" },
+    { code: "CAD", nameAr: "دولار كندي", nameEn: "Canadian Dollar" },
+    { code: "AUD", nameAr: "دولار أسترالي", nameEn: "Australian Dollar" },
+    { code: "CHF", nameAr: "فرنك سويسري", nameEn: "Swiss Franc" },
+    { code: "RUB", nameAr: "روبل روسي", nameEn: "Russian Ruble" },
+    {
+      code: "SYP_NEW",
+      nameAr: "ليرة سورية جديدة",
+      nameEn: "Syrian Pound (New)",
+    },
+    {
+      code: "SYP_OLD",
+      nameAr: "ليرة سورية قديمة",
+      nameEn: "Syrian Pound (Old)",
     },
   ];
 
@@ -102,7 +139,7 @@ export default function PlansPage() {
     if (
       !formData.name ||
       !formData.type ||
-      !formData.price ||
+      (!formData.isFree && (!formData.price || !formData.currency)) ||
       !formData.description.trim()
     ) {
       showToast(
@@ -115,14 +152,21 @@ export default function PlansPage() {
     }
 
     try {
+      // Prepare data to send
+      const planData = {
+        ...formData,
+        // Ensure currency is sent even for free plans (for consistency)
+        currency: formData.currency || "USD",
+      };
+
       if (editingPlan) {
-        await api.put(`/admin/plans/${editingPlan.id}`, formData);
+        await api.put(`/admin/plans/${editingPlan.id}`, planData);
         showToast(
           isRTL ? "تم تحديث الخطة بنجاح" : "Plan updated successfully",
           "success"
         );
       } else {
-        await api.post("/admin/plans", formData);
+        await api.post("/admin/plans", planData);
         showToast(
           isRTL ? "تم إضافة الخطة بنجاح" : "Plan added successfully",
           "success"
@@ -149,6 +193,7 @@ export default function PlansPage() {
       descriptionAr: plan.descriptionAr || "",
       type: plan.type,
       price: Number(plan.price),
+      currency: plan.currency || "USD",
       duration: plan.duration,
       maxTables: plan.maxTables,
       maxMenus: plan.maxMenus,
@@ -169,6 +214,7 @@ export default function PlansPage() {
       descriptionAr: "",
       type: "BASIC",
       price: 0,
+      currency: "USD",
       duration: 30,
       maxTables: 10,
       maxMenus: 1,
@@ -506,7 +552,7 @@ export default function PlansPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                           {isRTL ? "النوع" : "Type"}
@@ -536,7 +582,33 @@ export default function PlansPage() {
                         step="0.01"
                         min="0"
                         required
+                        disabled={formData.isFree}
                       />
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          {isRTL ? "العملة" : "Currency"} *
+                        </label>
+                        <select
+                          value={formData.currency}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              currency: e.target.value,
+                            })
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          required
+                          disabled={formData.isFree}
+                        >
+                          {popularCurrencies.map((curr) => (
+                            <option key={curr.code} value={curr.code}>
+                              {isRTL
+                                ? `${curr.code} - ${curr.nameAr}`
+                                : `${curr.code} - ${curr.nameEn}`}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                   </div>
 

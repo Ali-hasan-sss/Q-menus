@@ -143,18 +143,31 @@ export function KitchenSectionsManager() {
       }
     } catch (error: any) {
       console.error("Error deleting section:", error);
-      showToast(
-        error.response?.data?.message ||
-          (isRTL ? "حدث خطأ في حذف القسم" : "Error deleting section"),
-        "error"
-      );
+      const errorMessage = error.response?.data?.message || "";
+
+      // Translate specific error message
+      let translatedMessage = errorMessage;
+      if (
+        errorMessage.includes(
+          "Cannot delete kitchen section with associated menu items"
+        ) ||
+        errorMessage.includes("associated menu items")
+      ) {
+        translatedMessage = isRTL
+          ? "لا يمكن حذف قسم المطبخ المرتبط بعناصر قائمة. يرجى إعادة تعيين العناصر أولاً."
+          : "Cannot delete kitchen section with associated menu items. Please reassign items first.";
+      } else if (errorMessage) {
+        translatedMessage = errorMessage;
+      } else {
+        translatedMessage = isRTL
+          ? "حدث خطأ في حذف القسم"
+          : "Error deleting section";
+      }
+
+      showToast(translatedMessage, "error");
     } finally {
       setSaving(false);
     }
-  };
-
-  const handleToggleActive = async (id: string, isActive: boolean) => {
-    await handleUpdate(id, { isActive: !isActive });
   };
 
   if (loading) {
@@ -198,23 +211,6 @@ export function KitchenSectionsManager() {
               }
               placeholder={isRTL ? "مثال: Hot Kitchen" : "e.g., Hot Kitchen"}
               required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              {isRTL ? "ترتيب العرض" : "Display Order"}
-            </label>
-            <Input
-              type="number"
-              min="0"
-              value={newSection.sortOrder}
-              onChange={(e) =>
-                setNewSection({
-                  ...newSection,
-                  sortOrder: parseInt(e.target.value) || 0,
-                })
-              }
-              placeholder="0"
             />
           </div>
         </div>
@@ -285,24 +281,7 @@ export function KitchenSectionsManager() {
                         isRTL ? "اسم القسم (إنجليزي)" : "Section Name (English)"
                       }
                     />
-                    <Input
-                      type="number"
-                      min="0"
-                      value={section.sortOrder}
-                      onChange={(e) =>
-                        setSections(
-                          sections.map((s) =>
-                            s.id === section.id
-                              ? {
-                                  ...s,
-                                  sortOrder: parseInt(e.target.value) || 0,
-                                }
-                              : s
-                          )
-                        )
-                      }
-                      placeholder={isRTL ? "ترتيب" : "Order"}
-                    />
+
                     <div className="flex gap-2">
                       <Button
                         size="sm"
@@ -343,54 +322,49 @@ export function KitchenSectionsManager() {
                             ({section.nameAr})
                           </span>
                         )}
-                        <span className="text-xs px-2 py-1 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
-                          {isRTL ? "ترتيب:" : "Order:"} {section.sortOrder}
-                        </span>
-                        {section.isActive ? (
-                          <span className="text-xs px-2 py-1 rounded bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
-                            {isRTL ? "نشط" : "Active"}
-                          </span>
-                        ) : (
-                          <span className="text-xs px-2 py-1 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
-                            {isRTL ? "غير نشط" : "Inactive"}
-                          </span>
-                        )}
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() =>
-                          handleToggleActive(section.id, section.isActive)
-                        }
-                        disabled={saving}
-                      >
-                        {section.isActive
-                          ? isRTL
-                            ? "تعطيل"
-                            : "Deactivate"
-                          : isRTL
-                            ? "تفعيل"
-                            : "Activate"}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
+                    <div className="flex gap-2 items-center">
+                      <button
                         onClick={() => setEditingId(section.id)}
                         disabled={saving}
+                        className="p-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={isRTL ? "تعديل" : "Edit"}
                       >
-                        {isRTL ? "تعديل" : "Edit"}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                          />
+                        </svg>
+                      </button>
+                      <button
                         onClick={() => handleDelete(section.id)}
                         disabled={saving}
-                        className="text-red-600 hover:text-red-700 border-red-300 hover:border-red-400"
+                        className="p-2 text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={isRTL ? "حذف" : "Delete"}
                       >
-                        {isRTL ? "حذف" : "Delete"}
-                      </Button>
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                          />
+                        </svg>
+                      </button>
                     </div>
                   </>
                 )}

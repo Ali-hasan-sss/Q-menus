@@ -180,6 +180,8 @@ export default function Navbar() {
   const [waiterRequestsCount, setWaiterRequestsCount] = useState(0);
   const desktopNotificationRef = useRef<HTMLDivElement>(null);
   const mobileNotificationRef = useRef<HTMLDivElement>(null);
+  const desktopWaiterRequestsRef = useRef<HTMLDivElement>(null);
+  const mobileWaiterRequestsRef = useRef<HTMLDivElement>(null);
 
   const handleLogout = () => {
     showConfirm({
@@ -221,6 +223,17 @@ export default function Navbar() {
 
         if (!clickedInsideDesktop && !clickedInsideMobile) {
           setIsNotificationsOpen(false);
+        }
+      }
+      if (isWaiterRequestsOpen) {
+        const clickedInsideDesktop = desktopWaiterRequestsRef.current?.contains(
+          event.target as Node
+        );
+        const clickedInsideMobile = mobileWaiterRequestsRef.current?.contains(
+          event.target as Node
+        );
+
+        if (!clickedInsideDesktop && !clickedInsideMobile) {
           setIsWaiterRequestsOpen(false);
         }
       }
@@ -322,7 +335,7 @@ export default function Navbar() {
             {/* Right side */}
             <div className="flex items-center space-x-4">
               {/* Waiter Requests */}
-              <div className="relative">
+              <div className="relative" ref={desktopWaiterRequestsRef}>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -348,7 +361,10 @@ export default function Navbar() {
 
                 {/* Waiter Requests Dropdown */}
                 {isWaiterRequestsOpen && (
-                  <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    className="absolute right-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50"
+                  >
                     <div className="p-4 border-b border-gray-200 dark:border-gray-700">
                       <div className="flex justify-between items-center">
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -880,7 +896,7 @@ export default function Navbar() {
           </div>
           <div className="flex items-center space-x-2">
             {/* Mobile Waiter Requests */}
-            <div className="relative">
+            <div className="relative" ref={mobileWaiterRequestsRef}>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
