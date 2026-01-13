@@ -7,7 +7,7 @@ import React, {
   useEffect,
   useCallback,
 } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { api } from "@/lib/api";
 import toast from "react-hot-toast";
 
@@ -87,19 +87,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const pathname = usePathname();
 
-  // Check if user is authenticated on mount
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
+  const checkAuth = useCallback(async () => {
     if (typeof window === "undefined") {
       setLoading(false);
       return;
     }
 
-    const currentPath = window.location.pathname;
+    const currentPath = pathname || window.location.pathname;
 
     // Skip auth check for public pages, but only if user is not already authenticated
     // This allows redirects after login to work properly
@@ -129,19 +125,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Skip auth check for public pages if user is not set
-    if (isPublicPage && !user) {
-      console.log("🏠 Public page detected - skipping auth check");
-      setLoading(false);
-      return;
-    }
-
     // For protected pages (admin, dashboard), always check authentication
     const isProtectedPage =
       currentPath.startsWith("/admin") ||
       currentPath.startsWith("/dashboard") ||
       currentPath.startsWith("/kitchen");
 
+    // Always check authentication, even for public pages, to maintain session state
     try {
       console.log("🔐 Checking auth with httpOnly cookie");
       console.log("📡 Fetching user profile...");
@@ -179,6 +169,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log("🔄 Redirecting owner without restaurant to onboarding");
         router.push("/onboarding");
       }
+      // For public pages with authenticated user, don't redirect here
+      // Let the page component handle the redirect (e.g., home page)
     } catch (error: any) {
       console.error(
         "❌ Auth check failed:",
@@ -203,7 +195,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pathname, router]);
+
+  // Check if user is authenticated on mount and when pathname changes
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
 
   const login = async (email: string, password: string) => {
     try {

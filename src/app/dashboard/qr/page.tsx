@@ -37,10 +37,368 @@ function QRPageContent() {
   const [selectedQRCodes, setSelectedQRCodes] = useState<string[]>([]);
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [hasTriedAutoCreate, setHasTriedAutoCreate] = useState(false);
+  const [showPrintOptions, setShowPrintOptions] = useState(false);
+  const [showSinglePrintOptions, setShowSinglePrintOptions] = useState(false);
+  const [selectedQRForPrint, setSelectedQRForPrint] = useState<any>(null);
+  const [printType, setPrintType] = useState<"standard" | "label">("standard");
 
   useEffect(() => {
     fetchQRCodes();
   }, [fetchQRCodes]);
+
+  // Print functions
+  const printStandard = (codes: any[]) => {
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      const qrCodesPerPage = 6;
+      const totalPages = Math.ceil(codes.length / qrCodesPerPage);
+
+      let htmlContent = `
+        <html>
+          <head>
+            <title>${isRTL ? "أكواد QR للطاولات" : "Table QR Codes"}</title>
+            <meta charset="UTF-8">
+            <style>
+              * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+              }
+              @page {
+                size: A4;
+                margin: 15mm;
+              }
+              html, body { 
+                font-family: Arial, sans-serif; 
+                direction: ${isRTL ? "rtl" : "ltr"};
+                margin: 0;
+                padding: 0;
+                width: 100%;
+              }
+              .page {
+                page-break-after: always;
+                page-break-inside: avoid;
+                width: 180mm;
+                height: 267mm;
+                margin: 0 auto;
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                grid-template-rows: repeat(3, 1fr);
+                gap: 10mm;
+                padding: 0;
+              }
+              .page:last-child {
+                page-break-after: auto;
+              }
+              .qr-card {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                border: 1.5px solid #ddd;
+                padding: 8mm;
+                border-radius: 6px;
+                background: white;
+                text-align: center;
+                break-inside: avoid;
+              }
+              .qr-image {
+                width: 35mm;
+                height: 35mm;
+                margin: 3mm auto;
+                display: block;
+              }
+              .table-number {
+                font-weight: bold;
+                font-size: 14pt;
+                margin: 3mm 0;
+                color: #333;
+              }
+              .instructions {
+                font-size: 9pt;
+                color: #666;
+                margin-top: 2mm;
+              }
+              @media print {
+                html, body {
+                  margin: 0 !important;
+                  padding: 0 !important;
+                }
+              }
+            </style>
+          </head>
+          <body>
+      `;
+
+      for (let page = 0; page < totalPages; page++) {
+        htmlContent += '<div class="page">';
+        const startIndex = page * qrCodesPerPage;
+        const endIndex = Math.min(startIndex + qrCodesPerPage, codes.length);
+
+        for (let i = startIndex; i < endIndex; i++) {
+          const qr = codes[i];
+          htmlContent += `
+            <div class="qr-card">
+              <div class="table-number">
+                ${isRTL ? `طاولة ${qr.tableNumber}` : `Table ${qr.tableNumber}`}
+              </div>
+              <img src="${qr.qrCodeImage}" alt="QR Code" class="qr-image" />
+              <div class="instructions">
+                ${isRTL ? "امسح لعرض القائمة" : "Scan to view menu"}
+              </div>
+            </div>
+          `;
+        }
+        htmlContent += "</div>";
+      }
+
+      htmlContent += `
+          </body>
+        </html>
+      `;
+
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      setTimeout(() => printWindow.print(), 300);
+    }
+  };
+
+  const printLabel = (codes: any[]) => {
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      // 4cm x 4cm per QR code, 8cm paper width
+      // Convert to mm: 40mm x 40mm per code, 80mm paper width
+      let htmlContent = `
+        <html>
+          <head>
+            <title>${isRTL ? "أكواد QR للطاولات - طابعة الملصقات" : "Table QR Codes - Label Printer"}</title>
+            <meta charset="UTF-8">
+            <style>
+              * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+              }
+              @page {
+                size: 80mm auto;
+                margin: 0;
+              }
+              html, body { 
+                font-family: Arial, sans-serif; 
+                direction: ${isRTL ? "rtl" : "ltr"};
+                margin: 0;
+                padding: 0;
+                width: 80mm;
+              }
+              .qr-label {
+                width: 80mm;
+                height: 40mm;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                border-bottom: 1px solid #ddd;
+                padding: 2mm;
+                page-break-inside: avoid;
+                break-inside: avoid;
+              }
+              .qr-label:last-child {
+                border-bottom: none;
+              }
+              .qr-image {
+                width: 30mm;
+                height: 30mm;
+                display: block;
+                margin: 0 auto 1mm;
+              }
+              .table-number {
+                font-weight: bold;
+                font-size: 10pt;
+                margin: 0;
+                color: #333;
+                text-align: center;
+              }
+              .instructions {
+                font-size: 7pt;
+                color: #666;
+                margin-top: 1mm;
+                text-align: center;
+              }
+              @media print {
+                html, body {
+                  margin: 0 !important;
+                  padding: 0 !important;
+                  width: 80mm !important;
+                }
+                .qr-label {
+                  page-break-after: auto;
+                }
+              }
+            </style>
+          </head>
+          <body>
+      `;
+
+      codes.forEach((qr) => {
+        htmlContent += `
+          <div class="qr-label">
+            <div class="table-number">
+              ${isRTL ? `طاولة ${qr.tableNumber}` : `Table ${qr.tableNumber}`}
+            </div>
+            <img src="${qr.qrCodeImage}" alt="QR Code" class="qr-image" />
+            <div class="instructions">
+              ${isRTL ? "امسح لعرض القائمة" : "Scan to view menu"}
+            </div>
+          </div>
+        `;
+      });
+
+      htmlContent += `
+          </body>
+        </html>
+      `;
+
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      setTimeout(() => printWindow.print(), 300);
+    }
+  };
+
+  // Print single QR code functions
+  const printSingleStandard = (qr: any) => {
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>${isRTL ? `كود QR - طاولة ${qr.tableNumber}` : `QR Code - Table ${qr.tableNumber}`}</title>
+            <style>
+              @page {
+                size: A4;
+                margin: 20mm;
+              }
+              body { 
+                font-family: Arial, sans-serif; 
+                text-align: center; 
+                padding: 40px;
+                direction: ${isRTL ? "rtl" : "ltr"};
+                margin: 0;
+              }
+              .qr-container { 
+                margin: 30px auto;
+                max-width: 350px;
+              }
+              .qr-image { 
+                width: 300px;
+                height: 300px;
+                display: block;
+                margin: 0 auto;
+              }
+              .table-info { 
+                margin: 30px 0; 
+                font-size: 24px; 
+                font-weight: bold;
+                color: #333;
+              }
+              .instructions {
+                margin: 20px 0;
+                font-size: 16px;
+                color: #666;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="table-info">${isRTL ? `طاولة ${qr.tableNumber}` : `Table ${qr.tableNumber}`}</div>
+            <div class="qr-container">
+              <img src="${qr.qrCodeImage}" alt="QR Code" class="qr-image" />
+            </div>
+            <div class="instructions">
+              <p>${isRTL ? "امسح هذا الرمز لعرض قائمة المطعم" : "Scan this QR code to view the restaurant menu"}</p>
+            </div>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      setTimeout(() => printWindow.print(), 300);
+    }
+  };
+
+  const printSingleLabel = (qr: any) => {
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      // 4cm x 4cm QR code, 8cm paper width
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>${isRTL ? `كود QR - طاولة ${qr.tableNumber} - طابعة الملصقات` : `QR Code - Table ${qr.tableNumber} - Label Printer`}</title>
+            <style>
+              @page {
+                size: 80mm 40mm;
+                margin: 0;
+              }
+              html, body { 
+                font-family: Arial, sans-serif; 
+                direction: ${isRTL ? "rtl" : "ltr"};
+                margin: 0;
+                padding: 0;
+                width: 80mm;
+                height: 40mm;
+              }
+              .qr-label {
+                width: 80mm;
+                height: 40mm;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                padding: 2mm;
+              }
+              .qr-image {
+                width: 30mm;
+                height: 30mm;
+                display: block;
+                margin: 0 auto 1mm;
+              }
+              .table-number {
+                font-weight: bold;
+                font-size: 10pt;
+                margin: 0;
+                color: #333;
+                text-align: center;
+              }
+              .instructions {
+                font-size: 7pt;
+                color: #666;
+                margin-top: 1mm;
+                text-align: center;
+              }
+              @media print {
+                html, body {
+                  margin: 0 !important;
+                  padding: 0 !important;
+                  width: 80mm !important;
+                  height: 40mm !important;
+                }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="qr-label">
+              <div class="table-number">
+                ${isRTL ? `طاولة ${qr.tableNumber}` : `Table ${qr.tableNumber}`}
+              </div>
+              <img src="${qr.qrCodeImage}" alt="QR Code" class="qr-image" />
+              <div class="instructions">
+                ${isRTL ? "امسح لعرض القائمة" : "Scan to view menu"}
+              </div>
+            </div>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      setTimeout(() => printWindow.print(), 300);
+    }
+  };
 
   // Separate effect for auto-creating restaurant QR (only once)
   useEffect(() => {
@@ -237,127 +595,7 @@ function QRPageContent() {
                 {qrCodes.length > 0 && (
                   <>
                     <Button
-                      onClick={() => {
-                        // Print all table QR codes
-                        const printWindow = window.open("", "_blank");
-                        if (printWindow) {
-                          const qrCodesPerPage = 6;
-                          const totalPages = Math.ceil(
-                            qrCodes.length / qrCodesPerPage
-                          );
-
-                          let htmlContent = `
-                            <html>
-                              <head>
-                                <title>${isRTL ? "أكواد QR للطاولات" : "Table QR Codes"}</title>
-                                <meta charset="UTF-8">
-                                <style>
-                                  * {
-                                    margin: 0;
-                                    padding: 0;
-                                    box-sizing: border-box;
-                                  }
-                                  @page {
-                                    size: A4;
-                                    margin: 15mm;
-                                  }
-                                  html, body { 
-                                    font-family: Arial, sans-serif; 
-                                    direction: ${isRTL ? "rtl" : "ltr"};
-                                    margin: 0;
-                                    padding: 0;
-                                    width: 100%;
-                                  }
-                                  .page {
-                                    page-break-after: always;
-                                    page-break-inside: avoid;
-                                    width: 180mm;
-                                    height: 267mm;
-                                    margin: 0 auto;
-                                    display: grid;
-                                    grid-template-columns: repeat(2, 1fr);
-                                    grid-template-rows: repeat(3, 1fr);
-                                    gap: 10mm;
-                                    padding: 0;
-                                  }
-                                  .page:last-child {
-                                    page-break-after: auto;
-                                  }
-                                  .qr-card {
-                                    display: flex;
-                                    flex-direction: column;
-                                    align-items: center;
-                                    justify-content: center;
-                                    border: 1.5px solid #ddd;
-                                    padding: 8mm;
-                                    border-radius: 6px;
-                                    background: white;
-                                    text-align: center;
-                                    break-inside: avoid;
-                                  }
-                                  .qr-image {
-                                    width: 35mm;
-                                    height: 35mm;
-                                    margin: 3mm auto;
-                                    display: block;
-                                  }
-                                  .table-number {
-                                    font-weight: bold;
-                                    font-size: 14pt;
-                                    margin: 3mm 0;
-                                    color: #333;
-                                  }
-                                  .instructions {
-                                    font-size: 9pt;
-                                    color: #666;
-                                    margin-top: 2mm;
-                                  }
-                                  @media print {
-                                    html, body {
-                                      margin: 0 !important;
-                                      padding: 0 !important;
-                                    }
-                                  }
-                                </style>
-                              </head>
-                              <body>
-                          `;
-
-                          for (let page = 0; page < totalPages; page++) {
-                            htmlContent += '<div class="page">';
-                            const startIndex = page * qrCodesPerPage;
-                            const endIndex = Math.min(
-                              startIndex + qrCodesPerPage,
-                              qrCodes.length
-                            );
-
-                            for (let i = startIndex; i < endIndex; i++) {
-                              const qr = qrCodes[i];
-                              htmlContent += `
-                                <div class="qr-card">
-                                  <div class="table-number">
-                                    ${isRTL ? `طاولة ${qr.tableNumber}` : `Table ${qr.tableNumber}`}
-                                  </div>
-                                  <img src="${qr.qrCodeImage}" alt="QR Code" class="qr-image" />
-                                  <div class="instructions">
-                                    ${isRTL ? "امسح لعرض القائمة" : "Scan to view menu"}
-                                  </div>
-                                </div>
-                              `;
-                            }
-                            htmlContent += "</div>";
-                          }
-
-                          htmlContent += `
-                              </body>
-                            </html>
-                          `;
-
-                          printWindow.document.write(htmlContent);
-                          printWindow.document.close();
-                          setTimeout(() => printWindow.print(), 300);
-                        }
-                      }}
+                      onClick={() => setShowPrintOptions(true)}
                       variant="outline"
                       size="sm"
                       className="bg-blue-50 text-blue-700 hover:bg-blue-100"
@@ -910,61 +1148,8 @@ function QRPageContent() {
                             size="sm"
                             variant="outline"
                             onClick={() => {
-                              const printWindow = window.open("", "_blank");
-                              if (printWindow) {
-                                printWindow.document.write(`
-                                <html>
-                                  <head>
-                                    <title>${isRTL ? `كود QR - طاولة ${qr.tableNumber}` : `QR Code - Table ${qr.tableNumber}`}</title>
-                                    <style>
-                                      @page {
-                                        size: A4;
-                                        margin: 20mm;
-                                      }
-                                      body { 
-                                        font-family: Arial, sans-serif; 
-                                        text-align: center; 
-                                        padding: 40px;
-                                        direction: ${isRTL ? "rtl" : "ltr"};
-                                        margin: 0;
-                                      }
-                                      .qr-container { 
-                                        margin: 30px auto;
-                                        max-width: 350px;
-                                      }
-                                      .qr-image { 
-                                        width: 300px;
-                                        height: 300px;
-                                        display: block;
-                                        margin: 0 auto;
-                                      }
-                                      .table-info { 
-                                        margin: 30px 0; 
-                                        font-size: 24px; 
-                                        font-weight: bold;
-                                        color: #333;
-                                      }
-                                      .instructions {
-                                        margin: 20px 0;
-                                        font-size: 16px;
-                                        color: #666;
-                                      }
-                                    </style>
-                                  </head>
-                                  <body>
-                                    <div class="table-info">${isRTL ? `طاولة ${qr.tableNumber}` : `Table ${qr.tableNumber}`}</div>
-                                    <div class="qr-container">
-                                      <img src="${qr.qrCodeImage}" alt="QR Code" class="qr-image" />
-                                    </div>
-                                    <div class="instructions">
-                                      <p>${isRTL ? "امسح لعرض القائمة" : "Scan to view menu"}</p>
-                                    </div>
-                                  </body>
-                                </html>
-                              `);
-                                printWindow.document.close();
-                                setTimeout(() => printWindow.print(), 300);
-                              }
+                              setSelectedQRForPrint(qr);
+                              setShowSinglePrintOptions(true);
                             }}
                             className="w-full"
                           >
@@ -1088,6 +1273,242 @@ function QRPageContent() {
                       </Button>
                     </div>
                   </form>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Single QR Print Options Modal */}
+          {showSinglePrintOptions && selectedQRForPrint && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                    {isRTL ? "اختر نوع الطباعة" : "Select Print Type"}
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setShowSinglePrintOptions(false);
+                      setSelectedQRForPrint(null);
+                    }}
+                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  >
+                    <svg
+                      className="w-6 h-6"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  <button
+                    onClick={() => {
+                      printSingleStandard(selectedQRForPrint);
+                      setShowSinglePrintOptions(false);
+                      setSelectedQRForPrint(null);
+                    }}
+                    className="w-full p-4 border-2 border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-500 dark:hover:border-primary-500 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+                        <svg
+                          className="w-6 h-6 text-blue-600 dark:text-blue-400"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                          />
+                        </svg>
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-gray-900 dark:text-white">
+                          {isRTL ? "الطباعة القياسية" : "Standard Print"}
+                        </h4>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          {isRTL
+                            ? "طباعة على صفحة A4 - مناسب للطابعات العادية"
+                            : "Print on A4 page - Suitable for standard printers"}
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      printSingleLabel(selectedQRForPrint);
+                      setShowSinglePrintOptions(false);
+                      setSelectedQRForPrint(null);
+                    }}
+                    className="w-full p-4 border-2 border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-500 dark:hover:border-primary-500 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
+                        <svg
+                          className="w-6 h-6 text-green-600 dark:text-green-400"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"
+                          />
+                        </svg>
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-gray-900 dark:text-white">
+                          {isRTL ? "طابعة الملصقات" : "Label Printer"}
+                        </h4>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          {isRTL
+                            ? "طباعة على عمود واحد - كل كود 4×4 سم، عرض الورقة 8 سم"
+                            : "Print in single column - Each code 4×4 cm, paper width 8 cm"}
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+
+                <div className="mt-6 flex justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowSinglePrintOptions(false);
+                      setSelectedQRForPrint(null);
+                    }}
+                  >
+                    {isRTL ? "إلغاء" : "Cancel"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Print Options Modal */}
+          {showPrintOptions && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                    {isRTL ? "اختر نوع الطباعة" : "Select Print Type"}
+                  </h3>
+                  <button
+                    onClick={() => setShowPrintOptions(false)}
+                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  >
+                    <svg
+                      className="w-6 h-6"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  <button
+                    onClick={() => {
+                      printStandard(qrCodes);
+                      setShowPrintOptions(false);
+                    }}
+                    className="w-full p-4 border-2 border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-500 dark:hover:border-primary-500 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+                        <svg
+                          className="w-6 h-6 text-blue-600 dark:text-blue-400"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                          />
+                        </svg>
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-gray-900 dark:text-white">
+                          {isRTL ? "الطباعة القياسية" : "Standard Print"}
+                        </h4>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          {isRTL
+                            ? "طباعة على صفين (2×3) - مناسب للطابعات العادية"
+                            : "Print in 2 columns (2×3) - Suitable for standard printers"}
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      printLabel(qrCodes);
+                      setShowPrintOptions(false);
+                    }}
+                    className="w-full p-4 border-2 border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-500 dark:hover:border-primary-500 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
+                        <svg
+                          className="w-6 h-6 text-green-600 dark:text-green-400"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"
+                          />
+                        </svg>
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-gray-900 dark:text-white">
+                          {isRTL ? "طابعة الملصقات" : "Label Printer"}
+                        </h4>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          {isRTL
+                            ? "طباعة على عمود واحد - كل كود 4×4 سم، عرض الورقة 8 سم"
+                            : "Print in single column - Each code 4×4 cm, paper width 8 cm"}
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+
+                <div className="mt-6 flex justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowPrintOptions(false)}
+                  >
+                    {isRTL ? "إلغاء" : "Cancel"}
+                  </Button>
                 </div>
               </div>
             </div>

@@ -7,8 +7,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useCustomerSocket } from "@/contexts/CustomerSocketContext";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { LanguageToggle } from "@/components/ui/LanguageToggle";
-import { ThemeToggle } from "@/components/ui/ThemeToggle";
+
 import { MenuItem } from "@/components/customer/MenuItem";
 import { OrderSummary } from "@/components/customer/OrderSummary";
 import { OrderStatus } from "@/components/customer/OrderStatus";
@@ -222,6 +221,107 @@ export default function OrderPage() {
     }
   }, [order?.restaurant?.id, joinRestaurant]);
 
+  // Update restaurant currency when order data changes
+  useEffect(() => {
+    if (order?.restaurant?.currency) {
+      setRestaurantCurrency(order.restaurant.currency);
+    } else if (order?.currency) {
+      setRestaurantCurrency(order.currency);
+    }
+  }, [order?.restaurant?.currency, order?.currency]);
+
+  // Update selected payment currency when restaurant currency changes
+  useEffect(() => {
+    if (!restaurantCurrency || !order?.restaurant?.id) return;
+
+    // Always try to load from localStorage first, then fall back to restaurant currency
+    // This ensures we use the user's saved selection or the correct restaurant currency
+    try {
+      const savedCurrency = localStorage.getItem(
+        `selectedCurrency_${order.restaurant.id}`
+      );
+
+      // Determine what currency to use
+      let currencyToUse = restaurantCurrency;
+
+      if (savedCurrency) {
+        currencyToUse = savedCurrency;
+      }
+
+      // Only update if different from current selection to avoid unnecessary re-renders
+      // This handles the case where USD is set as default but restaurant currency is different
+      setSelectedPaymentCurrency((currentCurrency) => {
+        // If current is null or USD (default) and restaurant currency is different, update it
+        if (
+          !currentCurrency ||
+          (currentCurrency === "USD" && restaurantCurrency !== "USD")
+        ) {
+          return currencyToUse;
+        }
+        // If we have a saved currency, use it
+        if (savedCurrency && savedCurrency !== currentCurrency) {
+          return savedCurrency;
+        }
+        // Otherwise, keep current selection
+        return currentCurrency;
+      });
+    } catch (error) {
+      console.error("Failed to load selected currency:", error);
+      // Fall back to restaurant currency on error
+      setSelectedPaymentCurrency((currentCurrency) => {
+        if (
+          !currentCurrency ||
+          (currentCurrency === "USD" && restaurantCurrency !== "USD")
+        ) {
+          return restaurantCurrency;
+        }
+        return currentCurrency;
+      });
+    }
+  }, [restaurantCurrency, order?.restaurant?.id]);
+
+  // Handle browser back button - redirect to menu with order ID
+  useEffect(() => {
+    if (!order?.restaurant?.id || !order?.id) return;
+
+    // Push current state to history to enable back button detection
+    window.history.pushState(
+      { page: "order-details", orderId: order.id },
+      "",
+      window.location.href
+    );
+
+    const handlePopState = (event: PopStateEvent) => {
+      // Navigate to menu page with order ID (same as "Add Items" button)
+      const tableParam =
+        order.orderType === "DELIVERY" ? "DELIVERY" : order.tableNumber;
+
+      if (tableParam) {
+        router.push(
+          `/menu/${order.restaurant.id}?tableNumber=${tableParam}&addToOrder=${order.id}`
+        );
+      } else {
+        // Fallback to restaurant QR
+        router.push(
+          `/menu/${order.restaurant.id}?tableNumber=DELIVERY&addToOrder=${order.id}`
+        );
+      }
+    };
+
+    // Add popstate listener
+    window.addEventListener("popstate", handlePopState);
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, [
+    order?.restaurant?.id,
+    order?.id,
+    order?.orderType,
+    order?.tableNumber,
+    router,
+  ]);
+
   // Function to play customer notification sound
   const playCustomerNotification = (status: string) => {
     try {
@@ -334,9 +434,16 @@ export default function OrderPage() {
             };
 
             // Update currency from updated order if available
-            if (mergedOrder.restaurant?.currency) {
+            // The useEffect hook will handle currency updates automatically
+            if (
+              mergedOrder.restaurant?.currency &&
+              mergedOrder.restaurant.currency !== restaurantCurrency
+            ) {
               setRestaurantCurrency(mergedOrder.restaurant.currency);
-            } else if (mergedOrder.currency) {
+            } else if (
+              mergedOrder.currency &&
+              mergedOrder.currency !== restaurantCurrency
+            ) {
               setRestaurantCurrency(mergedOrder.currency);
             }
 
@@ -344,9 +451,15 @@ export default function OrderPage() {
           }
 
           // Update currency from new order if available
-          if (updatedOrder.restaurant?.currency) {
+          if (
+            updatedOrder.restaurant?.currency &&
+            updatedOrder.restaurant.currency !== restaurantCurrency
+          ) {
             setRestaurantCurrency(updatedOrder.restaurant.currency);
-          } else if (updatedOrder.currency) {
+          } else if (
+            updatedOrder.currency &&
+            updatedOrder.currency !== restaurantCurrency
+          ) {
             setRestaurantCurrency(updatedOrder.currency);
           }
 
@@ -676,7 +789,16 @@ export default function OrderPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div
+      className="min-h-screen bg-gray-50 dark:bg-gray-900"
+      style={{
+        fontFamily: isRTL
+          ? "var(--font-cairo), Arial, sans-serif"
+          : "var(--font-inter), system-ui, sans-serif",
+      }}
+      dir={isRTL ? "rtl" : "ltr"}
+      lang={language}
+    >
       {/* Header */}
       <RestaurantHeader
         restaurant={restaurant}

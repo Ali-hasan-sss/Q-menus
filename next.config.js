@@ -54,6 +54,8 @@ const baseConfig = {
     // IMPORTANT: Proxy must be false for cookies to work with cross-origin
     // Next.js rewrites don't properly forward Set-Cookie headers
     NEXT_PUBLIC_PROXY_API: process.env.NEXT_PUBLIC_PROXY_API || "false",
+    NEXT_PUBLIC_SUPPORT_WHATSAPP_PHONE:
+      process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP_PHONE || "963994488858",
   },
   async rewrites() {
     const backend = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";

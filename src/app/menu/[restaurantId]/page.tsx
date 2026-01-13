@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { publicApi, endpoints } from "@/lib/api";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -164,6 +164,7 @@ export default function CustomerMenuPage() {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(
     null
   );
+  const selectedCategoryRef = useRef<Category | null>(null);
   const [showOrderSummary, setShowOrderSummary] = useState(false);
   const [pendingOrder, setPendingOrder] = useState<any>(null);
   const [incompleteOrder, setIncompleteOrder] = useState<any>(null);
@@ -309,12 +310,7 @@ export default function CustomerMenuPage() {
             // This will prevent menu from being displayed
             const order = response.data.data.order;
             setIncompleteOrder(order);
-            console.log(
-              "🚫 Incomplete order found for table:",
-              tableNumber,
-              "Order ID:",
-              order.id
-            );
+
             // Don't load menu if there's an incomplete order
             return;
           }
@@ -331,12 +327,7 @@ export default function CustomerMenuPage() {
     };
 
     checkIncompleteOrderBeforeLoad();
-
-    // Clear browser history to prevent back button manipulation
-    if (typeof window !== "undefined") {
-      window.history.replaceState(null, "", window.location.href);
-    }
-  }, [restaurantId, tableNumber, addToOrderParam, router]);
+  }, [restaurantId, tableNumber, addToOrderParam]);
 
   // Debug effect to log color opacity and theme changes
   useEffect(() => {
@@ -423,30 +414,57 @@ export default function CustomerMenuPage() {
     }
   }, [restaurantId, joinRestaurant]);
 
-  // Handle browser back/forward navigation - Force QR scan for security
+  // Keep ref in sync with selectedCategory
+  useEffect(() => {
+    selectedCategoryRef.current = selectedCategory;
+  }, [selectedCategory]);
+
+  // Handle browser back/forward navigation
   useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
-      // Prevent default browser back behavior
-      event.preventDefault();
+      // Use ref to get current selectedCategory (always up-to-date)
+      const currentSelectedCategory = selectedCategoryRef.current;
 
+      // Check if we're going back from a category view
+      if (currentSelectedCategory) {
+        // Simply update state - no history manipulation
+        // This prevents page reload
+        setSelectedCategory(null);
+        setCategorySearchQuery(""); // Clear category search when going back
+        return;
+      }
+
+      // If no category is selected, prevent back button for security
       // Force user to scan QR again for security
       const confirmExit = window.confirm(
         isRTL
-          ? "للأمان، يجب مسح رمز QR مرة أخرى للوصول إلى القائمة"
-          : "For security, you must scan the QR code again to access the menu"
+          ? "استخدم زر الرجوع ياسفل الشاشة للعودة إلى القائمة"
+          : "Use the back button at the bottom of the screen to return to the menu"
       );
 
       if (confirmExit) {
-        // Redirect to QR scanner (remove tableNumber to force scan)
-        router.push(`/menu/${restaurantId}`);
+        toast.success("شكرا لك  ");
       } else {
-        // Push current state back to history to prevent back button from working
-        window.history.pushState(null, "", window.location.href);
+        // Push current state back to prevent back button from working
+        window.history.pushState(
+          { page: "menu", selectedCategory: null },
+          "",
+          window.location.href
+        );
       }
     };
 
-    // Push initial state to prevent back button
-    window.history.pushState(null, "", window.location.href);
+    // Initialize history state only once when component mounts
+    if (typeof window !== "undefined") {
+      const currentState = window.history.state;
+      if (!currentState || !currentState.page) {
+        window.history.replaceState(
+          { page: "menu", selectedCategory: selectedCategory?.id || null },
+          "",
+          window.location.href
+        );
+      }
+    }
 
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
@@ -901,11 +919,29 @@ export default function CustomerMenuPage() {
   const handleCategoryClick = (category: Category) => {
     // Set selected category immediately
     setSelectedCategory(category);
+
+    // Push new state to history when selecting a category (enables back button)
+    if (typeof window !== "undefined") {
+      window.history.pushState(
+        { page: "menu", selectedCategory: category.id },
+        "",
+        window.location.href
+      );
+    }
   };
 
   const handleBackToCategories = () => {
     setSelectedCategory(null);
     setCategorySearchQuery(""); // Clear category search when going back
+
+    // Replace state when going back to categories (no new history entry)
+    if (typeof window !== "undefined") {
+      window.history.replaceState(
+        { page: "menu", selectedCategory: null },
+        "",
+        window.location.href
+      );
+    }
   };
 
   // Function to handle item click
@@ -1698,8 +1734,9 @@ export default function CustomerMenuPage() {
                     className="shadow-lg hover:shadow-xl rounded-full w-14 h-14 flex items-center justify-center transition-all duration-200"
                     style={{
                       backgroundColor:
-                        menuTheme?.primaryColor || "var(--theme-primary)",
+                        menuTheme?.accentColor || "var(--theme-accent)",
                       color: menuTheme?.textColor || "#ffffff",
+                      border: `2px solid ${menuTheme?.secondaryColor || "#2797dd"}`,
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.backgroundColor =
@@ -1707,7 +1744,7 @@ export default function CustomerMenuPage() {
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.backgroundColor =
-                        menuTheme?.primaryColor || "var(--theme-primary)";
+                        menuTheme?.accentColor || "var(--theme-accent)";
                     }}
                   >
                     {isRTL ? (

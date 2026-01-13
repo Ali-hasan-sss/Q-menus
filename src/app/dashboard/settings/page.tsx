@@ -210,13 +210,14 @@ export default function SettingsPage() {
     try {
       setSaving(true);
 
-      // Ensure currency is included in the request
+      // Ensure currency and kitchenWhatsApp are included in the request
       const formData = {
         ...restaurantForm,
         currency: restaurantForm.currency || "USD", // Ensure currency is always sent
+        kitchenWhatsApp: restaurantForm.kitchenWhatsApp || "", // Ensure kitchenWhatsApp is always sent
       };
 
-      const response = await api.put("/restaurant/profile", formData);
+      const response = await api.put("/restaurant", formData);
       if (response.data.success) {
         showToast(
           isRTL
@@ -226,6 +227,13 @@ export default function SettingsPage() {
         );
         const updatedData = response.data.data.restaurant || response.data.data;
         setRestaurant(updatedData);
+        // Update restaurantForm with the updated data to keep it in sync
+        setRestaurantForm((prev) => ({
+          ...prev,
+          ...updatedData,
+          kitchenWhatsApp:
+            updatedData.kitchenWhatsApp || prev.kitchenWhatsApp || "",
+        }));
       }
     } catch (error: any) {
       const message =
@@ -575,15 +583,18 @@ export default function SettingsPage() {
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-gray-200 dark:border-gray-700 mb-6">
-          <nav className="flex -mb-px gap-8" aria-label="Tabs">
+        <div className="border-b border-gray-200 dark:border-gray-700 mb-4 sm:mb-6">
+          <nav
+            className="flex -mb-px gap-2 sm:gap-4 md:gap-8 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+            aria-label="Tabs"
+          >
             <button
               onClick={() => setActiveTab("personal")}
               className={`${
                 activeTab === "personal"
                   ? "border-primary-500 text-primary-600 dark:text-primary-400"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
-              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
+              } whitespace-nowrap py-3 sm:py-4 px-2 sm:px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors flex-shrink-0`}
             >
               {isRTL ? "البيانات الشخصية" : "Personal Information"}
             </button>
@@ -593,7 +604,7 @@ export default function SettingsPage() {
                 activeTab === "restaurant"
                   ? "border-primary-500 text-primary-600 dark:text-primary-400"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
-              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
+              } whitespace-nowrap py-3 sm:py-4 px-2 sm:px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors flex-shrink-0`}
             >
               {isRTL ? "بيانات المطعم" : "Restaurant Information"}
             </button>
@@ -603,7 +614,7 @@ export default function SettingsPage() {
                 activeTab === "settings"
                   ? "border-primary-500 text-primary-600 dark:text-primary-400"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
-              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors`}
+              } whitespace-nowrap py-3 sm:py-4 px-2 sm:px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors flex-shrink-0`}
             >
               {isRTL ? "إعدادات المطعم" : "Restaurant Settings"}
             </button>
@@ -1081,38 +1092,43 @@ export default function SettingsPage() {
               </Card>
 
               {/* Currency Exchange Settings */}
-              <Card className="p-6">
-                <div className="flex justify-between items-center mb-6">
+              <Card className="p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 mb-4 sm:mb-6">
                   <div>
-                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                    <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">
                       {isRTL ? "إعدادات العملات" : "Currency Exchange Settings"}
                     </h2>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                     {currencyExchanges.length > 0 && (
                       <Button
                         onClick={handleBulkEditExchangeRates}
                         type="button"
                         variant="outline"
+                        className="text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2 flex-1 sm:flex-initial"
                       >
                         {isRTL ? "تعديل أسعار الصرف" : "Edit Exchange Rates"}
                       </Button>
                     )}
-                    <Button onClick={handleAddCurrency} type="button">
+                    <Button
+                      onClick={handleAddCurrency}
+                      type="button"
+                      className="text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2 flex-1 sm:flex-initial"
+                    >
                       {isRTL ? "+ إضافة عملة" : "+ Add Currency"}
                     </Button>
                   </div>
                 </div>
 
                 {/* Base Currency Selector */}
-                <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     {isRTL
                       ? "العملة الأساسية للمطعم"
                       : "Restaurant Base Currency"}
                   </label>
                   <select
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    className="w-full px-2 sm:px-3 py-1.5 sm:py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                     value={restaurantForm.currency}
                     onChange={async (e) => {
                       const newCurrency = e.target.value;
@@ -1123,7 +1139,7 @@ export default function SettingsPage() {
 
                       // Save immediately when currency changes
                       try {
-                        const response = await api.put("/restaurant/profile", {
+                        const response = await api.put("/restaurant", {
                           ...restaurantForm,
                           currency: newCurrency,
                         });
@@ -1166,7 +1182,7 @@ export default function SettingsPage() {
                       : "The base currency that will be used for all prices and displays"}
                   </p>
                 </div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-3 sm:mb-4">
                   {isRTL
                     ? "أضف عملات بديلة مع أسعار صرفها بالنسبة للعملة الأساسية. سيتمكن الزبائن من اختيار العملة التي يريدون الدفع بها."
                     : "Add alternative currencies with their exchange rates relative to the base currency. Customers will be able to choose the currency they want to pay with."}
@@ -1192,11 +1208,11 @@ export default function SettingsPage() {
                     {currencyExchanges.map((currency) => (
                       <div
                         key={currency.id}
-                        className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg flex items-center justify-between"
+                        className="p-3 sm:p-4 border border-gray-200 dark:border-gray-700 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4"
                       >
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3">
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        <div className="flex-1 min-w-0 w-full sm:w-auto">
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
+                            <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
                               {currency.currency}
                             </h3>
                             <span
@@ -1215,38 +1231,41 @@ export default function SettingsPage() {
                                   : "Inactive"}
                             </span>
                           </div>
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1 break-words">
                             {isRTL
                               ? `سعر الصرف: 1 ${currency.currency} = ${currency.exchangeRate} ${restaurantForm.currency}`
                               : `Exchange Rate: 1 ${currency.currency} = ${currency.exchangeRate} ${restaurantForm.currency}`}
                           </p>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => toggleCurrencyActive(currency)}
-                            className={`px-3 py-1 text-sm rounded ${
-                              currency.isActive
-                                ? "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300"
-                                : "bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900 dark:text-green-300"
-                            }`}
-                          >
-                            {currency.isActive
-                              ? isRTL
-                                ? "تعطيل"
-                                : "Disable"
-                              : isRTL
-                                ? "تفعيل"
-                                : "Enable"}
-                          </button>
+                        <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                          {/* Switch for Active/Inactive */}
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={currency.isActive}
+                              onChange={() => toggleCurrencyActive(currency)}
+                              className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary-600"></div>
+                            <span className="ml-2 sm:ml-3 text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 hidden sm:inline">
+                              {currency.isActive
+                                ? isRTL
+                                  ? "نشط"
+                                  : "Active"
+                                : isRTL
+                                  ? "غير نشط"
+                                  : "Inactive"}
+                            </span>
+                          </label>
                           <button
                             onClick={() => handleEditCurrency(currency)}
-                            className="px-3 py-1 text-sm bg-blue-100 text-blue-700 hover:bg-blue-200 rounded dark:bg-blue-900 dark:text-blue-300"
+                            className="px-2 sm:px-3 py-1 text-xs sm:text-sm bg-blue-100 text-blue-700 hover:bg-blue-200 rounded dark:bg-blue-900 dark:text-blue-300 flex-shrink-0"
                           >
                             {isRTL ? "تعديل" : "Edit"}
                           </button>
                           <button
                             onClick={() => handleDeleteCurrency(currency.id)}
-                            className="px-3 py-1 text-sm bg-red-100 text-red-700 hover:bg-red-200 rounded dark:bg-red-900 dark:text-red-300"
+                            className="px-2 sm:px-3 py-1 text-xs sm:text-sm bg-red-100 text-red-700 hover:bg-red-200 rounded dark:bg-red-900 dark:text-red-300 flex-shrink-0"
                           >
                             {isRTL ? "حذف" : "Delete"}
                           </button>

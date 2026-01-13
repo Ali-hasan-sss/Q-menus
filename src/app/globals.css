@@ -79,7 +79,6 @@ html[lang="en"],
   background-color: #111827;
 }
 
-
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
@@ -497,9 +496,28 @@ html[lang="en"],
 
 /* Intersection Observer trigger for animations */
 .animate-on-scroll {
-  opacity: 0;
-  transform: translateY(30px);
-  transition: all 0.8s ease-out;
+  /* Elements are visible by default - no hidden state */
+  opacity: 1;
+  transform: translateY(0);
+  transition:
+    opacity 0.6s ease-out,
+    transform 0.6s ease-out;
+}
+
+/* Optional: Add subtle animation when element enters viewport */
+.animate-on-scroll:not(.no-animate) {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .animate-on-scroll.visible {

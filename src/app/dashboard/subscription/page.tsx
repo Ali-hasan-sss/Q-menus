@@ -72,7 +72,9 @@ export default function SubscriptionPage() {
     name: string;
     nameAr?: string;
   } | null>(null);
-  const [adminPhone, setAdminPhone] = useState<string>("963994488858"); // Fallback
+  const [adminPhone, setAdminPhone] = useState<string>(
+    process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP_PHONE || "963994488858"
+  ); // Fallback
 
   useEffect(() => {
     const run = async () => {
@@ -131,8 +133,15 @@ export default function SubscriptionPage() {
           }
         }
 
-        // Get contact section for admin phone
+        // Use environment variable as primary source for admin phone
+        // Contact section phone is only used as fallback if env var is not set
+        const envPhone =
+          process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP_PHONE || "963994488858";
+        setAdminPhone(envPhone);
+
+        // Optionally override with contact section phone if env var is not set
         if (
+          !process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP_PHONE &&
           contactRes?.data?.success &&
           contactRes.data.data.sections.length > 0
         ) {
@@ -144,7 +153,7 @@ export default function SubscriptionPage() {
               ? attributes[1].valueAr
               : attributes[1].value;
             const phoneNumber = phoneValue.replace(/\D/g, ""); // Remove non-digits
-            if (phoneNumber) {
+            if (phoneNumber && phoneNumber.length >= 10) {
               setAdminPhone(phoneNumber);
             }
           }

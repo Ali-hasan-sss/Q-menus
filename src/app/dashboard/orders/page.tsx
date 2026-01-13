@@ -2026,13 +2026,51 @@ export default function OrdersPage() {
                       >
                         {getStatusLabel(order.status)}
                       </span>
-                      <p className="text-sm font-semibold text-gray-900 dark:text-white mt-1">
-                        {formatCurrencyWithLanguage(
-                          Number(order.totalPrice),
-                          restaurantCurrency || order.currency || "USD",
-                          language
+                      <div className="flex flex-col sm:flex-row items-end sm:items-center gap-1.5 sm:gap-2 mt-1">
+                        {/* Currency Selector */}
+                        {currencyExchanges.length > 0 && (
+                          <select
+                            value={
+                              selectedPaymentCurrency || restaurantCurrency
+                            }
+                            onChange={(e) =>
+                              setSelectedPaymentCurrency(
+                                e.target.value === restaurantCurrency
+                                  ? null
+                                  : e.target.value
+                              )
+                            }
+                            className="px-1.5 py-0.5 text-xs border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-1 focus:ring-primary-500 focus:border-transparent"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <option value={restaurantCurrency}>
+                              {restaurantCurrency} ({isRTL ? "أساسي" : "Base"})
+                            </option>
+                            {currencyExchanges.map((ce) => {
+                              const currencyName = getCurrencyName(ce.currency);
+                              return (
+                                <option key={ce.id} value={ce.currency}>
+                                  {ce.currency} - {currencyName}
+                                </option>
+                              );
+                            })}
+                          </select>
                         )}
-                      </p>
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                          {(() => {
+                            const baseTotal = Number(order.totalPrice);
+                            const converted = calculateTotalInCurrency(
+                              baseTotal,
+                              selectedPaymentCurrency
+                            );
+                            return formatCurrencyWithLanguage(
+                              converted.amount,
+                              converted.currency,
+                              language
+                            );
+                          })()}
+                        </p>
+                      </div>
                     </div>
                   </div>
 
@@ -2799,20 +2837,20 @@ export default function OrdersPage() {
 
       {/* Order Details Modal */}
       {showOrderModal && selectedOrder && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-4xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
+            <div className="p-4 sm:p-6">
               {/* Modal Header */}
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+              <div className="flex justify-between items-center mb-4 sm:mb-6">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
                   {isRTL ? "تفاصيل الطلب" : "Order Details"}
                 </h2>
                 <button
                   onClick={closeOrderModal}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1"
                 >
                   <svg
-                    className="w-6 h-6"
+                    className="w-5 h-5 sm:w-6 sm:h-6"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -2909,12 +2947,12 @@ export default function OrdersPage() {
               )}
 
               {/* Order Information */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3 sm:p-4">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-2 sm:mb-3">
                     {isRTL ? "معلومات الطلب" : "Order Information"}
                   </h3>
-                  <div className="space-y-2 text-sm">
+                  <div className="space-y-2 text-xs sm:text-sm">
                     <div className="flex justify-between">
                       <span className="text-gray-600 dark:text-gray-400">
                         {isRTL ? "رقم الطلب:" : "Order ID:"}
@@ -3008,9 +3046,9 @@ export default function OrdersPage() {
                         ))}
                       </>
                     )}
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-2">
-                        <span className="text-gray-600 dark:text-gray-400">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0 pt-2 border-t border-gray-200 dark:border-gray-600">
+                      <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <span className="text-gray-600 dark:text-gray-400 font-medium">
                           {isRTL ? "المجموع:" : "Total:"}
                         </span>
                         {/* Currency Selector */}
@@ -3026,7 +3064,7 @@ export default function OrdersPage() {
                                   : e.target.value
                               )
                             }
-                            className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            className="px-1.5 sm:px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent flex-shrink-0"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <option value={restaurantCurrency}>
@@ -3043,8 +3081,8 @@ export default function OrdersPage() {
                           </select>
                         )}
                       </div>
-                      <div className="text-right">
-                        <span className="font-medium text-gray-900 dark:text-white">
+                      <div className="text-right sm:text-right w-full sm:w-auto">
+                        <span className="font-bold text-base sm:text-lg text-gray-900 dark:text-white">
                           {(() => {
                             const baseTotal = Number(selectedOrder.totalPrice);
                             const converted = calculateTotalInCurrency(
@@ -3084,11 +3122,11 @@ export default function OrdersPage() {
                   </div>
                 </div>
 
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3 sm:p-4">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-2 sm:mb-3">
                     {isRTL ? "معلومات العميل" : "Customer Information"}
                   </h3>
-                  <div className="space-y-2 text-sm">
+                  <div className="space-y-2 text-xs sm:text-sm">
                     {selectedOrder.customerName && (
                       <div className="flex justify-between">
                         <span className="text-gray-600 dark:text-gray-400">
@@ -3134,19 +3172,19 @@ export default function OrdersPage() {
               </div>
 
               {/* Order Items */}
-              <div className="mb-6">
-                <div className="flex justify-between items-center mb-3">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              <div className="mb-4 sm:mb-6">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0 mb-3">
+                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
                     {isRTL ? "عناصر الطلب" : "Order Items"}
                   </h3>
                   {selectedOrder.status !== "COMPLETED" &&
                     selectedOrder.status !== "CANCELLED" && (
                       <button
                         onClick={() => setShowAddItemModal(true)}
-                        className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-sm rounded-md flex items-center gap-2"
+                        className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-xs sm:text-sm rounded-md flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto justify-center"
                       >
                         <svg
-                          className="w-4 h-4"
+                          className="w-3.5 h-3.5 sm:w-4 sm:h-4"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -3162,21 +3200,21 @@ export default function OrdersPage() {
                       </button>
                     )}
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                <div className="overflow-x-auto -mx-4 sm:mx-0">
+                  <table className="w-full text-xs sm:text-sm min-w-[500px]">
                     <thead>
                       <tr className="border-b border-gray-200 dark:border-gray-700">
-                        <th className="text-center py-2 px-3 font-medium text-gray-700 dark:text-gray-300">
+                        <th className="text-center py-2 px-2 sm:px-3 font-medium text-gray-700 dark:text-gray-300">
                           {isRTL ? "العنصر" : "Item"}
                         </th>
-                        <th className="text-center py-2 px-3 font-medium text-gray-700 dark:text-gray-300">
+                        <th className="text-center py-2 px-2 sm:px-3 font-medium text-gray-700 dark:text-gray-300">
                           {isRTL ? "الكمية" : "Qty"}
                         </th>
 
-                        <th className="text-center py-2 px-3 font-medium text-gray-700 dark:text-gray-300">
+                        <th className="text-center py-2 px-2 sm:px-3 font-medium text-gray-700 dark:text-gray-300">
                           {isRTL ? "ملاحظات" : "Notes"}
                         </th>
-                        <th className="text-center py-2 px-3 font-medium text-gray-700 dark:text-gray-300">
+                        <th className="text-center py-2 px-2 sm:px-3 font-medium text-gray-700 dark:text-gray-300">
                           {isRTL ? "السعر" : "Price"}
                         </th>
                       </tr>
@@ -3196,7 +3234,7 @@ export default function OrdersPage() {
                                   : ""
                             }`}
                           >
-                            <td className="py-3 text-center px-3">
+                            <td className="py-2 sm:py-3 text-center px-2 sm:px-3">
                               <div className="flex items-center space-x-2">
                                 <div>
                                   {getItemCategory(item) && (
