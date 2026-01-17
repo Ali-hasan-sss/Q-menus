@@ -127,6 +127,7 @@ interface Order {
     id: string;
     quantity: number;
     price: number;
+    discount?: number | null;
     notes?: string;
     isCustomItem?: boolean;
     customItemName?: string;
@@ -136,6 +137,7 @@ interface Order {
       name: string;
       nameAr?: string;
       price: number;
+      discount?: number;
     };
   }[];
 }
@@ -160,6 +162,7 @@ export default function OrderPage() {
   const [menuTheme, setMenuTheme] = useState<MenuTheme | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [restaurantTaxes, setRestaurantTaxes] = useState<any[]>([]);
   const [showAddItems, setShowAddItems] = useState(false);
   const [newOrderItems, setNewOrderItems] = useState<OrderItem[]>([]);
   const [customerName, setCustomerName] = useState("");
@@ -644,6 +647,31 @@ export default function OrderPage() {
         }
       }
 
+      // Get restaurant taxes from order response (if available) or calculate from totalPrice
+      // The /track endpoint returns subtotal and taxes, so we can derive tax percentages
+      if (orderData.taxes && Array.isArray(orderData.taxes) && orderData.taxes.length > 0) {
+        // Use taxes from order response
+        setRestaurantTaxes(orderData.taxes.map((tax: any) => ({
+          name: tax.name || "",
+          nameAr: tax.nameAr || tax.name || "",
+          percentage: tax.percentage || 0,
+        })));
+      } else if (orderData.subtotal && orderData.totalPrice) {
+        // If taxes are not available, calculate from subtotal and totalPrice
+        // taxPercentage = ((totalPrice - subtotal) / subtotal) * 100
+        const subtotalNum = Number(orderData.subtotal);
+        const totalPriceNum = Number(orderData.totalPrice);
+        if (subtotalNum > 0 && totalPriceNum > subtotalNum) {
+          const totalTaxPercentage = ((totalPriceNum - subtotalNum) / subtotalNum) * 100;
+          // Create a single tax entry with the calculated percentage
+          setRestaurantTaxes([{
+            name: isRTL ? "ضريبة" : "Tax",
+            nameAr: "ضريبة",
+            percentage: totalTaxPercentage,
+          }]);
+        }
+      }
+
       // Fetch currency exchanges for ALL order types (DINE_IN and DELIVERY)
       if (orderData.restaurant?.id) {
         try {
@@ -657,23 +685,23 @@ export default function OrderPage() {
             );
             setCurrencyExchanges(activeCurrencies);
           }
-
-          // Load selected currency from localStorage, or use restaurant default currency
+            
+            // Load selected currency from localStorage, or use restaurant default currency
           // This should happen regardless of whether exchanges were fetched successfully
-          try {
-            const savedCurrency = localStorage.getItem(
-              `selectedCurrency_${orderData.restaurant.id}`
-            );
-            if (savedCurrency) {
-              setSelectedPaymentCurrency(savedCurrency);
-            } else {
-              // Default to restaurant's base currency if no saved currency
+            try {
+              const savedCurrency = localStorage.getItem(
+                `selectedCurrency_${orderData.restaurant.id}`
+              );
+              if (savedCurrency) {
+                setSelectedPaymentCurrency(savedCurrency);
+              } else {
+                // Default to restaurant's base currency if no saved currency
               // Use currentRestaurantCurrency which is already updated
               setSelectedPaymentCurrency(currentRestaurantCurrency);
-            }
-          } catch (currencyError) {
-            console.error("Failed to load selected currency:", currencyError);
-            // Default to restaurant's base currency on error
+              }
+            } catch (currencyError) {
+              console.error("Failed to load selected currency:", currencyError);
+              // Default to restaurant's base currency on error
             setSelectedPaymentCurrency(currentRestaurantCurrency);
           }
         } catch (currencyError) {
@@ -983,7 +1011,71 @@ export default function OrderPage() {
                         className={`py-3 text-gray-900 ${isRTL ? "text-left" : "text-right"}`}
                       >
                         {(() => {
-                          const basePrice = Number(item.price) * item.quantity;
+                          // Check if item has discount for display purposes
+                          const itemDiscount = item.discount || (item.menuItem?.discount || 0);
+                          const hasDiscount =
+                            !item.isCustomItem &&
+                            itemDiscount > 0 &&
+                            item.menuItem?.price;
+
+                          // item.price is TAX-INCLUSIVE (stored in database, AFTER discount if any)
+                          const totalTaxPercentage = restaurantTaxes.reduce((sum, tax) => {
+                            return sum + (tax.percentage || 0);
+                          }, 0);
+
+                          if (hasDiscount && item.menuItem?.price) {
+                            // For items with discount:
+                            // - item.price = tax-inclusive price AFTER discount (what customer pays)
+                            // - item.menuItem.price = original tax-inclusive price (before discount)
+                            const discountedPriceInclusive = Number(item.price); // Already includes discount and tax
+                            const originalPriceInclusive = Number(item.menuItem.price); // Original price with tax
+                            
+                            // Calculate totals (per item * quantity)
+                            const discountedTotal = discountedPriceInclusive * item.quantity;
+                            const originalTotal = originalPriceInclusive * item.quantity;
+                            
+                            // Display: original price (strikethrough) and discounted price (red, what customer pays)
+                            const originalDisplayPrice = calculateTotalInCurrency(
+                              originalTotal,
+                              selectedPaymentCurrency
+                            );
+                            const originalPriceDisplay = formatCurrencyWithLanguage(
+                              originalDisplayPrice.amount,
+                              originalDisplayPrice.currency,
+                              language
+                            );
+
+                            const discountedDisplayPrice = calculateTotalInCurrency(
+                              discountedTotal,
+                              selectedPaymentCurrency
+                            );
+                            const discountedPriceDisplay = formatCurrencyWithLanguage(
+                              discountedDisplayPrice.amount,
+                              discountedDisplayPrice.currency,
+                              language
+                            );
+
+                            // Display original price (tax-inclusive, before discount) with strikethrough and discounted price (tax-inclusive, after discount) in red
+                            return (
+                              <div className={`flex flex-col gap-0.5 ${isRTL ? "items-start" : "items-end"}`}>
+                                <span className="line-through text-gray-400 text-xs">
+                                  {originalPriceDisplay}
+                                </span>
+                                <span className="text-red-600 font-semibold">
+                                  {discountedPriceDisplay}
+                                </span>
+                              </div>
+                            );
+                          }
+
+                          // No discount - display price without tax (rounded to nearest integer) for consistency with subtotal calculation
+                          const itemPriceInclusive = Number(item.price);
+                          const itemPriceWithoutTax = totalTaxPercentage > 0
+                            ? itemPriceInclusive / (1 + totalTaxPercentage / 100)
+                            : itemPriceInclusive;
+                          
+                          // Round to nearest integer for each item total (without tax) * quantity
+                          const basePrice = Math.round(itemPriceWithoutTax * item.quantity);
                           const displayPrice = calculateTotalInCurrency(
                             basePrice,
                             selectedPaymentCurrency
@@ -1000,73 +1092,119 @@ export default function OrderPage() {
                 })}
               </tbody>
               <tfoot className="border-t-2 border-gray-300">
-                {order.subtotal !== undefined && (
-                  <tr className="border-t border-gray-200">
-                    <td className="py-2 text-sm text-gray-700">
-                      {isRTL ? "المجموع الفرعي:" : "Subtotal:"}
-                    </td>
-                    <td></td>
-                    <td
-                      className={`py-2 text-sm text-gray-700 ${isRTL ? "text-left" : "text-right"}`}
-                    >
-                      {(() => {
-                        const baseSubtotal = Number(order.subtotal);
-                        const displaySubtotal = calculateTotalInCurrency(
-                          baseSubtotal,
-                          selectedPaymentCurrency
-                        );
-                        return formatCurrencyWithLanguage(
-                          displaySubtotal.amount,
-                          displaySubtotal.currency,
-                          language
-                        );
-                      })()}
-                    </td>
-                  </tr>
-                )}
-                {order.taxes && order.taxes.length > 0 && (
-                  <tr className="border-t-2 border-b-2 border-gray-400">
-                    <td
-                      colSpan={3}
-                      className="py-3 px-3 bg-gray-50"
-                      style={{ border: "2px solid #9ca3af" }}
-                    >
-                      <div className="mb-2">
-                        <strong className="text-sm text-gray-900">
-                          {isRTL ? "الضرائب:" : "Taxes:"}
-                        </strong>
-                      </div>
-                      <div className="space-y-1">
-                        {order.taxes.map((tax: any, index: number) => (
-                          <div
-                            key={index}
-                            className="flex justify-between items-center text-sm"
+                {(() => {
+                  // Calculate subtotal from items (rounded) and taxes to match totalPrice
+                  const totalPrice = Number(order.totalPrice || 0);
+                  
+                  // Calculate total tax percentage from restaurant settings
+                  const totalTaxPercentage = restaurantTaxes.reduce((sum, tax) => {
+                    return sum + (tax.percentage || 0);
+                  }, 0);
+                  
+                  // Calculate subtotal from sum of all items (rounded, without tax)
+                  const subtotalFromItems = order.items.reduce((sum, item) => {
+                    const itemPriceInclusive = Number(item.price);
+                    const itemPriceWithoutTax = totalTaxPercentage > 0
+                      ? itemPriceInclusive / (1 + totalTaxPercentage / 100)
+                      : itemPriceInclusive;
+                    // Round to nearest integer for each item total
+                    return sum + Math.round(itemPriceWithoutTax * item.quantity);
+                  }, 0);
+                  
+                  // Use rounded subtotal from items
+                  const baseSubtotal = subtotalFromItems;
+                  
+                  // Calculate taxes to ensure subtotal + taxes = totalPrice (exact match)
+                  const calculatedTaxAmounts = restaurantTaxes.map((tax) => {
+                    return baseSubtotal * ((tax.percentage || 0) / 100);
+                  });
+                  const totalCalculatedTaxes = calculatedTaxAmounts.reduce((sum, amount) => sum + amount, 0);
+                  const taxDifference = totalPrice - baseSubtotal - totalCalculatedTaxes;
+                  
+                  // Calculate taxes with adjustment to match totalPrice exactly
+                  const calculatedTaxes = restaurantTaxes.map((tax, index) => {
+                    const baseTaxAmount = calculatedTaxAmounts[index];
+                    // Distribute the difference proportionally
+                    const adjustedTaxAmount = totalCalculatedTaxes > 0
+                      ? baseTaxAmount + (taxDifference * (baseTaxAmount / totalCalculatedTaxes))
+                      : baseTaxAmount;
+                    return {
+                      name: tax.name || "",
+                      nameAr: tax.nameAr || tax.name || "",
+                      percentage: tax.percentage || 0,
+                      amount: adjustedTaxAmount,
+                    };
+                  });
+
+                  return (
+                    <>
+                      {/* Always show subtotal (calculated from items) */}
+                      <tr className="border-t border-gray-200">
+                        <td className="py-2 text-sm text-gray-700">
+                          {isRTL ? "المجموع الفرعي:" : "Subtotal:"}
+                        </td>
+                        <td></td>
+                        <td
+                          className={`py-2 text-sm text-gray-700 ${isRTL ? "text-left" : "text-right"}`}
+                        >
+                          {(() => {
+                            const displaySubtotal = calculateTotalInCurrency(
+                              baseSubtotal,
+                              selectedPaymentCurrency
+                            );
+                            return formatCurrencyWithLanguage(
+                              displaySubtotal.amount,
+                              displaySubtotal.currency,
+                              language
+                            );
+                          })()}
+                        </td>
+                      </tr>
+                      {calculatedTaxes.length > 0 && (
+                        <tr className="border-t-2 border-b-2 border-gray-400">
+                          <td
+                            colSpan={3}
+                            className="py-3 px-3 bg-gray-50"
+                            style={{ border: "2px solid #9ca3af" }}
                           >
-                            <span className="text-gray-700">
-                              {isRTL ? tax.nameAr || tax.name : tax.name} (
-                              {tax.percentage}%)
-                            </span>
-                            <span className="text-gray-900 font-medium">
-                              {(() => {
-                                const baseTaxAmount = tax.amount;
-                                const displayTaxAmount =
-                                  calculateTotalInCurrency(
-                                    baseTaxAmount,
-                                    selectedPaymentCurrency
-                                  );
-                                return formatCurrencyWithLanguage(
-                                  displayTaxAmount.amount,
-                                  displayTaxAmount.currency,
-                                  language
-                                );
-                              })()}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </td>
-                  </tr>
-                )}
+                            <div className="mb-2">
+                              <strong className="text-sm text-gray-900">
+                                {isRTL ? "الضرائب:" : "Taxes:"}
+                              </strong>
+                            </div>
+                            <div className="space-y-1">
+                              {calculatedTaxes.map((tax: any, index: number) => (
+                                <div
+                                  key={index}
+                                  className="flex justify-between items-center text-sm"
+                                >
+                                  <span className="text-gray-700">
+                                    {isRTL ? tax.nameAr || tax.name : tax.name} (
+                                    {tax.percentage}%)
+                                  </span>
+                                  <span className="text-gray-900 font-medium">
+                                    {(() => {
+                                      const displayTaxAmount =
+                                        calculateTotalInCurrency(
+                                          tax.amount,
+                                          selectedPaymentCurrency
+                                        );
+                                      return formatCurrencyWithLanguage(
+                                        displayTaxAmount.amount,
+                                        displayTaxAmount.currency,
+                                        language
+                                      );
+                                    })()}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  );
+                })()}
                 <tr>
                   <td className="py-3 font-bold text-gray-900">
                     {isRTL ? "المجموع الكلي:" : "Total:"}
@@ -1113,9 +1251,10 @@ export default function OrderPage() {
               restaurantId={order.restaurant?.id}
               orderType={order.orderType}
               orderItems={order.items || []}
-              subtotal={order.subtotal}
-              taxes={order.taxes}
+              subtotal={undefined}
+              taxes={undefined}
               totalPrice={order.totalPrice?.toString()}
+              restaurantTaxes={restaurantTaxes}
               currency={
                 restaurantCurrency ||
                 (order.restaurant as any)?.currency ||

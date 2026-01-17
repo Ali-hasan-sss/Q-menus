@@ -56,15 +56,28 @@ export default function DashboardPage() {
   const [restaurantForm, setRestaurantForm] = useState({
     address: "",
     phone: "",
+    phoneCountry: "SY", // SY for Syria, LB for Lebanon
     kitchenWhatsApp: "",
+    kitchenWhatsAppCountry: "SY", // SY for Syria, LB for Lebanon
     currency: "USD",
   });
   const [savingRestaurant, setSavingRestaurant] = useState(false);
+  const [formErrors, setFormErrors] = useState<{
+    address?: string;
+    phone?: string;
+    kitchenWhatsApp?: string;
+  }>({});
 
   // Currency exchange states
   const [currencyExchanges, setCurrencyExchanges] = useState<any[]>([]);
   const [loadingCurrencies, setLoadingCurrencies] = useState(false);
+  const [showAddCurrencyModal, setShowAddCurrencyModal] = useState(false);
   const [showBulkEditModal, setShowBulkEditModal] = useState(false);
+  const [editingCurrency, setEditingCurrency] = useState<any>(null);
+  const [currencyForm, setCurrencyForm] = useState({
+    currency: "",
+    exchangeRate: "",
+  });
   const [bulkExchangeRates, setBulkExchangeRates] = useState<
     Record<string, string>
   >({});
@@ -151,10 +164,50 @@ export default function DashboardPage() {
       if (response.data.success && response.data.data.restaurant) {
         const restaurant = response.data.data.restaurant;
         setRestaurantInfo(restaurant);
+        // Extract country code from phone if exists
+        let phoneCountry = "SY"; // Default to Syria
+        let phoneNumber = restaurant.phone || "";
+        
+        // Check if phone starts with country code
+        if (phoneNumber.startsWith("+963")) {
+          phoneCountry = "SY";
+          phoneNumber = phoneNumber.replace("+963", "").trim();
+        } else if (phoneNumber.startsWith("+961")) {
+          phoneCountry = "LB";
+          phoneNumber = phoneNumber.replace("+961", "").trim();
+        } else if (phoneNumber.startsWith("963")) {
+          phoneCountry = "SY";
+          phoneNumber = phoneNumber.replace("963", "").trim();
+        } else if (phoneNumber.startsWith("961")) {
+          phoneCountry = "LB";
+          phoneNumber = phoneNumber.replace("961", "").trim();
+        }
+        
+        // Extract country code from kitchenWhatsApp if exists
+        let kitchenWhatsAppCountry = "SY"; // Default to Syria
+        let kitchenWhatsAppNumber = restaurant.kitchenWhatsApp || "";
+        
+        // Check if kitchenWhatsApp starts with country code
+        if (kitchenWhatsAppNumber.startsWith("+963")) {
+          kitchenWhatsAppCountry = "SY";
+          kitchenWhatsAppNumber = kitchenWhatsAppNumber.replace("+963", "").trim();
+        } else if (kitchenWhatsAppNumber.startsWith("+961")) {
+          kitchenWhatsAppCountry = "LB";
+          kitchenWhatsAppNumber = kitchenWhatsAppNumber.replace("+961", "").trim();
+        } else if (kitchenWhatsAppNumber.startsWith("963")) {
+          kitchenWhatsAppCountry = "SY";
+          kitchenWhatsAppNumber = kitchenWhatsAppNumber.replace("963", "").trim();
+        } else if (kitchenWhatsAppNumber.startsWith("961")) {
+          kitchenWhatsAppCountry = "LB";
+          kitchenWhatsAppNumber = kitchenWhatsAppNumber.replace("961", "").trim();
+        }
+        
         setRestaurantForm({
           address: restaurant.address || "",
-          phone: restaurant.phone || "",
-          kitchenWhatsApp: restaurant.kitchenWhatsApp || "",
+          phone: phoneNumber,
+          phoneCountry: phoneCountry,
+          kitchenWhatsApp: kitchenWhatsAppNumber,
+          kitchenWhatsAppCountry: kitchenWhatsAppCountry,
           currency: restaurant.currency || "USD",
         });
         setRestaurantCurrency(restaurant.currency || "USD");
@@ -244,8 +297,70 @@ export default function DashboardPage() {
     }
   };
 
+  // Validate phone number
+  const validatePhone = (phone: string, country: string): string | undefined => {
+    if (!phone) return undefined; // Phone is optional
+    
+    // Remove any non-digit characters
+    const digitsOnly = phone.replace(/\D/g, "");
+    
+    // Check length (must be 9 digits)
+    if (digitsOnly.length !== 9) {
+      return isRTL
+        ? "يجب أن يتكون رقم الهاتف من 9 أرقام"
+        : "Phone number must be exactly 9 digits";
+    }
+    
+    // Check first digit (must be 9)
+    if (digitsOnly[0] !== "9") {
+      return isRTL
+        ? "يجب أن يبدأ رقم الهاتف بالرقم 9"
+        : "Phone number must start with 9";
+    }
+    
+    return undefined;
+  };
+
+  // Validate kitchen WhatsApp number (same validation as phone)
+  const validateKitchenWhatsApp = (whatsapp: string, country: string): string | undefined => {
+    return validatePhone(whatsapp, country);
+  };
+
   const handleRestaurantSettingsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Clear previous errors
+    setFormErrors({});
+    
+    // Validate form
+    const errors: {
+      address?: string;
+      phone?: string;
+      kitchenWhatsApp?: string;
+    } = {};
+    
+    // Validate phone if provided
+    if (restaurantForm.phone) {
+      const phoneError = validatePhone(restaurantForm.phone, restaurantForm.phoneCountry);
+      if (phoneError) {
+        errors.phone = phoneError;
+      }
+    }
+    
+    // Validate kitchenWhatsApp if provided
+    if (restaurantForm.kitchenWhatsApp) {
+      const whatsappError = validateKitchenWhatsApp(restaurantForm.kitchenWhatsApp, restaurantForm.kitchenWhatsAppCountry);
+      if (whatsappError) {
+        errors.kitchenWhatsApp = whatsappError;
+      }
+    }
+    
+    // If there are errors, show them and stop
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+    
     try {
       setSavingRestaurant(true);
 
@@ -253,9 +368,18 @@ export default function DashboardPage() {
       const requestData: any = {};
 
       if (restaurantForm.address) requestData.address = restaurantForm.address;
-      if (restaurantForm.phone) requestData.phone = restaurantForm.phone;
-      if (restaurantForm.kitchenWhatsApp)
-        requestData.kitchenWhatsApp = restaurantForm.kitchenWhatsApp;
+      
+      // Format phone with country code
+      if (restaurantForm.phone) {
+        const countryCode = restaurantForm.phoneCountry === "SY" ? "+963" : "+961";
+        requestData.phone = `${countryCode}${restaurantForm.phone.replace(/\D/g, "")}`;
+      }
+      
+      // Format kitchenWhatsApp with country code
+      if (restaurantForm.kitchenWhatsApp) {
+        const countryCode = restaurantForm.kitchenWhatsAppCountry === "SY" ? "+963" : "+961";
+        requestData.kitchenWhatsApp = `${countryCode}${restaurantForm.kitchenWhatsApp.replace(/\D/g, "")}`;
+      }
 
       // Always include currency - it's required
       // Make sure we use the actual selected value, not the default
@@ -352,6 +476,72 @@ export default function DashboardPage() {
         (isRTL
           ? "حدث خطأ أثناء تحديث أسعار الصرف"
           : "Error updating exchange rates");
+      showToast(message, "error");
+    } finally {
+      setSavingRestaurant(false);
+    }
+  };
+
+  const handleAddCurrency = () => {
+    setEditingCurrency(null);
+    setCurrencyForm({ currency: "", exchangeRate: "" });
+    setShowAddCurrencyModal(true);
+  };
+
+  const handleEditCurrency = (currency: any) => {
+    setEditingCurrency(currency);
+    setCurrencyForm({
+      currency: currency.currency,
+      exchangeRate: currency.exchangeRate.toString(),
+    });
+    setShowAddCurrencyModal(true);
+  };
+
+  const handleSaveCurrency = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setSavingRestaurant(true);
+
+      if (editingCurrency) {
+        // Update existing
+        const response = await api.put(
+          `/restaurant/currency-exchanges/${editingCurrency.id}`,
+          {
+            exchangeRate: parseFloat(currencyForm.exchangeRate),
+          }
+        );
+        if (response.data.success) {
+          showToast(
+            isRTL ? "تم تحديث العملة بنجاح" : "Currency updated successfully",
+            "success"
+          );
+          setShowAddCurrencyModal(false);
+          setCurrencyForm({ currency: "", exchangeRate: "" });
+          setEditingCurrency(null);
+          fetchCurrencyExchanges();
+        }
+      } else {
+        // Add new
+        const response = await api.post("/restaurant/currency-exchanges", {
+          currency: currencyForm.currency,
+          exchangeRate: parseFloat(currencyForm.exchangeRate),
+        });
+        if (response.data.success) {
+          showToast(
+            isRTL ? "تم إضافة العملة بنجاح" : "Currency added successfully",
+            "success"
+          );
+          setShowAddCurrencyModal(false);
+          setCurrencyForm({ currency: "", exchangeRate: "" });
+          fetchCurrencyExchanges();
+        }
+      }
+    } catch (error: any) {
+      const message =
+        error.response?.data?.message ||
+        (isRTL
+          ? "حدث خطأ أثناء حفظ العملة"
+          : "Error saving currency");
       showToast(message, "error");
     } finally {
       setSavingRestaurant(false);
@@ -708,11 +898,33 @@ export default function DashboardPage() {
                   </svg>
                   {isRTL ? "إعدادات المطعم" : "Restaurant Settings"}
                 </Button>
-                {currencyExchanges.length > 0 && (
+                <div className="flex gap-2 flex-wrap">
+                  {currencyExchanges.length > 0 && (
+                    <Button
+                      className="w-full justify-start flex-1"
+                      variant="outline"
+                      onClick={handleBulkEditExchangeRates}
+                    >
+                      <svg
+                        className="w-5 h-5 mr-2"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
+                      {isRTL ? "تعديل أسعار الصرف" : "Edit Exchange Rates"}
+                    </Button>
+                  )}
                   <Button
-                    className="w-full justify-start"
-                    variant="outline"
-                    onClick={handleBulkEditExchangeRates}
+                    className="w-full justify-start flex-1"
+                    onClick={handleAddCurrency}
+                    type="button"
                   >
                     <svg
                       className="w-5 h-5 mr-2"
@@ -724,12 +936,12 @@ export default function DashboardPage() {
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeWidth={2}
-                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                        d="M12 4v16m8-8H4"
                       />
                     </svg>
-                    {isRTL ? "تعديل أسعار الصرف" : "Edit Exchange Rates"}
+                    {isRTL ? "+ إضافة عملة" : "+ Add Currency"}
                   </Button>
-                )}
+                </div>
                 {restaurantInfo && (
                   <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                     <div className="space-y-2 text-sm">
@@ -900,17 +1112,66 @@ export default function DashboardPage() {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     {isRTL ? "رقم الهاتف" : "Phone Number"}
                   </label>
-                  <Input
-                    type="tel"
-                    value={restaurantForm.phone}
-                    onChange={(e) =>
-                      setRestaurantForm((prev) => ({
-                        ...prev,
-                        phone: e.target.value,
-                      }))
-                    }
-                    placeholder={isRTL ? "رقم الهاتف" : "Phone number"}
-                  />
+                  <div className="flex flex-row">
+                   
+                    
+                    {/* Phone Input - Always on the right */}
+                    <div className="flex-1">
+                      <Input
+                        type="tel"
+                        value={restaurantForm.phone}
+                        onChange={(e) => {
+                          // Only allow digits, max 9 digits
+                          const value = e.target.value.replace(/\D/g, "").slice(0, 9);
+                          setRestaurantForm((prev) => ({
+                            ...prev,
+                            phone: value,
+                          }));
+                          // Clear error when user starts typing
+                          if (formErrors.phone) {
+                            setFormErrors((prev) => ({ ...prev, phone: undefined }));
+                          }
+                        }}
+                        placeholder={isRTL ? "9XXXXXXXX" : "9XXXXXXXX"}
+                        className={`rounded-r-md border-l-0 ${
+                          formErrors.phone ? "border-red-500 focus:ring-red-500" : ""
+                        }`}
+                        maxLength={9}
+                      />
+                    </div>
+                     {/* Country Select - Always on the left */}
+                     <select
+                      className={`px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent focus:outline-none rounded-l-md border-r-0 ${
+                        formErrors.phone ? "border-red-500" : ""
+                      }`}
+                      value={restaurantForm.phoneCountry}
+                      onChange={(e) => {
+                        setRestaurantForm((prev) => ({
+                          ...prev,
+                          phoneCountry: e.target.value,
+                          phone: "", // Clear phone when country changes
+                        }));
+                        setFormErrors((prev) => ({ ...prev, phone: undefined }));
+                      }}
+                    >
+                      <option value="SY">
+                        {isRTL ? "🇸🇾 +963" : "🇸🇾 +963"}
+                      </option>
+                      <option value="LB">
+                        {isRTL ? "🇱🇧 +961" : "🇱🇧 +961"}
+                      </option>
+                    </select>
+                  </div>
+                  {formErrors.phone && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                      {formErrors.phone}
+                    </p>
+                  )}
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    {isRTL
+                      ? "يجب أن يتكون من 9 أرقام ويبدأ بالرقم 9"
+                      : "Must be 9 digits starting with 9"}
+                  </p>
                 </div>
 
                 <div>
@@ -952,23 +1213,67 @@ export default function DashboardPage() {
                         <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.890-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
                       </svg>
                       <span>
-                        {isRTL ? "واتساب المطبخ" : "Kitchen WhatsApp"}
+                        {isRTL ? "واتساب المطبخ (لارسال الطلبات)" : "Kitchen WhatsApp (for sending orders)"}
                       </span>
                     </div>
                   </label>
-                  <Input
-                    type="text"
-                    placeholder={isRTL ? "رقم الواتساب" : "WhatsApp number"}
-                    value={restaurantForm.kitchenWhatsApp}
-                    onChange={(e) =>
-                      setRestaurantForm((prev) => ({
-                        ...prev,
-                        kitchenWhatsApp: e.target.value,
-                      }))
-                    }
-                  />
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    {isRTL ? "مثال: 963999123456" : "Example: 963999123456"}
+                  <div className="flex flex-row">
+                    {/* Kitchen WhatsApp Input - Always on the right */}
+                    <div className="flex-1">
+                      <Input
+                        type="tel"
+                        value={restaurantForm.kitchenWhatsApp}
+                        onChange={(e) => {
+                          // Only allow digits, max 9 digits
+                          const value = e.target.value.replace(/\D/g, "").slice(0, 9);
+                          setRestaurantForm((prev) => ({
+                            ...prev,
+                            kitchenWhatsApp: value,
+                          }));
+                          // Clear error when user starts typing
+                          if (formErrors.kitchenWhatsApp) {
+                            setFormErrors((prev) => ({ ...prev, kitchenWhatsApp: undefined }));
+                          }
+                        }}
+                        placeholder={isRTL ? "9XXXXXXXX" : "9XXXXXXXX"}
+                        className={`rounded-r-md border-l-0 ${
+                          formErrors.kitchenWhatsApp ? "border-red-500 focus:ring-red-500" : ""
+                        }`}
+                        maxLength={9}
+                      />
+                    </div>
+                    {/* Country Select - Always on the left */}
+                    <select
+                      className={`px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent focus:outline-none rounded-l-md border-r-0 ${
+                        formErrors.kitchenWhatsApp ? "border-red-500" : ""
+                      }`}
+                      value={restaurantForm.kitchenWhatsAppCountry}
+                      onChange={(e) => {
+                        setRestaurantForm((prev) => ({
+                          ...prev,
+                          kitchenWhatsAppCountry: e.target.value,
+                          kitchenWhatsApp: "", // Clear phone when country changes
+                        }));
+                        setFormErrors((prev) => ({ ...prev, kitchenWhatsApp: undefined }));
+                      }}
+                    >
+                      <option value="SY">
+                        {isRTL ? "🇸🇾 +963" : "🇸🇾 +963"}
+                      </option>
+                      <option value="LB">
+                        {isRTL ? "🇱🇧 +961" : "🇱🇧 +961"}
+                      </option>
+                    </select>
+                  </div>
+                  {formErrors.kitchenWhatsApp && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                      {formErrors.kitchenWhatsApp}
+                    </p>
+                  )}
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    {isRTL
+                      ? "يجب أن يتكون من 9 أرقام ويبدأ بالرقم 9"
+                      : "Must be 9 digits starting with 9"}
                   </p>
                 </div>
               </div>
@@ -989,6 +1294,143 @@ export default function DashboardPage() {
                     : isRTL
                       ? "حفظ"
                       : "Save"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add/Edit Currency Modal */}
+      {showAddCurrencyModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                {editingCurrency
+                  ? isRTL
+                    ? "تعديل العملة"
+                    : "Edit Currency"
+                  : isRTL
+                    ? "إضافة عملة"
+                    : "Add Currency"}
+              </h3>
+              <button
+                onClick={() => {
+                  setShowAddCurrencyModal(false);
+                  setCurrencyForm({ currency: "", exchangeRate: "" });
+                  setEditingCurrency(null);
+                }}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveCurrency} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {isRTL ? "اختر العملة" : "Select Currency"}
+                </label>
+                {editingCurrency ? (
+                  <Input
+                    type="text"
+                    value={currencyForm.currency}
+                    disabled
+                    className="bg-gray-100 dark:bg-gray-700"
+                  />
+                ) : (
+                  <select
+                    value={currencyForm.currency}
+                    onChange={(e) =>
+                      setCurrencyForm((prev) => ({
+                        ...prev,
+                        currency: e.target.value,
+                      }))
+                    }
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="">
+                      {isRTL ? "-- اختر العملة --" : "-- Select Currency --"}
+                    </option>
+                    {popularCurrencies.map((curr) => (
+                      <option key={curr.code} value={curr.code}>
+                        {isRTL
+                          ? `${curr.code} - ${curr.nameAr}`
+                          : `${curr.code} - ${curr.nameEn}`}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {isRTL
+                    ? "اختر العملة من القائمة المترجمة"
+                    : "Select currency from the translated list"}
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {isRTL ? "سعر الصرف" : "Exchange Rate"}
+                </label>
+                <Input
+                  type="number"
+                  step="0.000001"
+                  min="0.000001"
+                  value={currencyForm.exchangeRate}
+                  onChange={(e) =>
+                    setCurrencyForm((prev) => ({
+                      ...prev,
+                      exchangeRate: e.target.value,
+                    }))
+                  }
+                  placeholder={isRTL ? "مثال: 0.85" : "e.g., 0.85"}
+                  required
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {isRTL
+                    ? `1 ${currencyForm.currency || "XXX"} = كم ${restaurantForm.currency}؟`
+                    : `1 ${currencyForm.currency || "XXX"} = how many ${restaurantForm.currency}?`}
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowAddCurrencyModal(false);
+                    setCurrencyForm({ currency: "", exchangeRate: "" });
+                    setEditingCurrency(null);
+                  }}
+                >
+                  {isRTL ? "إلغاء" : "Cancel"}
+                </Button>
+                <Button type="submit" disabled={savingRestaurant}>
+                  {savingRestaurant
+                    ? isRTL
+                      ? "جاري الحفظ..."
+                      : "Saving..."
+                    : editingCurrency
+                      ? isRTL
+                        ? "تحديث"
+                        : "Update"
+                      : isRTL
+                        ? "إضافة"
+                        : "Add"}
                 </Button>
               </div>
             </form>

@@ -44,6 +44,70 @@ const translations = {
     "auth.registerSuccess": "تم إنشاء الحساب بنجاح",
     "auth.logoutSuccess": "تم تسجيل الخروج بنجاح",
 
+    // Auth Error Messages - Login
+    "auth.error.invalidCredentials": "بيانات الدخول غير صحيحة",
+    "auth.error.loginRateLimitExceeded": "تم تجاوز عدد محاولات تسجيل الدخول المسموح بها. يرجى المحاولة مرة أخرى بعد 5 دقائق",
+    "auth.error.userNotFound": "المستخدم غير موجود",
+    "auth.error.userInactive": "الحساب غير نشط",
+    "auth.error.loginFailed": "فشل تسجيل الدخول",
+    "auth.error.serverError": "خطأ في الخادم. يرجى المحاولة لاحقاً",
+
+    // Auth Error Messages - Registration
+    "auth.error.userAlreadyExists":
+      "هذا البريد الإلكتروني مستخدم بالفعل. يرجى تسجيل الدخول",
+    "auth.error.emailNotVerified":
+      "البريد الإلكتروني غير مفعّل. يرجى التحقق من بريدك الإلكتروني قبل إنشاء الحساب",
+    "auth.error.registrationFailed": "فشل إنشاء الحساب",
+    "auth.error.invalidEmail": "البريد الإلكتروني غير صحيح",
+    "auth.error.passwordTooShort": "كلمة المرور يجب أن تكون 6 أحرف على الأقل",
+    "auth.error.passwordsDoNotMatch": "كلمات المرور غير متطابقة",
+    "auth.error.firstNameRequired": "الاسم الأول مطلوب",
+    "auth.error.lastNameRequired": "الاسم الأخير مطلوب",
+    "auth.error.restaurantNameRequired": "اسم المطعم مطلوب",
+
+    // Auth Error Messages - Verification Code
+    "auth.error.verificationCodeSent":
+      "تم إرسال رمز التحقق بنجاح. يرجى التحقق من بريدك الإلكتروني",
+    "auth.error.verificationCodeFailed":
+      "فشل إرسال رمز التحقق. يرجى المحاولة لاحقاً",
+    "auth.error.verificationCodeInvalid": "رمز التحقق غير صحيح",
+    "auth.error.verificationCodeExpired":
+      "رمز التحقق منتهي الصلاحية. يرجى طلب رمز جديد",
+    "auth.error.verificationCodeRequired": "رمز التحقق مطلوب",
+    "auth.error.emailMissing": "البريد الإلكتروني مفقود",
+    "auth.error.rateLimitExceeded":
+      "تم تجاوز الحد المسموح. يرجى الانتظار {minutes} دقيقة قبل طلب رمز جديد",
+    "auth.error.rateLimitExceededSingular":
+      "تم تجاوز الحد المسموح. يرجى الانتظار دقيقة واحدة قبل طلب رمز جديد",
+
+    // Auth Error Messages - Resend Verification
+    "auth.error.resendCodeSuccess": "تم إرسال رمز التحقق بنجاح",
+    "auth.error.resendCodeFailed": "حدث خطأ أثناء إرسال رمز التحقق",
+
+    // Auth Success Messages
+    "auth.success.verificationCodeSent":
+      "تم إرسال رمز التحقق إلى بريدك الإلكتروني",
+    "auth.success.emailVerified": "تم التحقق من البريد الإلكتروني بنجاح",
+    "auth.success.accountCreated": "تم إنشاء الحساب بنجاح",
+    "auth.success.passwordReset": "تم إعادة تعيين كلمة المرور بنجاح",
+    "auth.success.passwordResetCodeSent":
+      "تم إرسال رمز إعادة تعيين كلمة المرور إلى بريدك الإلكتروني",
+
+    // Password Reset Messages
+    "auth.passwordReset.didNotReceiveCode": "لم أستلم الرمز",
+    "auth.passwordReset.checkSpam":
+      "يرجى التحقق من مجلد البريد غير المرغوب فيه (Spam)",
+    "auth.passwordReset.resendingCode": "جاري إعادة الإرسال...",
+    "auth.passwordReset.resendCodeSuccess":
+      "تم إعادة إرسال رمز إعادة التعيين بنجاح",
+
+    // Contact Us Messages
+    "contact.success.messageSent": "تم إرسال رسالتك بنجاح. سنتواصل معك قريباً",
+    "contact.error.fillAllFields": "الرجاء ملء جميع الحقول قبل الإرسال.",
+    "contact.error.invalidEmail": "البريد الإلكتروني غير صحيح",
+    "contact.error.sendFailed": "حدث خطأ أثناء إرسال الرسالة",
+    "contact.error.sendFailedRetry": "حدث خطأ أثناء إرسال الرسالة. يرجى المحاولة لاحقاً",
+
     // Common
     "common.save": "حفظ",
     "common.cancel": "إلغاء",
@@ -268,6 +332,67 @@ const translations = {
     "auth.loginSuccess": "Login successful",
     "auth.registerSuccess": "Registration successful",
     "auth.logoutSuccess": "Logout successful",
+
+    // Auth Error Messages - Login
+    "auth.error.invalidCredentials": "Invalid credentials",
+    "auth.error.loginRateLimitExceeded": "Too many login attempts. Please try again after 5 minutes",
+    "auth.error.userNotFound": "User not found",
+    "auth.error.userInactive": "Account is inactive",
+    "auth.error.loginFailed": "Login failed",
+    "auth.error.serverError": "Internal server error. Please try again later",
+
+    // Auth Error Messages - Registration
+    "auth.error.userAlreadyExists":
+      "This email is already registered. Please login instead",
+    "auth.error.emailNotVerified":
+      "Email not verified. Please verify your email before creating an account",
+    "auth.error.registrationFailed": "Registration failed",
+    "auth.error.invalidEmail": "Invalid email address",
+    "auth.error.passwordTooShort": "Password must be at least 6 characters",
+    "auth.error.passwordsDoNotMatch": "Passwords do not match",
+    "auth.error.firstNameRequired": "First name is required",
+    "auth.error.lastNameRequired": "Last name is required",
+    "auth.error.restaurantNameRequired": "Restaurant name is required",
+
+    // Auth Error Messages - Verification Code
+    "auth.error.verificationCodeSent":
+      "Verification code sent successfully. Please check your email",
+    "auth.error.verificationCodeFailed":
+      "Failed to send verification code. Please try again later",
+    "auth.error.verificationCodeInvalid": "Invalid verification code",
+    "auth.error.verificationCodeExpired":
+      "Verification code has expired. Please request a new code",
+    "auth.error.verificationCodeRequired": "Verification code is required",
+    "auth.error.emailMissing": "Email is missing",
+    "auth.error.rateLimitExceeded":
+      "Rate limit exceeded. Please wait {minutes} minutes before requesting a new code",
+    "auth.error.rateLimitExceededSingular":
+      "Rate limit exceeded. Please wait 1 minute before requesting a new code",
+
+    // Auth Error Messages - Resend Verification
+    "auth.error.resendCodeSuccess": "Verification code sent successfully",
+    "auth.error.resendCodeFailed": "Error sending verification code",
+
+    // Auth Success Messages
+    "auth.success.verificationCodeSent": "Verification code sent to your email",
+    "auth.success.emailVerified": "Email verified successfully",
+    "auth.success.accountCreated": "Account created successfully",
+    "auth.success.passwordReset": "Password reset successfully",
+    "auth.success.passwordResetCodeSent":
+      "Password reset code sent to your email",
+
+    // Password Reset Messages
+    "auth.passwordReset.didNotReceiveCode": "Didn't receive the code?",
+    "auth.passwordReset.checkSpam": "Please check your spam/junk folder",
+    "auth.passwordReset.resendingCode": "Resending...",
+    "auth.passwordReset.resendCodeSuccess": "Reset code resent successfully",
+
+    // Contact Us Messages
+    "contact.success.messageSent": "Your message has been sent successfully. We will contact you soon",
+    "contact.error.fillAllFields": "Please fill all fields before sending.",
+    "contact.error.invalidEmail": "Invalid email address",
+    "contact.error.sendFailed": "An error occurred while sending the message",
+    "contact.error.sendFailedRetry": "An error occurred while sending the message. Please try again later",
 
     // Common
     "common.save": "Save",

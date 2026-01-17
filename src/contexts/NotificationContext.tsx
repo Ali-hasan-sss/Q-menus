@@ -44,10 +44,12 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
   const { user } = useAuth();
   const { socket } = useSocket();
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [browserNotificationsEnabled, setBrowserNotificationsEnabled] =
     useState(false);
+
+  // Calculate unread count from notifications array
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   // Show browser notification
   const showBrowserNotification = useCallback(
@@ -110,10 +112,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
         return [notification, ...prev];
       });
 
-      // Increment unread count if notification is not read
-      if (!notification.isRead) {
-        setUnreadCount((prev) => prev + 1);
-      }
+      // unreadCount is now automatically calculated from notifications array
 
       // Show browser notification if enabled
       if (browserNotificationsEnabled) {
@@ -220,7 +219,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
       );
-      setUnreadCount((prev) => Math.max(0, prev - 1));
+      // unreadCount is now automatically calculated from notifications array
     } catch (error) {
       console.error("Error marking notification as read:", error);
     }
@@ -232,7 +231,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
 
       // Update local state
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-      setUnreadCount(0);
+      // unreadCount is now automatically calculated from notifications array
     } catch (error) {
       console.error("Error marking all notifications as read:", error);
     }
@@ -243,13 +242,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
       await api.delete(`/notifications/${id}`);
 
       // Update local state
-      setNotifications((prev) => {
-        const deleted = prev.find((n) => n.id === id);
-        if (deleted && !deleted.isRead) {
-          setUnreadCount((count) => Math.max(0, count - 1));
-        }
-        return prev.filter((n) => n.id !== id);
-      });
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+      // unreadCount is now automatically calculated from notifications array
     } catch (error) {
       console.error("Error deleting notification:", error);
     }
@@ -275,7 +269,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
       console.log("⚠️ No user, skipping notifications fetch");
       // Clear notifications when user logs out
       setNotifications([]);
-      setUnreadCount(0);
+      // unreadCount is now automatically calculated from notifications array
     }
   }, [
     user,

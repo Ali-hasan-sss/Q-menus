@@ -47,6 +47,11 @@ interface OrderStatusProps {
     amount: number;
   }>;
   totalPrice?: string | number;
+  restaurantTaxes?: Array<{
+    name: string;
+    nameAr?: string;
+    percentage: number;
+  }>;
   currency?: string;
   currencyExchanges?: Array<{
     id: string;
@@ -132,6 +137,7 @@ export function OrderStatus({
   subtotal,
   taxes,
   totalPrice = "0",
+  restaurantTaxes = [],
   currency = "USD",
   currencyExchanges = [],
   selectedPaymentCurrency = null,
@@ -559,7 +565,18 @@ export function OrderStatus({
                       className={`py-3 text-gray-900 ${isRTL ? "text-left" : "text-right"}`}
                     >
                       {(() => {
-                        const basePrice = Number(item.price) * item.quantity;
+                        // Extract tax from item price and round to nearest integer
+                        const totalTaxPercentage = restaurantTaxes.reduce((sum, tax) => {
+                          return sum + (tax.percentage || 0);
+                        }, 0);
+                        
+                        const itemPriceInclusive = Number(item.price);
+                        const itemPriceWithoutTax = totalTaxPercentage > 0
+                          ? itemPriceInclusive / (1 + totalTaxPercentage / 100)
+                          : itemPriceInclusive;
+                        
+                        // Round to nearest integer for each item total (without tax)
+                        const basePrice = Math.round(itemPriceWithoutTax * item.quantity);
                         const displayPrice = calculateTotalInCurrency(
                           basePrice,
                           selectedPaymentCurrency
@@ -592,104 +609,151 @@ export function OrderStatus({
               })}
             </tbody>
             <tfoot className="border-t-2 border-gray-300">
-              {subtotal !== undefined && (
-                <tr className="border-t border-gray-200">
-                  <td className="py-2 text-sm text-gray-700">
-                    {isRTL ? "المجموع الفرعي:" : "Subtotal:"}
-                  </td>
-                  <td></td>
-                  <td
-                    className={`py-2 text-sm text-gray-700 ${isRTL ? "text-left" : "text-right"}`}
-                  >
-                    {(() => {
-                      const baseSubtotal = Number(subtotal);
-                      const displaySubtotal = calculateTotalInCurrency(
-                        baseSubtotal,
-                        selectedPaymentCurrency
-                      );
-                      return (
-                        <>
-                          {formatCurrencyWithLanguage(
-                            displaySubtotal.amount,
-                            displaySubtotal.currency,
-                            language
-                          )}
-                          {selectedPaymentCurrency &&
-                            selectedPaymentCurrency !== currency && (
-                              <div className="text-xs font-normal text-gray-500 mt-0.5">
-                                (
-                                {formatCurrencyWithLanguage(
-                                  baseSubtotal,
-                                  currency,
-                                  language
+              {(() => {
+                // Calculate subtotal from items (rounded) and taxes to match totalPrice
+                const totalPriceNum = Number(totalPrice || 0);
+                
+                // Calculate total tax percentage from restaurant settings
+                const totalTaxPercentage = restaurantTaxes.reduce((sum, tax) => {
+                  return sum + (tax.percentage || 0);
+                }, 0);
+                
+                // Calculate subtotal from sum of all items (rounded, without tax)
+                const subtotalFromItems = orderItems.reduce((sum, item) => {
+                  const itemPriceInclusive = Number(item.price);
+                  const itemPriceWithoutTax = totalTaxPercentage > 0
+                    ? itemPriceInclusive / (1 + totalTaxPercentage / 100)
+                    : itemPriceInclusive;
+                  // Round to nearest integer for each item total
+                  return sum + Math.round(itemPriceWithoutTax * item.quantity);
+                }, 0);
+                
+                // Use rounded subtotal from items
+                const baseSubtotal = subtotalFromItems;
+                
+                // Calculate taxes to ensure subtotal + taxes = totalPrice (exact match)
+                const calculatedTaxAmounts = restaurantTaxes.map((tax) => {
+                  return baseSubtotal * ((tax.percentage || 0) / 100);
+                });
+                const totalCalculatedTaxes = calculatedTaxAmounts.reduce((sum, amount) => sum + amount, 0);
+                const taxDifference = totalPriceNum - baseSubtotal - totalCalculatedTaxes;
+                
+                // Calculate taxes with adjustment to match totalPrice exactly
+                const calculatedTaxes = restaurantTaxes.map((tax, index) => {
+                  const baseTaxAmount = calculatedTaxAmounts[index];
+                  // Distribute the difference proportionally
+                  const adjustedTaxAmount = totalCalculatedTaxes > 0
+                    ? baseTaxAmount + (taxDifference * (baseTaxAmount / totalCalculatedTaxes))
+                    : baseTaxAmount;
+                  return {
+                    name: tax.name || "",
+                    nameAr: tax.nameAr || tax.name || "",
+                    percentage: tax.percentage || 0,
+                    amount: adjustedTaxAmount,
+                  };
+                });
+
+                return (
+                  <>
+                    {/* Always show subtotal (calculated from items) */}
+                    <tr className="border-t border-gray-200">
+                      <td className="py-2 text-sm text-gray-700">
+                        {isRTL ? "المجموع الفرعي:" : "Subtotal:"}
+                      </td>
+                      <td></td>
+                      <td
+                        className={`py-2 text-sm text-gray-700 ${isRTL ? "text-left" : "text-right"}`}
+                      >
+                        {(() => {
+                          const displaySubtotal = calculateTotalInCurrency(
+                            baseSubtotal,
+                            selectedPaymentCurrency
+                          );
+                          return (
+                            <>
+                              {formatCurrencyWithLanguage(
+                                displaySubtotal.amount,
+                                displaySubtotal.currency,
+                                language
+                              )}
+                              {selectedPaymentCurrency &&
+                                selectedPaymentCurrency !== currency && (
+                                  <div className="text-xs font-normal text-gray-500 mt-0.5">
+                                    (
+                                    {formatCurrencyWithLanguage(
+                                      baseSubtotal,
+                                      currency,
+                                      language
+                                    )}
+                                    )
+                                  </div>
                                 )}
-                                )
-                              </div>
-                            )}
-                        </>
-                      );
-                    })()}
-                  </td>
-                </tr>
-              )}
-              {taxes && taxes.length > 0 && (
-                <tr className="border-t-2 border-b-2 border-gray-400">
-                  <td
-                    colSpan={3}
-                    className="py-3 px-3 bg-gray-50 dark:bg-gray-800"
-                    style={{ border: "2px solid #9ca3af" }}
-                  >
-                    <div className="mb-2">
-                      <strong className="text-sm text-gray-900 dark:text-white">
-                        {isRTL ? "الضرائب:" : "Taxes:"}
-                      </strong>
-                    </div>
-                    <div className="space-y-1">
-                      {taxes.map((tax, index) => (
-                        <div
-                          key={index}
-                          className="flex justify-between items-center text-sm"
+                            </>
+                          );
+                        })()}
+                      </td>
+                    </tr>
+                    {calculatedTaxes.length > 0 && (
+                      <tr className="border-t-2 border-b-2 border-gray-400">
+                        <td
+                          colSpan={3}
+                          className="py-3 px-3 bg-gray-50 dark:bg-gray-800"
+                          style={{ border: "2px solid #9ca3af" }}
                         >
-                          <span className="text-gray-700 dark:text-gray-300">
-                            {isRTL ? tax.nameAr || tax.name : tax.name} (
-                            {tax.percentage}%)
-                          </span>
-                          <span className="text-gray-900 dark:text-white font-medium">
-                            {(() => {
-                              const baseTaxAmount = tax.amount;
-                              const displayTaxAmount = calculateTotalInCurrency(
-                                baseTaxAmount,
-                                selectedPaymentCurrency
-                              );
-                              return (
-                                <>
-                                  {formatCurrencyWithLanguage(
-                                    displayTaxAmount.amount,
-                                    displayTaxAmount.currency,
-                                    language
-                                  )}
-                                  {selectedPaymentCurrency &&
-                                    selectedPaymentCurrency !== currency && (
-                                      <span className="text-xs font-normal text-gray-500 ml-1">
-                                        (
+                          <div className="mb-2">
+                            <strong className="text-sm text-gray-900 dark:text-white">
+                              {isRTL ? "الضرائب:" : "Taxes:"}
+                            </strong>
+                          </div>
+                          <div className="space-y-1">
+                            {calculatedTaxes.map((tax, index) => (
+                              <div
+                                key={index}
+                                className="flex justify-between items-center text-sm"
+                              >
+                                <span className="text-gray-700 dark:text-gray-300">
+                                  {isRTL ? tax.nameAr || tax.name : tax.name} (
+                                  {tax.percentage}%)
+                                </span>
+                                <span className="text-gray-900 dark:text-white font-medium">
+                                  {(() => {
+                                    const baseTaxAmount = tax.amount;
+                                    const displayTaxAmount = calculateTotalInCurrency(
+                                      baseTaxAmount,
+                                      selectedPaymentCurrency
+                                    );
+                                    return (
+                                      <>
                                         {formatCurrencyWithLanguage(
-                                          baseTaxAmount,
-                                          currency,
+                                          displayTaxAmount.amount,
+                                          displayTaxAmount.currency,
                                           language
                                         )}
-                                        )
-                                      </span>
-                                    )}
-                                </>
-                              );
-                            })()}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </td>
-                </tr>
-              )}
+                                        {selectedPaymentCurrency &&
+                                          selectedPaymentCurrency !== currency && (
+                                            <span className="text-xs font-normal text-gray-500 ml-1">
+                                              (
+                                              {formatCurrencyWithLanguage(
+                                                baseTaxAmount,
+                                                currency,
+                                                language
+                                              )}
+                                              )
+                                            </span>
+                                          )}
+                                      </>
+                                    );
+                                  })()}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                );
+              })()}
               <tr>
                 <td className="py-3 font-bold text-gray-900">
                   {isRTL ? "المجموع الكلي:" : "Total:"}
@@ -996,7 +1060,18 @@ export function OrderStatus({
                               className={`py-3 px-3 text-gray-900 dark:text-white ${isRTL ? "text-left" : "text-right"}`}
                             >
                               {(() => {
-                                const basePrice = Number(item.price) * item.quantity;
+                                // Extract tax from item price and round to nearest integer
+                                const totalTaxPercentage = restaurantTaxes.reduce((sum, tax) => {
+                                  return sum + (tax.percentage || 0);
+                                }, 0);
+                                
+                                const itemPriceInclusive = Number(item.price);
+                                const itemPriceWithoutTax = totalTaxPercentage > 0
+                                  ? itemPriceInclusive / (1 + totalTaxPercentage / 100)
+                                  : itemPriceInclusive;
+                                
+                                // Round to nearest integer for each item total (without tax)
+                                const basePrice = Math.round(itemPriceWithoutTax * item.quantity);
                                 const displayPrice = calculateTotalInCurrency(
                                   basePrice,
                                   selectedPaymentCurrency
@@ -1029,47 +1104,91 @@ export function OrderStatus({
                       })}
                     </tbody>
                     <tfoot>
-                      {subtotal !== undefined && (
-                        <tr className="border-t border-gray-300 dark:border-gray-600">
-                          <td className="py-2 px-3 text-sm text-gray-700 dark:text-gray-300">
-                            {isRTL ? "المجموع الفرعي:" : "Subtotal:"}
-                          </td>
-                          <td></td>
-                          <td
-                            className={`py-2 px-3 text-sm text-gray-700 dark:text-gray-300 ${isRTL ? "text-left" : "text-right"}`}
-                          >
-                            {(() => {
-                              const baseSubtotal = Number(subtotal);
-                              const displaySubtotal = calculateTotalInCurrency(
-                                baseSubtotal,
-                                selectedPaymentCurrency
-                              );
-                              return (
-                                <>
-                                  {formatCurrencyWithLanguage(
-                                    displaySubtotal.amount,
-                                    displaySubtotal.currency,
-                                    language
-                                  )}
-                                  {selectedPaymentCurrency &&
-                                    selectedPaymentCurrency !== currency && (
-                                      <div className="text-xs font-normal text-gray-500 dark:text-gray-400 mt-0.5">
-                                        (
-                                        {formatCurrencyWithLanguage(
-                                          baseSubtotal,
-                                          currency,
-                                          language
+                      {(() => {
+                        // Calculate subtotal from items (rounded) and taxes to match totalPrice
+                        const totalPriceNum = Number(totalPrice || 0);
+                        
+                        // Calculate total tax percentage from restaurant settings
+                        const totalTaxPercentage = restaurantTaxes.reduce((sum, tax) => {
+                          return sum + (tax.percentage || 0);
+                        }, 0);
+                        
+                        // Calculate subtotal from sum of all items (rounded, without tax)
+                        const subtotalFromItems = orderItems.reduce((sum, item) => {
+                          const itemPriceInclusive = Number(item.price);
+                          const itemPriceWithoutTax = totalTaxPercentage > 0
+                            ? itemPriceInclusive / (1 + totalTaxPercentage / 100)
+                            : itemPriceInclusive;
+                          // Round to nearest integer for each item total
+                          return sum + Math.round(itemPriceWithoutTax * item.quantity);
+                        }, 0);
+                        
+                        // Use rounded subtotal from items
+                        const baseSubtotal = subtotalFromItems;
+                        
+                        // Calculate taxes to ensure subtotal + taxes = totalPrice (exact match)
+                        const calculatedTaxAmounts = restaurantTaxes.map((tax) => {
+                          return baseSubtotal * ((tax.percentage || 0) / 100);
+                        });
+                        const totalCalculatedTaxes = calculatedTaxAmounts.reduce((sum, amount) => sum + amount, 0);
+                        const taxDifference = totalPriceNum - baseSubtotal - totalCalculatedTaxes;
+                        
+                        // Calculate taxes with adjustment to match totalPrice exactly
+                        const calculatedTaxes = restaurantTaxes.map((tax, index) => {
+                          const baseTaxAmount = calculatedTaxAmounts[index];
+                          // Distribute the difference proportionally
+                          const adjustedTaxAmount = totalCalculatedTaxes > 0
+                            ? baseTaxAmount + (taxDifference * (baseTaxAmount / totalCalculatedTaxes))
+                            : baseTaxAmount;
+                          return {
+                            name: tax.name || "",
+                            nameAr: tax.nameAr || tax.name || "",
+                            percentage: tax.percentage || 0,
+                            amount: adjustedTaxAmount,
+                          };
+                        });
+
+                        return (
+                          <>
+                            {/* Always show subtotal (calculated from items) */}
+                            <tr className="border-t border-gray-300 dark:border-gray-600">
+                              <td className="py-2 px-3 text-sm text-gray-700 dark:text-gray-300">
+                                {isRTL ? "المجموع الفرعي:" : "Subtotal:"}
+                              </td>
+                              <td></td>
+                              <td
+                                className={`py-2 px-3 text-sm text-gray-700 dark:text-gray-300 ${isRTL ? "text-left" : "text-right"}`}
+                              >
+                                {(() => {
+                                  const displaySubtotal = calculateTotalInCurrency(
+                                    baseSubtotal,
+                                    selectedPaymentCurrency
+                                  );
+                                  return (
+                                    <>
+                                      {formatCurrencyWithLanguage(
+                                        displaySubtotal.amount,
+                                        displaySubtotal.currency,
+                                        language
+                                      )}
+                                      {selectedPaymentCurrency &&
+                                        selectedPaymentCurrency !== currency && (
+                                          <div className="text-xs font-normal text-gray-500 dark:text-gray-400 mt-0.5">
+                                            (
+                                            {formatCurrencyWithLanguage(
+                                              baseSubtotal,
+                                              currency,
+                                              language
+                                            )}
+                                            )
+                                          </div>
                                         )}
-                                        )
-                                      </div>
-                                    )}
-                                </>
-                              );
-                            })()}
-                          </td>
-                        </tr>
-                      )}
-                      {taxes && taxes.length > 0 && (
+                                    </>
+                                  );
+                                })()}
+                              </td>
+                            </tr>
+                            {calculatedTaxes.length > 0 && (
                         <tr className="border-t-2 border-b-2 border-gray-400 dark:border-gray-500">
                           <td
                             colSpan={3}
@@ -1082,7 +1201,7 @@ export function OrderStatus({
                               </strong>
                             </div>
                             <div className="space-y-1">
-                              {taxes.map((tax, index) => (
+                              {calculatedTaxes.map((tax, index) => (
                                 <div
                                   key={index}
                                   className="flex justify-between items-center text-sm"
@@ -1165,6 +1284,9 @@ export function OrderStatus({
                           })()}
                         </td>
                       </tr>
+                          </>
+                        );
+                      })()}
                     </tfoot>
                   </table>
                 </div>

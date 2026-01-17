@@ -58,7 +58,7 @@ export default function VerifyEmailPage() {
               </h2>
               <p className="text-gray-600 dark:text-gray-400 mb-6">
                 {isRTL
-                  ? "تم إرسال رمز التحقق إلى بريدك الإلكتروني. يرجى التحقق من صندوق الوارد أو مجلد الرسائل المزعجة."
+                  ? "تم إرسال رمز التحقق إلى بريدك الإلكتروني. يرجى التحقق من صندوق الوارد أو مجلد الرسائل غير المرغوب بها في بريدك."
                   : "A verification code has been sent to your email. Please check your inbox or spam folder."}
               </p>
               <p className="font-semibold text-primary-600 mb-6">

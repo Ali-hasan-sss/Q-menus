@@ -6,6 +6,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { publicApi, endpoints } from "@/lib/api";
+import toast from "react-hot-toast";
 
 interface SectionAttribute {
   key: string;
@@ -33,7 +34,8 @@ export default function ContactPage() {
     null
   );
   const [loading, setLoading] = useState(true);
-  const { isRTL } = useLanguage();
+  const [sending, setSending] = useState(false);
+  const { isRTL, language, t } = useLanguage();
 
   useEffect(() => {
     fetchContactSection();
@@ -157,22 +159,48 @@ export default function ContactPage() {
     );
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!name || !email || !message) {
-      alert(
-        isRTL
-          ? "الرجاء ملء جميع الحقول قبل الإرسال."
-          : "Please fill all fields before sending."
-      );
+      toast.error(t("contact.error.fillAllFields"));
       return;
     }
 
-    const text = isRTL
-      ? `👤 الاسم: ${name}\n📧 البريد: ${email}\n💬 الرسالة:\n${message}`
-      : `👋 Hello, new message:\n\n👤 Name: ${name}\n📧 Email: ${email}\n💬 Message:\n${message}`;
-    const encodedText = encodeURIComponent(text);
-    const url = `https://wa.me/${whatsappPhone}?text=${encodedText}`;
-    window.open(url, "_blank");
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast.error(t("contact.error.invalidEmail"));
+      return;
+    }
+
+    setSending(true);
+    try {
+      const response = await publicApi.post(endpoints.public.contact, {
+        name,
+        email,
+        message,
+        lang: language || (isRTL ? "ar" : "en"),
+      });
+
+      if (response.data.success) {
+        // Use translation instead of backend message to ensure consistency
+        toast.success(t("contact.success.messageSent"));
+        // Clear form
+        setName("");
+        setEmail("");
+        setMessage("");
+      } else {
+        toast.error(
+          response.data.message || t("contact.error.sendFailed")
+        );
+      }
+    } catch (error: any) {
+      console.error("Error sending contact message:", error);
+      const errorMessage =
+        error.response?.data?.message || t("contact.error.sendFailedRetry");
+      toast.error(errorMessage);
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -278,9 +306,18 @@ export default function ContactPage() {
             </div>
             <button
               onClick={handleSend}
-              className="w-full bg-tm-blue hover:bg-tm-orange text-white font-medium py-3 rounded-full transition-all duration-300 transform hover:scale-105"
+              disabled={sending}
+              className={`w-full bg-tm-blue hover:bg-tm-orange text-white font-medium py-3 rounded-full transition-all duration-300 transform hover:scale-105 ${
+                sending ? "opacity-50 cursor-not-allowed" : ""
+              }`}
             >
-              {isRTL ? "إرسال عبر واتساب" : "Send via WhatsApp"}
+              {sending
+                ? isRTL
+                  ? "جاري الإرسال..."
+                  : "Sending..."
+                : isRTL
+                  ? "إرسال الرسالة"
+                  : "Send Message"}
             </button>
           </div>
 

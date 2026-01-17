@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -46,7 +46,7 @@ const initialFormData: FormData = {
 };
 
 export default function RegisterForm() {
-  const { isRTL } = useLanguage();
+  const { isRTL, t } = useLanguage();
   const { showToast } = useToast();
   const { loginWithToken } = useAuth();
   const [showEmailVerification, setShowEmailVerification] = useState(false);
@@ -59,6 +59,7 @@ export default function RegisterForm() {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [loading, setLoading] = useState(false);
+  const [sendingVerification, setSendingVerification] = useState(false);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Partial<FormData>>({});
   const restaurantNameArRef = useRef<HTMLDivElement | null>(null);
@@ -66,9 +67,13 @@ export default function RegisterForm() {
   const handleInputChange = (field: keyof FormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (error) setError("");
-    // Clear field error when user starts typing
+    // Clear field error when user starts typing - delete the key instead of setting to undefined
     if (fieldErrors[field]) {
-      setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
+      setFieldErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
     }
   };
 
@@ -178,26 +183,60 @@ export default function RegisterForm() {
         return;
       }
       try {
-        await api.post("/auth/resend-verification", {
+        setSendingVerification(true);
+        await api.post("/auth/send-verification", {
           email: formData.email,
         });
         setUserEmail(formData.email);
         setShowEmailVerification(true);
-        showToast(
-          isRTL
-            ? "تم إرسال رمز التحقق إلى بريدك الإلكتروني"
-            : "Verification code sent to your email",
-          "success"
-        );
-      } catch (err) {
-        showToast(
-          isRTL ? "تعذر إرسال رمز التحقق" : "Failed to send verification code",
-          "error"
-        );
+        showToast(t("auth.success.verificationCodeSent"), "success");
+      } catch (err: any) {
+        const errorCode = err.response?.data?.code;
+        const errorMessage = err.response?.data?.message;
+        const remainingMinutes = err.response?.data?.remainingMinutes;
+
+        // Translate error messages based on error code
+        let translatedMessage = errorMessage;
+        let translationKey = "";
+
+        if (errorCode === "USER_ALREADY_EXISTS") {
+          translationKey = "auth.error.userAlreadyExists";
+          translatedMessage = t(translationKey);
+          setFieldErrors((prev) => ({
+            ...prev,
+            email: translatedMessage,
+          }));
+        } else if (errorCode === "RATE_LIMIT_EXCEEDED") {
+          if (remainingMinutes === 1) {
+            translationKey = "auth.error.rateLimitExceededSingular";
+            translatedMessage = t(translationKey);
+          } else {
+            translationKey = "auth.error.rateLimitExceeded";
+            translatedMessage = t(translationKey).replace(
+              "{minutes}",
+              remainingMinutes?.toString() || "1"
+            );
+          }
+        } else if (errorCode === "VERIFICATION_EMAIL_FAILED") {
+          translationKey = "auth.error.verificationCodeFailed";
+          translatedMessage = t(translationKey);
+        } else if (errorCode === "SERVER_ERROR") {
+          translationKey = "auth.error.serverError";
+          translatedMessage = t(translationKey);
+        } else {
+          // Fallback to original message or default error
+          translatedMessage =
+            errorMessage || t("auth.error.verificationCodeFailed");
+        }
+
+        showToast(translatedMessage, "error");
+      } finally {
+        setSendingVerification(false);
       }
       return;
     }
 
+    // If email is verified, allow moving to next step
     if (currentStep < 3) {
       setCurrentStep((prev) => prev + 1);
       setError("");
@@ -273,10 +312,29 @@ export default function RegisterForm() {
         }
       }
     } catch (error: any) {
-      const errorMessage =
-        error.response?.data?.message || "Registration failed";
-      setError(errorMessage);
-      showToast(errorMessage, "error");
+      const errorCode = error.response?.data?.code;
+      const errorMessage = error.response?.data?.message;
+
+      // Translate error messages based on error code
+      let translatedMessage = errorMessage;
+      let translationKey = "";
+
+      if (errorCode === "USER_ALREADY_EXISTS") {
+        translationKey = "auth.error.userAlreadyExists";
+        translatedMessage = t(translationKey);
+      } else if (errorCode === "EMAIL_NOT_VERIFIED") {
+        translationKey = "auth.error.emailNotVerified";
+        translatedMessage = t(translationKey);
+      } else if (errorCode === "SERVER_ERROR") {
+        translationKey = "auth.error.serverError";
+        translatedMessage = t(translationKey);
+      } else {
+        // Fallback to original message or default error
+        translatedMessage = errorMessage || t("auth.error.registrationFailed");
+      }
+
+      setError(translatedMessage);
+      showToast(translatedMessage, "error");
     } finally {
       setLoading(false);
     }
@@ -287,10 +345,16 @@ export default function RegisterForm() {
     setEmailVerified(true);
     showToast(
       isRTL
-        ? "تم التحقق من البريد الإلكتروني بنجاح! يمكنك الآن تسجيل الدخول"
-        : "Email verified successfully! You can now log in",
+        ? "تم التحقق من البريد الإلكتروني بنجاح! يمكنك الآن المتابعة"
+        : "Email verified successfully! You can now continue",
       "success"
     );
+    // Clear any email field errors since verification succeeded
+    setFieldErrors((prev) => {
+      const newErrors = { ...prev };
+      delete newErrors.email;
+      return newErrors;
+    });
     // Move to next step and focus restaurant name
     setCurrentStep(2);
     if (typeof window !== "undefined") {
@@ -314,16 +378,50 @@ export default function RegisterForm() {
     }
   }, [currentStep, isRTL]);
 
-  const isStep1Valid =
-    formData.firstName &&
-    formData.lastName &&
-    formData.email &&
-    formData.password &&
-    formData.confirmPassword &&
-    formData.password === formData.confirmPassword &&
-    Object.keys(fieldErrors).length === 0;
-  const isStep2Valid = formData.restaurantName && formData.restaurantNameAr;
-  const isFormValid = isStep1Valid && isStep2Valid;
+  // Recalculate validation status whenever formData or fieldErrors change
+  const isStep1Valid = useMemo(() => {
+    // Check if all required fields are filled
+    const allFieldsFilled =
+      formData.firstName &&
+      formData.lastName &&
+      formData.email &&
+      formData.password &&
+      formData.confirmPassword;
+
+    // Check if passwords match
+    const passwordsMatch = formData.password === formData.confirmPassword;
+
+    // Check if there are no field errors (filter out undefined values)
+    const noErrors =
+      Object.keys(fieldErrors).filter(
+        (key) => fieldErrors[key as keyof FormData] !== undefined
+      ).length === 0;
+
+    // Check individual validations
+    const firstNameValid = formData.firstName && formData.firstName.length >= 2;
+    const lastNameValid = formData.lastName && formData.lastName.length >= 2;
+    const emailValid =
+      formData.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email);
+    const passwordValid = formData.password && formData.password.length >= 6;
+
+    return (
+      allFieldsFilled &&
+      passwordsMatch &&
+      noErrors &&
+      firstNameValid &&
+      lastNameValid &&
+      emailValid &&
+      passwordValid
+    );
+  }, [formData, fieldErrors]);
+
+  const isStep2Valid = useMemo(() => {
+    return formData.restaurantName && formData.restaurantNameAr;
+  }, [formData.restaurantName, formData.restaurantNameAr]);
+
+  const isFormValid = useMemo(() => {
+    return isStep1Valid && isStep2Valid;
+  }, [isStep1Valid, isStep2Valid]);
 
   return (
     <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
@@ -406,7 +504,7 @@ export default function RegisterForm() {
 
               <div>
                 <Input
-                  label={isRTL ? "كلمة المرور" : "Password"}
+                  label={isRTL ? "كلمة المرور (اكثر من 6 احرف)" : "Password "}
                   type="password"
                   value={formData.password}
                   onChange={(e) =>
@@ -599,10 +697,17 @@ export default function RegisterForm() {
                 onClick={handleNext}
                 disabled={
                   (currentStep === 1 && !isStep1Valid) ||
-                  (currentStep === 2 && !isStep2Valid)
+                  (currentStep === 2 && !isStep2Valid) ||
+                  sendingVerification
                 }
               >
-                {isRTL ? "التالي" : "Next"}
+                {sendingVerification ? (
+                  <LoadingSpinner size="sm" />
+                ) : isRTL ? (
+                  "التالي"
+                ) : (
+                  "Next"
+                )}
               </Button>
             ) : (
               <Button

@@ -8,13 +8,26 @@ import { useCustomerSocket } from "@/contexts/CustomerSocketContext";
 
 import { MenuItem } from "@/components/customer/MenuItem";
 import { RestaurantHeader } from "@/components/customer/RestaurantHeader";
+import dynamic from "next/dynamic";
 
 import { FloatingOrderSummary } from "@/components/customer/FloatingOrderSummary";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { MenuLoadingSkeleton } from "@/components/customer/MenuLoadingSkeleton";
-import QRScanner from "@/components/customer/QRScanner";
 import WaiterRequestButton from "@/components/customer/WaiterRequestButton";
+
+// Dynamically import QRScanner to avoid SSR issues with jsqr
+const QRScanner = dynamic(
+  () => import("@/components/customer/QRScanner"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="min-h-screen flex items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    ),
+  }
+);
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import toast from "react-hot-toast";

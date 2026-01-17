@@ -35,7 +35,7 @@ export default function LoginPage() {
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [userEmail, setUserEmail] = useState("");
   const { login, user, isAuthenticated } = useAuth();
-  const { t, isRTL } = useLanguage();
+  const { t, isRTL, language } = useLanguage();
   const { showToast } = useToast();
   const router = useRouter();
 
@@ -89,7 +89,56 @@ export default function LoginPage() {
         setUserEmail(data.email);
         setShowEmailVerification(true);
       } else {
-        // Error is handled by the auth context
+        // Translate error message
+        const errorCode = error.response?.data?.code;
+        const errorMessage = error.response?.data?.message;
+        const statusCode = error.response?.status;
+        
+        console.log("🔍 Login error details:", {
+          errorCode,
+          errorMessage,
+          statusCode,
+          fullResponse: error.response?.data,
+          errorResponse: error.response,
+        });
+        
+        let translatedMessage = errorMessage;
+        
+        // Check for rate limit (429 status or LOGIN_RATE_LIMIT_EXCEEDED code)
+        if (statusCode === 429 || errorCode === "LOGIN_RATE_LIMIT_EXCEEDED") {
+          translatedMessage = t("auth.error.loginRateLimitExceeded");
+        } else if (errorCode === "INVALID_CREDENTIALS") {
+          translatedMessage = t("auth.error.invalidCredentials");
+        } else if (errorCode === "USER_NOT_FOUND") {
+          translatedMessage = t("auth.error.userNotFound");
+          console.log("✅ Using translation for USER_NOT_FOUND:", {
+            errorCode,
+            translationKey: "auth.error.userNotFound",
+            translatedMessage,
+            language: language,
+          });
+        } else if (errorCode === "EMAIL_NOT_VERIFIED") {
+          translatedMessage = t("auth.error.emailNotVerified");
+        } else if (errorCode === "SERVER_ERROR") {
+          translatedMessage = t("auth.error.serverError");
+        } else if (errorMessage && (errorMessage.toLowerCase().includes("invalid credentials") || errorMessage.toLowerCase().includes("بيانات الدخول"))) {
+          // Fallback: if message contains "invalid credentials" but no code
+          translatedMessage = t("auth.error.invalidCredentials");
+        } else if (errorMessage && (errorMessage.toLowerCase().includes("user not found") || errorMessage.toLowerCase().includes("المستخدم غير موجود"))) {
+          // Fallback: if message contains "user not found" but no code
+          translatedMessage = t("auth.error.userNotFound");
+        } else {
+          translatedMessage = errorMessage || t("auth.error.loginFailed");
+        }
+        
+        console.log("📤 Showing toast with translated message:", {
+          originalMessage: errorMessage,
+          translatedMessage,
+          errorCode,
+          language: language,
+          translationKey: errorCode === "USER_NOT_FOUND" ? "auth.error.userNotFound" : "other",
+        });
+        showToast(translatedMessage, "error");
         console.error("Login error:", error);
       }
     }
@@ -97,12 +146,7 @@ export default function LoginPage() {
 
   const handleEmailVerified = () => {
     setShowEmailVerification(false);
-    showToast(
-      isRTL
-        ? "تم التحقق من البريد الإلكتروني بنجاح. يمكنك الآن تسجيل الدخول"
-        : "Email verified successfully. You can now log in",
-      "success"
-    );
+    showToast(t("auth.success.emailVerified"), "success");
   };
 
   const handleForgotPasswordSuccess = (email: string) => {
@@ -127,17 +171,17 @@ export default function LoginPage() {
       <Header />
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-100 dark:bg-gradient-to-br dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 -mt-24 md:-mt-28 pt-24 md:pt-28 relative overflow-hidden py-12 px-4 sm:px-6 lg:px-8">
         {/* Decorative bubbles */}
-        <div className="absolute -top-10 -left-10 w-40 h-40 opacity-10 dark:opacity-5">
+        <div className="absolute -top-10 -left-10 w-40 h-40 opacity-10 dark:opacity-5 z-0">
           <div className="w-full h-full bg-gradient-to-br from-blue-500 to-orange-500 rounded-full"></div>
         </div>
-        <div className="absolute -bottom-10 -right-10 w-56 h-56 opacity-10 dark:opacity-5">
+        <div className="absolute -bottom-10 -right-10 w-56 h-56 opacity-10 dark:opacity-5 z-0">
           <div className="w-full h-full bg-gradient-to-tr from-orange-500 to-blue-500 rounded-full"></div>
         </div>
-        <div className="max-w-md w-full space-y-8">
+        <div className="max-w-md w-full space-y-8 relative z-10">
           {/* Header */}
 
           {/* Login Form */}
-          <Card className="mt-8 p-6 w-full max-w-lg bg-white dark:bg-gray-800 shadow-xl">
+          <Card className="mt-8 p-6 w-full max-w-lg bg-white dark:bg-gray-800 shadow-xl relative z-10">
             <div>
               <h2 className="my-4 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
                 {isRTL
@@ -209,7 +253,13 @@ export default function LoginPage() {
                 <div className="text-sm">
                   <button
                     type="button"
-                    onClick={() => setShowForgotPassword(true)}
+                    onClick={() => {
+                      const currentEmail = watch("email");
+                      if (currentEmail) {
+                        setUserEmail(currentEmail);
+                      }
+                      setShowForgotPassword(true);
+                    }}
                     className="font-medium text-primary-600 hover:text-primary-500"
                   >
                     {t("auth.forgotPassword")}
@@ -239,13 +289,13 @@ export default function LoginPage() {
                     {t("auth.register")}
                   </Link>
                 </div>
-                <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+                <div className="pt-2 border-t border-gray-200 dark:border-gray-700 relative z-20">
                   <Link
                     href="/kitchen/login"
-                    className="inline-flex items-center gap-2 text-sm font-medium text-orange-600 hover:text-orange-500 dark:text-orange-400 dark:hover:text-orange-300 transition-colors"
+                    className="relative z-20 inline-flex items-center justify-center gap-2 w-full py-3 px-4 text-base font-semibold text-white bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 dark:from-orange-600 dark:to-orange-700 dark:hover:from-orange-700 dark:hover:to-orange-800 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
                   >
                     <svg
-                      className="w-5 h-5"
+                      className="w-6 h-6"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -279,6 +329,7 @@ export default function LoginPage() {
         isOpen={showForgotPassword}
         onClose={() => setShowForgotPassword(false)}
         onSuccess={handleForgotPasswordSuccess}
+        initialEmail={userEmail}
       />
       {/* Reset Password Modal */}
       <ResetPasswordModal

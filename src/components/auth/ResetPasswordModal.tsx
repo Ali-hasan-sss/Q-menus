@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -27,6 +28,7 @@ export function ResetPasswordModal({
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resendingCode, setResendingCode] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,12 +81,35 @@ export function ResetPasswordModal({
       }
     } catch (error: any) {
       console.error("Reset password error:", error);
-      const errorMessage =
-        error.response?.data?.message ||
-        (isRTL
-          ? "حدث خطأ أثناء إعادة تعيين كلمة المرور"
-          : "Error resetting password");
-      showToast(errorMessage, "error");
+      const errorCode = error.response?.data?.code;
+      const errorMessage = error.response?.data?.message;
+      
+      // Translate error messages based on error code
+      let translatedMessage = errorMessage;
+      
+      if (errorCode === "USER_NOT_FOUND") {
+        translatedMessage = t("auth.error.userNotFound");
+      } else if (errorCode === "INVALID_RESET_CODE") {
+        translatedMessage = t("auth.error.invalidVerificationCode");
+      } else if (errorCode === "RESET_CODE_EXPIRED") {
+        translatedMessage = t("auth.error.verificationCodeExpired");
+      } else if (errorCode === "PASSWORD_RESET_FAILED") {
+        translatedMessage = t("auth.error.passwordResetFailed");
+      } else if (errorCode === "SERVER_ERROR") {
+        translatedMessage = t("auth.error.serverError");
+      } else if (errorMessage && (errorMessage.toLowerCase().includes("user not found") || errorMessage.toLowerCase().includes("المستخدم غير موجود"))) {
+        // Fallback: if message contains "user not found" but no code
+        translatedMessage = t("auth.error.userNotFound");
+      } else {
+        // Fallback to original message or default error
+        translatedMessage =
+          errorMessage ||
+          (isRTL
+            ? "حدث خطأ أثناء إعادة تعيين كلمة المرور"
+            : "Error resetting password");
+      }
+      
+      showToast(translatedMessage, "error");
     } finally {
       setLoading(false);
     }
@@ -93,6 +118,67 @@ export function ResetPasswordModal({
   const handleResetCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/\D/g, "").slice(0, 6);
     setResetCode(value);
+  };
+
+  const handleResendCode = async () => {
+    if (!email) {
+      showToast(t("auth.error.emailMissing"), "error");
+      return;
+    }
+
+    try {
+      setResendingCode(true);
+      const response = await api.post("/auth/forgot-password", {
+        email,
+      });
+
+      if (response.data.success) {
+        showToast(t("auth.passwordReset.resendCodeSuccess"), "success");
+      }
+    } catch (error: any) {
+      console.error("Resend reset code error:", error);
+      const errorCode = error.response?.data?.code;
+      const errorMessage = error.response?.data?.message;
+      const remainingMinutes = error.response?.data?.remainingMinutes;
+
+      // Translate error messages based on error code
+      let translatedMessage = errorMessage;
+      let translationKey = "";
+
+      if (errorCode === "RATE_LIMIT_EXCEEDED") {
+        if (remainingMinutes === 1) {
+          translationKey = "auth.error.rateLimitExceededSingular";
+          translatedMessage = t(translationKey);
+        } else {
+          translationKey = "auth.error.rateLimitExceeded";
+          translatedMessage = t(translationKey).replace(
+            "{minutes}",
+            remainingMinutes?.toString() || "1"
+          );
+        }
+      } else if (errorCode === "USER_NOT_FOUND") {
+        translationKey = "auth.error.userNotFound";
+        translatedMessage = t(translationKey);
+      } else if (errorCode === "PASSWORD_RESET_EMAIL_FAILED") {
+        translationKey = "auth.error.verificationCodeFailed";
+        translatedMessage = t(translationKey);
+      } else if (errorCode === "SERVER_ERROR") {
+        translationKey = "auth.error.serverError";
+        translatedMessage = t(translationKey);
+      } else if (errorMessage && (errorMessage.toLowerCase().includes("user not found") || errorMessage.toLowerCase().includes("المستخدم غير موجود"))) {
+        // Fallback: if message contains "user not found" but no code
+        translationKey = "auth.error.userNotFound";
+        translatedMessage = t(translationKey);
+      } else {
+        // Fallback to original message or default error
+        translatedMessage =
+          errorMessage || t("auth.error.verificationCodeFailed");
+      }
+
+      showToast(translatedMessage, "error");
+    } finally {
+      setResendingCode(false);
+    }
   };
 
   return (
@@ -108,7 +194,10 @@ export function ResetPasswordModal({
               ? "أدخل رمز إعادة التعيين وكلمة المرور الجديدة"
               : "Enter the reset code and new password"}
           </p>
-          <p className="font-semibold text-primary-600">{email}</p>
+          <p className="font-semibold text-primary-600 mb-2">{email}</p>
+          <p className="text-xs text-amber-600 dark:text-amber-400 mb-4">
+            {t("auth.passwordReset.checkSpam")}
+          </p>
         </div>
 
         <div>
@@ -125,6 +214,23 @@ export function ResetPasswordModal({
             className="text-center text-xl tracking-widest"
             maxLength={6}
           />
+          <div className="mt-2 text-center">
+            <button
+              type="button"
+              onClick={handleResendCode}
+              disabled={resendingCode}
+              className="text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {resendingCode ? (
+                <span className="flex items-center justify-center gap-2">
+                  <LoadingSpinner size="sm" />
+                  {t("auth.passwordReset.resendingCode")}
+                </span>
+              ) : (
+                t("auth.passwordReset.didNotReceiveCode")
+              )}
+            </button>
+          </div>
         </div>
 
         <div>

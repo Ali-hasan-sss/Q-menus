@@ -38,6 +38,7 @@ interface Order {
     id: string;
     quantity: number;
     price: number;
+    discount?: number | null;
     notes?: string;
     extras?: any;
     isNew?: boolean;
@@ -49,6 +50,8 @@ interface Order {
       name: string;
       nameAr?: string;
       currency?: string;
+      price?: number;
+      discount?: number;
       category?: {
         id: string;
         name: string;
@@ -99,6 +102,15 @@ export default function OrdersPage() {
     new Set()
   );
   const [availableTables, setAvailableTables] = useState<string[]>([]);
+  // Load table count from localStorage on initial load for fast display
+  const [tableCount, setTableCount] = useState<number>(() => {
+    try {
+      const stored = localStorage.getItem(`tableCount_${user?.restaurant?.id}`);
+      return stored ? parseInt(stored, 10) : 0;
+    } catch {
+      return 0;
+    }
+  });
   const [qrCodes, setQrCodes] = useState<
     Record<string, { id: string; isOccupied: boolean }>
   >({});
@@ -159,6 +171,7 @@ export default function OrdersPage() {
   const [selectedPaymentCurrency, setSelectedPaymentCurrency] = useState<
     string | null
   >(null);
+  const [restaurantTaxes, setRestaurantTaxes] = useState<any[]>([]);
 
   // Popular currencies list with translations
   const popularCurrencies = [
@@ -283,10 +296,27 @@ export default function OrdersPage() {
     }
   };
 
+  // Fetch restaurant tax settings
+  const fetchRestaurantTaxes = async () => {
+    try {
+      const response = await api.get("/restaurant/settings");
+      if (response.data.success && response.data.data.taxes) {
+        const taxes = Array.isArray(response.data.data.taxes) 
+          ? response.data.data.taxes 
+          : [];
+        setRestaurantTaxes(taxes);
+      }
+    } catch (error) {
+      console.error("Error fetching restaurant taxes:", error);
+    }
+  };
+
   useEffect(() => {
     const loadData = async () => {
       // First fetch currency to ensure it's available
       await fetchRestaurantCurrency();
+      // Fetch restaurant tax settings
+      await fetchRestaurantTaxes();
       // Then fetch orders and other data
       await fetchOrders(1, false); // جلب الصفحة الأولى
       await fetchAvailableTables();
@@ -295,6 +325,25 @@ export default function OrdersPage() {
     };
     loadData();
   }, [statisticsPeriod]);
+
+  // Update table count in localStorage whenever availableTables changes
+  useEffect(() => {
+    if (user?.restaurant?.id) {
+      const newCount = availableTables.length;
+      // Only update if count actually changed to avoid unnecessary localStorage writes
+      if (newCount !== tableCount) {
+        setTableCount(newCount);
+        try {
+          localStorage.setItem(
+            `tableCount_${user.restaurant.id}`,
+            newCount.toString()
+          );
+        } catch (error) {
+          console.error("Error saving table count to localStorage:", error);
+        }
+      }
+    }
+  }, [availableTables.length, user?.restaurant?.id]); // Use availableTables.length instead of availableTables array
 
   // Load menu categories when quick order modal opens
   useEffect(() => {
@@ -840,6 +889,10 @@ export default function OrdersPage() {
   //   return () => clearTimeout(timer);
   // }, []);
 
+  // No recalculation needed - use stored totalPrice from backend
+  // The backend calculates and stores totalPrice correctly at order creation and completion
+  // We trust the backend's calculation and display it as-is
+
   // Listen for real-time order updates
   useEffect(() => {
     if (!socket) return;
@@ -847,6 +900,8 @@ export default function OrdersPage() {
     const handleNewOrder = (data: any) => {
       console.log("New order received:", data);
       const newOrder = data.order;
+      
+      // Use order as-is from backend - totalPrice is already calculated and stored correctly
 
       // Mark all items in the new order as new
       const newItemIds = newOrder.items.map((item: any) => item.id);
@@ -881,6 +936,8 @@ export default function OrdersPage() {
       console.log("🎯 Order update received:", data);
       const updatedOrder = data.order;
       const updatedBy = data.updatedBy;
+      
+      // Use order as-is from backend - totalPrice is already calculated and stored correctly
       console.log("🎯 Updated order details:", {
         id: updatedOrder.id,
         itemsCount: updatedOrder.items?.length,
@@ -1044,6 +1101,7 @@ export default function OrdersPage() {
       });
 
       if (response.data.success) {
+        // Use orders as-is from backend - totalPrice is already calculated and stored correctly
         const fetchedOrders = response.data.data.orders.filter(
           (order: Order) => order.status !== "CANCELLED"
         );
@@ -1113,6 +1171,20 @@ export default function OrdersPage() {
           .map((qr: any) => qr.tableNumber)
           .sort((a: string, b: string) => parseInt(a) - parseInt(b));
         setAvailableTables(tableNumbers);
+
+        // Update table count in localStorage
+        const newTableCount = tableNumbers.length;
+        setTableCount(newTableCount);
+        if (user?.restaurant?.id) {
+          try {
+            localStorage.setItem(
+              `tableCount_${user.restaurant.id}`,
+              newTableCount.toString()
+            );
+          } catch (error) {
+            console.error("Error saving table count to localStorage:", error);
+          }
+        }
 
         // Store QR codes with their IDs and occupied status
         const qrCodesMap: Record<string, { id: string; isOccupied: boolean }> =
@@ -1507,10 +1579,23 @@ export default function OrdersPage() {
   // Function to print invoice directly (thermal printer compatible)
   const handlePrintInvoice = (order: Order) => {
     // Calculate all prices in selected currency before building HTML
+    // Calculate total tax percentage from restaurant settings
+    const totalTaxPercentageForPrint = restaurantTaxes.reduce((sum, tax) => {
+      return sum + (tax.percentage || 0);
+    }, 0);
+    
     const itemsHtml = order.items
       .map((item) => {
-        const baseItemPrice = Number(item.price);
-        const baseItemTotal = baseItemPrice * item.quantity;
+        // Extract price without tax and round to nearest integer
+        const itemPriceInclusive = Number(item.price);
+        const itemPriceWithoutTax = totalTaxPercentageForPrint > 0
+          ? itemPriceInclusive / (1 + totalTaxPercentageForPrint / 100)
+          : itemPriceInclusive;
+        
+        // Round to nearest integer for each item total
+        const baseItemPrice = Math.round(itemPriceWithoutTax);
+        const baseItemTotal = Math.round(itemPriceWithoutTax * item.quantity);
+        
         const convertedItemPrice = calculateTotalInCurrency(
           baseItemPrice,
           selectedPaymentCurrency
@@ -1542,28 +1627,51 @@ export default function OrdersPage() {
       })
       .join("");
 
-    const subtotalHtml =
-      order.subtotal !== undefined
-        ? (() => {
-            const baseSubtotal = Number(order.subtotal);
+    // Calculate subtotal from items (rounded) and taxes to match totalPrice
+    const baseTotalPrice = Number(order.totalPrice);
+    
+    // Calculate subtotal from sum of all items (rounded, without tax)
+    const baseSubtotalFromItems = order.items.reduce((sum, item) => {
+      const itemPriceInclusive = Number(item.price);
+      const itemPriceWithoutTax = totalTaxPercentageForPrint > 0
+        ? itemPriceInclusive / (1 + totalTaxPercentageForPrint / 100)
+        : itemPriceInclusive;
+      // Round to nearest integer for each item total
+      return sum + Math.round(itemPriceWithoutTax * item.quantity);
+    }, 0);
+    
+    // Use rounded subtotal from items
+    const baseSubtotal = baseSubtotalFromItems;
+    
+    // Calculate taxes to ensure subtotal + taxes = totalPrice (exact match)
+    const calculatedTaxAmounts = restaurantTaxes.map((tax) => {
+      return baseSubtotal * ((tax.percentage || 0) / 100);
+    });
+    const totalCalculatedTaxes = calculatedTaxAmounts.reduce((sum, amount) => sum + amount, 0);
+    const taxDifference = baseTotalPrice - baseSubtotal - totalCalculatedTaxes;
+    
+    const subtotalHtml = `<div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+          <span>${isRTL ? "المجموع الفرعي:" : "Subtotal:"}</span>
+          <span>${(() => {
             const converted = calculateTotalInCurrency(
               baseSubtotal,
               selectedPaymentCurrency
             );
-            return `<div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-          <span>${isRTL ? "المجموع الفرعي:" : "Subtotal:"}</span>
-          <span>${formatCurrencyWithLanguage(converted.amount, converted.currency, language)}</span>
+            return formatCurrencyWithLanguage(converted.amount, converted.currency, language);
+          })()}</span>
         </div>`;
-          })()
-        : "";
 
     const taxesHtml =
-      order.taxes && order.taxes.length > 0
-        ? order.taxes
-            .map((tax: any) => {
-              const baseTaxAmount = tax.amount;
+      restaurantTaxes.length > 0
+        ? restaurantTaxes
+            .map((tax: any, index: number) => {
+              const baseTaxAmount = calculatedTaxAmounts[index];
+              // Distribute the difference proportionally
+              const adjustedTaxAmount = totalCalculatedTaxes > 0
+                ? baseTaxAmount + (taxDifference * (baseTaxAmount / totalCalculatedTaxes))
+                : baseTaxAmount;
               const converted = calculateTotalInCurrency(
-                baseTaxAmount,
+                adjustedTaxAmount,
                 selectedPaymentCurrency
               );
               return `
@@ -1576,6 +1684,8 @@ export default function OrdersPage() {
             .join("")
         : "";
 
+    // IMPORTANT: Use totalPrice directly from database (tax-inclusive)
+    // DO NOT add taxes to totalPrice - totalPrice is already the final amount
     const baseTotal = Number(order.totalPrice);
     const convertedTotal = calculateTotalInCurrency(
       baseTotal,
@@ -1766,12 +1876,13 @@ export default function OrdersPage() {
     showAll: boolean = false
   ) => {
     if (showAll) {
-      // For modal, show all statuses including current one, but exclude CANCELLED
+      // For modal, show all statuses including current one, but exclude CANCELLED and COMPLETED
       // CANCELLED will be handled by a separate cancel button
+      // COMPLETED will be handled by a separate "Mark as Paid" button
       const allStatuses =
         orderType === "DELIVERY"
-          ? ["PENDING", "PREPARING", "READY", "DELIVERED", "COMPLETED"]
-          : ["PENDING", "PREPARING", "READY", "COMPLETED"];
+          ? ["PENDING", "PREPARING", "READY", "DELIVERED"]
+          : ["PENDING", "PREPARING", "READY"];
 
       return allStatuses.map((status) => ({
         value: status,
@@ -2138,21 +2249,35 @@ export default function OrdersPage() {
                               >
                                 <td className="py-1 px-1 text-gray-900 dark:text-white">
                                   <div className="flex items-center space-x-2">
-                                    <div>
+                                    <div className="flex-1">
                                       {getItemCategory(item) && (
                                         <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
                                           {getItemCategory(item)}
                                         </p>
                                       )}
-                                      <p>{getItemName(item)}</p>
+                                      <div className="flex items-center gap-2">
+                                        <p>{getItemName(item)}</p>
+                                        {(() => {
+                                          const itemDiscount = item.discount || (item.menuItem?.discount || 0);
+                                          const hasDiscount =
+                                            !item.isCustomItem &&
+                                            itemDiscount > 0;
+                                          
+                                          return hasDiscount ? (
+                                            <span className="bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded font-medium whitespace-nowrap">
+                                              {itemDiscount}% {isRTL ? "خصم" : "off"}
+                                            </span>
+                                          ) : null;
+                                        })()}
+                                      </div>
                                     </div>
                                     {isNewItem && (
-                                      <span className="bg-blue-500 text-white text-xs px-1 py-0.5 rounded-full font-medium animate-pulse">
+                                      <span className="bg-blue-500 text-white text-xs px-1 py-0.5 rounded-full font-medium animate-pulse flex-shrink-0">
                                         {isRTL ? "جديد" : "NEW"}
                                       </span>
                                     )}
                                     {isModifiedItem && !isNewItem && (
-                                      <span className="bg-orange-500 text-white text-xs px-1 py-0.5 rounded-full font-medium animate-pulse">
+                                      <span className="bg-orange-500 text-white text-xs px-1 py-0.5 rounded-full font-medium animate-pulse flex-shrink-0">
                                         {isRTL ? "معدل" : "MODIFIED"}
                                       </span>
                                     )}
@@ -2186,15 +2311,78 @@ export default function OrdersPage() {
                                 </td>
                                 <td className="py-1 px-1 text-right font-medium text-gray-900 dark:text-white">
                                   {(() => {
-                                    const basePrice =
-                                      Number(item.price) * item.quantity;
-                                    const converted = calculateTotalInCurrency(
+                                    // Check if item has discount for display purposes
+                                    const itemDiscount = item.discount || (item.menuItem?.discount || 0);
+                                    const hasDiscount =
+                                      !item.isCustomItem &&
+                                      itemDiscount > 0 &&
+                                      item.menuItem?.price;
+
+                                    // item.price is TAX-INCLUSIVE (stored in database, AFTER discount if any)
+                                    const totalTaxPercentage = restaurantTaxes.reduce((sum, tax) => {
+                                      return sum + (tax.percentage || 0);
+                                    }, 0);
+
+                                    if (hasDiscount && item.menuItem?.price) {
+                                      // For items with discount:
+                                      // - item.price = tax-inclusive price AFTER discount (what customer pays)
+                                      // - item.menuItem.price = original tax-inclusive price (before discount)
+                                      const discountedPriceInclusive = Number(item.price); // Already includes discount and tax
+                                      const originalPriceInclusive = Number(item.menuItem.price); // Original price with tax
+                                      
+                                      // Calculate totals (per item * quantity)
+                                      const discountedTotal = discountedPriceInclusive * item.quantity;
+                                      const originalTotal = originalPriceInclusive * item.quantity;
+                                      
+                                      // Display: original price (strikethrough) and discounted price (red, what customer pays)
+                                      const originalDisplayPrice = calculateTotalInCurrency(
+                                        originalTotal,
+                                        selectedPaymentCurrency
+                                      );
+                                      const originalPriceDisplay = formatCurrencyWithLanguage(
+                                        originalDisplayPrice.amount,
+                                        originalDisplayPrice.currency,
+                                        language
+                                      );
+
+                                      const discountedDisplayPrice = calculateTotalInCurrency(
+                                        discountedTotal,
+                                        selectedPaymentCurrency
+                                      );
+                                      const discountedPriceDisplay = formatCurrencyWithLanguage(
+                                        discountedDisplayPrice.amount,
+                                        discountedDisplayPrice.currency,
+                                        language
+                                      );
+
+                                      // Display original price (tax-inclusive, before discount) with strikethrough and discounted price (tax-inclusive, after discount) in red
+                                      return (
+                                        <div className={`flex flex-col gap-0.5 ${isRTL ? "items-start" : "items-end"}`}>
+                                          <span className="line-through text-gray-400 text-xs">
+                                            {originalPriceDisplay}
+                                          </span>
+                                          <span className="text-red-600 font-semibold">
+                                            {discountedPriceDisplay}
+                                          </span>
+                                        </div>
+                                      );
+                                    }
+
+                                    // No discount - display price without tax (rounded to nearest integer) for consistency with subtotal calculation
+                                    const itemPriceInclusive = Number(item.price);
+                                    const itemPriceWithoutTax = totalTaxPercentage > 0
+                                      ? itemPriceInclusive / (1 + totalTaxPercentage / 100)
+                                      : itemPriceInclusive;
+                                    
+                                    // Round to nearest integer for each item total (without tax) * quantity
+                                    const basePrice = Math.round(itemPriceWithoutTax * item.quantity);
+                                    const displayPrice = calculateTotalInCurrency(
                                       basePrice,
                                       selectedPaymentCurrency
                                     );
                                     return formatCurrencyWithLanguage(
-                                      converted.amount,
-                                      converted.currency,
+                                      displayPrice.amount,
+                                      displayPrice.currency,
                                       language
                                     );
                                   })()}
@@ -2222,32 +2410,104 @@ export default function OrdersPage() {
                   )}
 
                   {/* Order Summary */}
-                  <div className="mb-3 p-2 bg-gray-50 dark:bg-gray-800 rounded">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                        {isRTL ? "المجموع: " : "Total: "}
-                        {order.items.reduce(
-                          (sum, item) => sum + item.quantity,
-                          0
-                        )}{" "}
-                        {isRTL ? "عنصر" : "items"}
-                      </span>
-                      <span className="text-sm font-bold text-gray-900 dark:text-white">
                         {(() => {
-                          const baseTotal = Number(order.totalPrice);
-                          const converted = calculateTotalInCurrency(
-                            baseTotal,
-                            selectedPaymentCurrency
-                          );
-                          return formatCurrencyWithLanguage(
-                            converted.amount,
-                            converted.currency,
+                    // Calculate subtotal from items (rounded) and taxes to match totalPrice
+                    const totalPrice = Number(order.totalPrice || 0);
+                    
+                    // Calculate total tax percentage from restaurant settings
+                    const totalTaxPercentage = restaurantTaxes.reduce((sum, tax) => {
+                      return sum + (tax.percentage || 0);
+                    }, 0);
+                    
+                    // Calculate subtotal from sum of all items (rounded, without tax)
+                    const subtotalFromItems = order.items.reduce((sum, item) => {
+                      const itemPriceInclusive = Number(item.price);
+                      const itemPriceWithoutTax = totalTaxPercentage > 0
+                        ? itemPriceInclusive / (1 + totalTaxPercentage / 100)
+                        : itemPriceInclusive;
+                      // Round to nearest integer for each item total
+                      return sum + Math.round(itemPriceWithoutTax * item.quantity);
+                    }, 0);
+                    
+                    // Use rounded subtotal from items
+                    const baseSubtotal = subtotalFromItems;
+                    
+                    // Calculate taxes to ensure subtotal + taxes = totalPrice (exact match)
+                    const calculatedTaxAmounts = restaurantTaxes.map((tax) => {
+                      return baseSubtotal * ((tax.percentage || 0) / 100);
+                    });
+                    const totalCalculatedTaxes = calculatedTaxAmounts.reduce((sum, amount) => sum + amount, 0);
+                    const taxDifference = totalPrice - baseSubtotal - totalCalculatedTaxes;
+                    
+                    // Calculate taxes with adjustment to match totalPrice exactly
+                    const calculatedTaxes = restaurantTaxes.map((tax, index) => {
+                      const baseTaxAmount = calculatedTaxAmounts[index];
+                      // Distribute the difference proportionally
+                      const adjustedTaxAmount = totalCalculatedTaxes > 0
+                        ? baseTaxAmount + (taxDifference * (baseTaxAmount / totalCalculatedTaxes))
+                        : baseTaxAmount;
+                      return {
+                        name: tax.name || "",
+                        nameAr: tax.nameAr || tax.name || "",
+                        percentage: tax.percentage || 0,
+                        amount: adjustedTaxAmount,
+                      };
+                    });
+
+                    const subtotalDisplay = calculateTotalInCurrency(baseSubtotal, selectedPaymentCurrency);
+                    const totalDisplay = calculateTotalInCurrency(totalPrice, selectedPaymentCurrency);
+
+                    return (
+                      <div className="mb-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 space-y-2">
+                        {/* Subtotal */}
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="font-medium text-gray-700 dark:text-gray-300">
+                            {isRTL ? "المجموع الفرعي:" : "Subtotal:"}
+                          </span>
+                          <span className="font-medium text-gray-900 dark:text-white">
+                            {formatCurrencyWithLanguage(
+                              subtotalDisplay.amount,
+                              subtotalDisplay.currency,
                             language
+                            )}
+                          </span>
+                        </div>
+                        
+                        {/* Taxes */}
+                        {calculatedTaxes.length > 0 && calculatedTaxes.map((tax, index) => {
+                          const taxDisplay = calculateTotalInCurrency(tax.amount, selectedPaymentCurrency);
+                          return (
+                            <div key={index} className="flex justify-between items-center text-xs">
+                              <span className="text-gray-600 dark:text-gray-400">
+                                {isRTL ? tax.nameAr || tax.name : tax.name} ({tax.percentage}%):
+                              </span>
+                              <span className="text-gray-900 dark:text-white">
+                                {formatCurrencyWithLanguage(
+                                  taxDisplay.amount,
+                                  taxDisplay.currency,
+                                  language
+                                )}
+                              </span>
+                            </div>
                           );
-                        })()}
+                        })}
+                        
+                        {/* Total */}
+                        <div className="flex justify-between items-center pt-2 border-t border-gray-200 dark:border-gray-700">
+                          <span className="text-sm font-bold text-gray-900 dark:text-white">
+                            {isRTL ? "المجموع:" : "Total:"}
+                          </span>
+                          <span className="text-sm font-bold text-gray-900 dark:text-white">
+                            {formatCurrencyWithLanguage(
+                              totalDisplay.amount,
+                              totalDisplay.currency,
+                              language
+                            )}
                       </span>
                     </div>
                   </div>
+                    );
+                  })()}
 
                   {/* Status Actions */}
                   <div className="flex flex-wrap gap-2">
@@ -2302,6 +2562,37 @@ export default function OrdersPage() {
                     </select>
                     {order.status !== "CANCELLED" &&
                       order.status !== "COMPLETED" && (
+                        <>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (
+                                confirm(
+                                  isRTL
+                                    ? "هل تريد تعيين هذا الطلب ك مكتمل (مدفوع)؟"
+                                    : "Do you want to mark this order as completed (paid)?"
+                                )
+                              ) {
+                                updateOrderStatus(order.id, "COMPLETED");
+                              }
+                            }}
+                            className="text-xs px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-md flex items-center gap-1"
+                          >
+                            <svg
+                              className="w-3 h-3"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                              />
+                            </svg>
+                            {isRTL ? "اكمال (مدفوع)" : "Complete (Paid)"}
+                          </button>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -2332,6 +2623,7 @@ export default function OrdersPage() {
                           </svg>
                           {isRTL ? "إلغاء" : "Cancel"}
                         </button>
+                        </>
                       )}
                     <button
                       onClick={(e) => {
@@ -2999,16 +3291,65 @@ export default function OrdersPage() {
                         {getStatusLabel(selectedOrder.status)}
                       </span>
                     </div>
-                    {selectedOrder.subtotal !== undefined && (
+                    {(() => {
+                      // IMPORTANT: Calculate subtotal from items (rounded) and taxes to match totalPrice
+                      // - totalPrice = tax-inclusive total (stored in database, what customer sees and pays)
+                      // - subtotal = sum of item prices (rounded, without tax) - for display only
+                      // - taxes = calculated to ensure subtotal + taxes = totalPrice
+                      const totalPrice = Number(selectedOrder.totalPrice || 0);
+                      
+                      // Calculate total tax percentage from restaurant settings
+                      const totalTaxPercentage = restaurantTaxes.reduce((sum, tax) => {
+                        return sum + (tax.percentage || 0);
+                      }, 0);
+                      
+                      // Calculate subtotal from sum of all items (rounded, without tax)
+                      const subtotalFromItems = selectedOrder.items.reduce((sum, item) => {
+                        const itemPriceInclusive = Number(item.price);
+                        const itemPriceWithoutTax = totalTaxPercentage > 0
+                          ? itemPriceInclusive / (1 + totalTaxPercentage / 100)
+                          : itemPriceInclusive;
+                        // Round to nearest integer for each item total
+                        return sum + Math.round(itemPriceWithoutTax * item.quantity);
+                      }, 0);
+                      
+                      // Use rounded subtotal from items
+                      const subtotal = subtotalFromItems;
+                      
+                      // Calculate taxes to ensure subtotal + taxes = totalPrice (exact match)
+                      // Distribute the tax difference proportionally across all taxes
+                      const calculatedTaxAmounts = restaurantTaxes.map((tax) => {
+                        return subtotal * ((tax.percentage || 0) / 100);
+                      });
+                      const totalCalculatedTaxes = calculatedTaxAmounts.reduce((sum, amount) => sum + amount, 0);
+                      const taxDifference = totalPrice - subtotal - totalCalculatedTaxes;
+                      
+                      // Calculate taxes with adjustment to match totalPrice exactly
+                      const calculatedTaxes = restaurantTaxes.map((tax, index) => {
+                        const baseTaxAmount = calculatedTaxAmounts[index];
+                        // Distribute the difference proportionally
+                        const adjustedTaxAmount = totalCalculatedTaxes > 0
+                          ? baseTaxAmount + (taxDifference * (baseTaxAmount / totalCalculatedTaxes))
+                          : baseTaxAmount;
+                        return {
+                          name: tax.name || "",
+                          nameAr: tax.nameAr || tax.name || "",
+                          percentage: tax.percentage || 0,
+                          amount: adjustedTaxAmount,
+                        };
+                      });
+
+                      return (
+                        <>
+                          {/* Always show subtotal (calculated from totalPrice) */}
                       <div className="flex justify-between">
                         <span className="text-gray-600 dark:text-gray-400">
                           {isRTL ? "المجموع الفرعي:" : "Subtotal:"}
                         </span>
                         <span className="font-medium text-gray-900 dark:text-white">
                           {(() => {
-                            const baseSubtotal = Number(selectedOrder.subtotal);
                             const converted = calculateTotalInCurrency(
-                              baseSubtotal,
+                                  subtotal,
                               selectedPaymentCurrency
                             );
                             return formatCurrencyWithLanguage(
@@ -3019,10 +3360,9 @@ export default function OrdersPage() {
                           })()}
                         </span>
                       </div>
-                    )}
-                    {selectedOrder.taxes && selectedOrder.taxes.length > 0 && (
+                          {calculatedTaxes.length > 0 && (
                       <>
-                        {selectedOrder.taxes.map((tax, index) => (
+                              {calculatedTaxes.map((tax, index) => (
                           <div key={index} className="flex justify-between">
                             <span className="text-gray-600 dark:text-gray-400">
                               {isRTL ? tax.nameAr || tax.name : tax.name} (
@@ -3030,9 +3370,8 @@ export default function OrdersPage() {
                             </span>
                             <span className="font-medium text-gray-900 dark:text-white">
                               {(() => {
-                                const baseTaxAmount = tax.amount;
                                 const converted = calculateTotalInCurrency(
-                                  baseTaxAmount,
+                                        tax.amount,
                                   selectedPaymentCurrency
                                 );
                                 return formatCurrencyWithLanguage(
@@ -3046,9 +3385,9 @@ export default function OrdersPage() {
                         ))}
                       </>
                     )}
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0 pt-2 border-t border-gray-200 dark:border-gray-600">
-                      <div className="flex items-center gap-2 w-full sm:w-auto">
-                        <span className="text-gray-600 dark:text-gray-400 font-medium">
+                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0 pt-2 border-t border-gray-200 dark:border-gray-600">
+                            <div className="flex items-center gap-2 w-full sm:w-auto">
+                              <span className="text-gray-600 dark:text-gray-400 font-medium">
                           {isRTL ? "المجموع:" : "Total:"}
                         </span>
                         {/* Currency Selector */}
@@ -3064,7 +3403,7 @@ export default function OrdersPage() {
                                   : e.target.value
                               )
                             }
-                            className="px-1.5 sm:px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent flex-shrink-0"
+                                  className="px-1.5 sm:px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent flex-shrink-0"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <option value={restaurantCurrency}>
@@ -3081,12 +3420,11 @@ export default function OrdersPage() {
                           </select>
                         )}
                       </div>
-                      <div className="text-right sm:text-right w-full sm:w-auto">
-                        <span className="font-bold text-base sm:text-lg text-gray-900 dark:text-white">
+                            <div className="text-right sm:text-right w-full sm:w-auto">
+                              <span className="font-bold text-base sm:text-lg text-gray-900 dark:text-white">
                           {(() => {
-                            const baseTotal = Number(selectedOrder.totalPrice);
                             const converted = calculateTotalInCurrency(
-                              baseTotal,
+                                    totalPrice,
                               selectedPaymentCurrency
                             );
                             return formatCurrencyWithLanguage(
@@ -3101,7 +3439,7 @@ export default function OrdersPage() {
                             <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                               {isRTL ? "المجموع الأصلي:" : "Original:"}{" "}
                               {formatCurrencyWithLanguage(
-                                Number(selectedOrder.totalPrice),
+                                        totalPrice,
                                 restaurantCurrency ||
                                   selectedOrder.currency ||
                                   "USD",
@@ -3111,6 +3449,9 @@ export default function OrdersPage() {
                           )}
                       </div>
                     </div>
+                        </>
+                      );
+                    })()}
                     <div className="flex justify-between">
                       <span className="text-gray-600 dark:text-gray-400">
                         {isRTL ? "الوقت:" : "Time:"}
@@ -3235,8 +3576,8 @@ export default function OrdersPage() {
                             }`}
                           >
                             <td className="py-2 sm:py-3 text-center px-2 sm:px-3">
-                              <div className="flex items-center space-x-2">
-                                <div>
+                              <div className="flex items-center justify-center space-x-2">
+                                <div className="relative">
                                   {getItemCategory(item) && (
                                     <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">
                                       {getItemCategory(item)}
@@ -3245,6 +3586,16 @@ export default function OrdersPage() {
                                   <p className="font-medium text-gray-900 dark:text-white">
                                     {getItemName(item)}
                                   </p>
+                                  {/* Discount Badge - Use stored item.discount if available, otherwise use menuItem.discount */}
+                                  {!item.isCustomItem &&
+                                    ((item.discount && item.discount > 0) ||
+                                      (item.menuItem &&
+                                        item.menuItem.discount &&
+                                        item.menuItem.discount > 0)) && (
+                                      <span className="absolute -top-1 -right-1 bg-red-500/80 text-white text-[9px] px-1 py-0.5 rounded-full font-medium shadow-sm z-10 whitespace-nowrap">
+                                        {(item.discount || item.menuItem?.discount || 0)}%
+                                      </span>
+                                    )}
                                 </div>
                                 {isNewItem && (
                                   <span className="bg-blue-500 text-white text-xs px-2 py-1 rounded-full font-medium animate-pulse">
@@ -3283,17 +3634,83 @@ export default function OrdersPage() {
                             </td>
                             <td className="text-center py-3 px-3 font-medium text-gray-900 dark:text-white">
                               {(() => {
-                                const basePrice =
-                                  Number(item.price) * item.quantity;
+                                // item.price is TAX-INCLUSIVE (stored in database, AFTER discount if any)
+                                // Calculate total tax percentage from restaurant settings
+                                const totalTaxPercentage = restaurantTaxes.reduce((sum, tax) => {
+                                  return sum + (tax.percentage || 0);
+                                }, 0);
+                                
+                                // Check if item has discount for display purposes
+                                const itemDiscount = item.discount || (item.menuItem?.discount || 0);
+                                const hasDiscount =
+                                  !item.isCustomItem &&
+                                  itemDiscount > 0 &&
+                                  item.menuItem?.price;
+
+                                if (hasDiscount && item.menuItem?.price) {
+                                  // For items with discount:
+                                  // - item.price = tax-inclusive price AFTER discount (what customer pays)
+                                  // - item.menuItem.price = original tax-inclusive price (before discount)
+                                  const discountedPriceInclusive = Number(item.price); // Already includes discount and tax
+                                  const originalPriceInclusive = Number(item.menuItem.price); // Original price with tax
+                                  
+                                  // Calculate totals (per item * quantity)
+                                  const discountedTotal = discountedPriceInclusive * item.quantity;
+                                  const originalTotal = originalPriceInclusive * item.quantity;
+                                  
+                                  // Display: original price (strikethrough) and discounted price (red, what customer pays)
+                                  const originalConverted = calculateTotalInCurrency(
+                                    originalTotal,
+                                    selectedPaymentCurrency
+                                  );
+                                  const originalPriceDisplay = formatCurrencyWithLanguage(
+                                    originalConverted.amount,
+                                    originalConverted.currency,
+                                    language
+                                  );
+
+                                  const discountedConverted = calculateTotalInCurrency(
+                                    discountedTotal,
+                                    selectedPaymentCurrency
+                                  );
+                                  const discountedPriceDisplay = formatCurrencyWithLanguage(
+                                    discountedConverted.amount,
+                                    discountedConverted.currency,
+                                    language
+                                  );
+
+                                  // Display original price (tax-inclusive, before discount) with strikethrough and discounted price (tax-inclusive, after discount) in red
+                                  return (
+                                    <div className="flex items-center justify-center gap-2">
+                                      <span className="line-through text-gray-400 dark:text-gray-500 text-xs">
+                                        {originalPriceDisplay}
+                                      </span>
+                                      <span className="text-red-600 dark:text-red-400 font-semibold">
+                                        {discountedPriceDisplay}
+                                      </span>
+                                    </div>
+                                  );
+                                }
+
+                                // No discount - display price without tax (rounded to nearest integer) for consistency with subtotal calculation
+                                const itemPriceInclusive = Number(item.price);
+                                const itemPriceWithoutTax = totalTaxPercentage > 0
+                                  ? itemPriceInclusive / (1 + totalTaxPercentage / 100)
+                                  : itemPriceInclusive;
+                                
+                                // Round to nearest integer for each item total (without tax) * quantity
+                                const displayPrice = Math.round(itemPriceWithoutTax * item.quantity);
+                                
                                 const converted = calculateTotalInCurrency(
-                                  basePrice,
+                                  displayPrice,
                                   selectedPaymentCurrency
                                 );
-                                return formatCurrencyWithLanguage(
+                                const currentPriceDisplay = formatCurrencyWithLanguage(
                                   converted.amount,
                                   converted.currency,
                                   language
                                 );
+                                return <span>{currentPriceDisplay}</span>;
                               })()}
                             </td>
                           </tr>
@@ -3301,7 +3718,57 @@ export default function OrdersPage() {
                       })}
                     </tbody>
                     <tfoot>
-                      {selectedOrder.subtotal !== undefined && (
+                      {(() => {
+                        // IMPORTANT: Calculate subtotal from items (rounded) and taxes to match totalPrice
+                        // - totalPrice = tax-inclusive total (stored in database, what customer sees and pays)
+                        // - subtotal = sum of item prices (rounded, without tax) - for display only
+                        // - taxes = calculated to ensure subtotal + taxes = totalPrice
+                        const totalPrice = Number(selectedOrder.totalPrice || 0);
+                        
+                        // Calculate total tax percentage from restaurant settings
+                        const totalTaxPercentage = restaurantTaxes.reduce((sum, tax) => {
+                          return sum + (tax.percentage || 0);
+                        }, 0);
+                        
+                        // Calculate subtotal from sum of all items (rounded, without tax)
+                        const subtotalFromItems = selectedOrder.items.reduce((sum, item) => {
+                          const itemPriceInclusive = Number(item.price);
+                          const itemPriceWithoutTax = totalTaxPercentage > 0
+                            ? itemPriceInclusive / (1 + totalTaxPercentage / 100)
+                            : itemPriceInclusive;
+                          // Round to nearest integer for each item total
+                          return sum + Math.round(itemPriceWithoutTax * item.quantity);
+                        }, 0);
+                        
+                        // Use rounded subtotal from items
+                        const subtotal = subtotalFromItems;
+                        
+                        // Calculate taxes to ensure subtotal + taxes = totalPrice (exact match)
+                        // Distribute the tax difference proportionally across all taxes
+                        const calculatedTaxAmounts = restaurantTaxes.map((tax) => {
+                          return subtotal * ((tax.percentage || 0) / 100);
+                        });
+                        const totalCalculatedTaxes = calculatedTaxAmounts.reduce((sum, amount) => sum + amount, 0);
+                        const taxDifference = totalPrice - subtotal - totalCalculatedTaxes;
+                        
+                        // Calculate taxes with adjustment to match totalPrice exactly
+                        const calculatedTaxes = restaurantTaxes.map((tax, index) => {
+                          const baseTaxAmount = calculatedTaxAmounts[index];
+                          // Distribute the difference proportionally
+                          const adjustedTaxAmount = totalCalculatedTaxes > 0
+                            ? baseTaxAmount + (taxDifference * (baseTaxAmount / totalCalculatedTaxes))
+                            : baseTaxAmount;
+                          return {
+                            name: tax.name || "",
+                            nameAr: tax.nameAr || tax.name || "",
+                            percentage: tax.percentage || 0,
+                            amount: adjustedTaxAmount,
+                          };
+                        });
+
+                        return (
+                          <>
+                            {/* Always show subtotal (calculated from totalPrice) */}
                         <tr className="border-t border-gray-200 dark:border-gray-700">
                           <td
                             colSpan={3}
@@ -3311,11 +3778,8 @@ export default function OrdersPage() {
                           </td>
                           <td className="text-right py-2 px-3 text-sm text-gray-700 dark:text-gray-300">
                             {(() => {
-                              const baseSubtotal = Number(
-                                selectedOrder.subtotal
-                              );
                               const converted = calculateTotalInCurrency(
-                                baseSubtotal,
+                                    subtotal,
                                 selectedPaymentCurrency
                               );
                               return formatCurrencyWithLanguage(
@@ -3326,11 +3790,9 @@ export default function OrdersPage() {
                             })()}
                           </td>
                         </tr>
-                      )}
-                      {selectedOrder.taxes &&
-                        selectedOrder.taxes.length > 0 && (
+                            {calculatedTaxes.length > 0 && (
                           <>
-                            {selectedOrder.taxes.map((tax, index) => (
+                                {calculatedTaxes.map((tax, index) => (
                               <tr
                                 key={index}
                                 className="border-t border-gray-200 dark:border-gray-700"
@@ -3344,9 +3806,8 @@ export default function OrdersPage() {
                                 </td>
                                 <td className="text-right py-2 px-3 text-sm text-gray-600 dark:text-gray-400">
                                   {(() => {
-                                    const baseTaxAmount = tax.amount;
                                     const converted = calculateTotalInCurrency(
-                                      baseTaxAmount,
+                                          tax.amount,
                                       selectedPaymentCurrency
                                     );
                                     return formatCurrencyWithLanguage(
@@ -3403,9 +3864,8 @@ export default function OrdersPage() {
                         </td>
                         <td className="text-right py-3 px-3 font-bold text-lg text-gray-900 dark:text-white">
                           {(() => {
-                            const baseTotal = Number(selectedOrder.totalPrice);
                             const converted = calculateTotalInCurrency(
-                              baseTotal,
+                                    totalPrice,
                               selectedPaymentCurrency
                             );
                             return formatCurrencyWithLanguage(
@@ -3419,7 +3879,7 @@ export default function OrdersPage() {
                               <div className="text-xs font-normal text-gray-500 dark:text-gray-400 mt-1">
                                 (
                                 {formatCurrencyWithLanguage(
-                                  Number(selectedOrder.totalPrice),
+                                  totalPrice,
                                   restaurantCurrency ||
                                     selectedOrder.currency ||
                                     "USD",
@@ -3430,35 +3890,37 @@ export default function OrdersPage() {
                             )}
                         </td>
                       </tr>
+                          </>
+                        );
+                      })()}
                     </tfoot>
                   </table>
                 </div>
               </div>
 
-              {/* Status Update */}
-              <div
-                className={` w-full flex flex-col md:flex-row ${isRTL ? "flex-row-reverse" : "flex-row"} justify-between gap-3`}
-              >
-                <div className="flex gap-3">
+              {/* Action Buttons */}
+              <div className="w-full border-t border-gray-200 dark:border-gray-700 pt-4 mt-4 space-y-4">
+                {/* Primary Actions Row */}
+                <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
                   <button
                     onClick={() => handleSendToKitchen(selectedOrder.id)}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-200 shadow-sm hover:shadow-md font-medium text-sm sm:text-base"
                   >
                     <svg
-                      className="w-5 h-5"
+                      className="w-5 h-5 flex-shrink-0"
                       fill="currentColor"
                       viewBox="0 0 24 24"
                     >
                       <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.890-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
                     </svg>
-                    {isRTL ? "إرسال إلى المطبخ" : "Send to Kitchen"}
+                    <span className="whitespace-nowrap">{isRTL ? "إرسال إلى المطبخ" : "Send to Kitchen"}</span>
                   </button>
                   <button
                     onClick={() => handlePrintInvoice(selectedOrder)}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 shadow-sm hover:shadow-md font-medium text-sm sm:text-base"
                   >
                     <svg
-                      className="w-5 h-5"
+                      className="w-5 h-5 flex-shrink-0"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -3470,10 +3932,12 @@ export default function OrdersPage() {
                         d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
                       />
                     </svg>
-                    {isRTL ? "طباعة الفاتورة" : "Print Invoice"}
+                    <span className="whitespace-nowrap">{isRTL ? "طباعة الفاتورة" : "Print Invoice"}</span>
                   </button>
                 </div>
-                <div className="flex justify-between md:justify-start gap-3 flex-wrap">
+
+                {/* Status and Actions Row */}
+                <div className="flex flex-col sm:flex-row gap-3 flex-wrap items-stretch sm:items-center">
                   <select
                     value={selectedOrder.status}
                     onChange={(e) => {
@@ -3483,7 +3947,7 @@ export default function OrdersPage() {
                         status: e.target.value,
                       });
                     }}
-                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    className="flex-1 sm:flex-initial min-w-[200px] px-4 py-2.5 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-medium text-sm sm:text-base transition-all duration-200 hover:border-gray-400 dark:hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                     disabled={
                       selectedOrder.status === "CANCELLED" ||
                       selectedOrder.status === "COMPLETED"
@@ -3499,8 +3963,43 @@ export default function OrdersPage() {
                       </option>
                     ))}
                   </select>
+                  
                   {selectedOrder.status !== "CANCELLED" &&
                     selectedOrder.status !== "COMPLETED" && (
+                      <div className="flex flex-col sm:flex-row gap-3 flex-1 sm:flex-initial">
+                        <button
+                          onClick={() => {
+                            if (
+                              confirm(
+                                isRTL
+                                  ? "هل تريد تعيين هذا الطلب ك مكتمل (مدفوع)؟"
+                                  : "Do you want to mark this order as completed (paid)?"
+                              )
+                            ) {
+                              updateOrderStatus(selectedOrder.id, "COMPLETED");
+                              setSelectedOrder({
+                                ...selectedOrder,
+                                status: "COMPLETED",
+                              });
+                            }
+                          }}
+                          className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-all duration-200 shadow-sm hover:shadow-md font-medium text-sm sm:text-base"
+                        >
+                          <svg
+                            className="w-5 h-5 flex-shrink-0"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                            />
+                          </svg>
+                          <span className="whitespace-nowrap">{isRTL ? "اكمال الطلب (مدفوع)" : "Mark as Completed (Paid)"}</span>
+                        </button>
                       <button
                         onClick={() => {
                           if (
@@ -3517,10 +4016,10 @@ export default function OrdersPage() {
                             });
                           }
                         }}
-                        className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors flex items-center gap-2"
+                          className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-all duration-200 shadow-sm hover:shadow-md font-medium text-sm sm:text-base"
                       >
                         <svg
-                          className="w-5 h-5"
+                            className="w-5 h-5 flex-shrink-0"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -3532,14 +4031,16 @@ export default function OrdersPage() {
                             d="M6 18L18 6M6 6l12 12"
                           />
                         </svg>
-                        {isRTL ? "إلغاء الطلب" : "Cancel Order"}
+                          <span className="whitespace-nowrap">{isRTL ? "إلغاء الطلب" : "Cancel Order"}</span>
                       </button>
+                      </div>
                     )}
+                  
                   <button
                     onClick={closeOrderModal}
-                    className="px-4 py-2 bg-gray-300 dark:bg-gray-600 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors"
+                    className="flex-1 sm:flex-initial inline-flex items-center justify-center px-4 py-2.5 bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-300 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md font-medium text-sm sm:text-base"
                   >
-                    {isRTL ? "إغلاق" : "Close"}
+                    <span className="whitespace-nowrap">{isRTL ? "إغلاق" : "Close"}</span>
                   </button>
                 </div>
               </div>

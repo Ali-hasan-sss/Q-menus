@@ -197,7 +197,7 @@ export function KitchenSectionsManager() {
               onChange={(e) =>
                 setNewSection({ ...newSection, nameAr: e.target.value })
               }
-              placeholder={isRTL ? "مثال: المطبخ الساخن" : "e.g., Hot Kitchen"}
+              placeholder={isRTL ? "مثال: قسم المقالي" : "e.g., Kitchen Section"}
             />
           </div>
           <div>

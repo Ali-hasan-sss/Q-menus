@@ -229,13 +229,16 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
         // Check if this is a quick order (created by cashier)
         const isQuickOrder = data.order.tableNumber === "QUICK";
 
-        // Increment new orders count (including quick orders)
-        setNewOrdersCount((prev) => prev + 1);
+        // Skip notifications for quick orders (no sound, no count increment)
+        if (!isQuickOrder) {
+          // Increment new orders count (only for non-quick orders)
+          setNewOrdersCount((prev) => prev + 1);
 
-        // Play notification sound for all new orders (including quick orders)
-        playNewOrderSound();
+          // Play notification sound (only for non-quick orders)
+          playNewOrderSound();
+        }
 
-        // Dispatch event for UI updates
+        // Dispatch event for UI updates (always, including quick orders)
         window.dispatchEvent(new CustomEvent("newOrder", { detail: data }));
       } else {
         // Order creation failed - no sound, no count increment

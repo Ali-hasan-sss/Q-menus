@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -26,6 +26,13 @@ export function EmailVerificationModal({
   const [verificationCode, setVerificationCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
+
+  // Reset verification code when modal opens or closes
+  useEffect(() => {
+    if (!isOpen) {
+      setVerificationCode("");
+    }
+  }, [isOpen]);
 
   const handleVerify = async () => {
     if (!email) {
@@ -53,23 +60,35 @@ export function EmailVerificationModal({
       });
 
       if (response.data.success) {
-        showToast(
-          isRTL
-            ? "تم التحقق من البريد الإلكتروني بنجاح"
-            : "Email verified successfully",
-          "success"
-        );
+        showToast(t("auth.success.emailVerified"), "success");
         onVerified();
         onClose();
       }
     } catch (error: any) {
       console.error("Verification error:", error);
-      const errorMessage =
-        error.response?.data?.message ||
-        (isRTL
-          ? "حدث خطأ أثناء التحقق من البريد الإلكتروني"
-          : "Error verifying email");
-      showToast(errorMessage, "error");
+      const errorCode = error.response?.data?.code;
+      const errorMessage = error.response?.data?.message;
+
+      // Translate error messages based on error code
+      let translatedMessage = errorMessage;
+      let translationKey = "";
+
+      if (errorCode === "INVALID_VERIFICATION_CODE") {
+        translationKey = "auth.error.verificationCodeInvalid";
+        translatedMessage = t(translationKey);
+      } else if (errorCode === "VERIFICATION_CODE_EXPIRED") {
+        translationKey = "auth.error.verificationCodeExpired";
+        translatedMessage = t(translationKey);
+      } else if (errorCode === "SERVER_ERROR") {
+        translationKey = "auth.error.serverError";
+        translatedMessage = t(translationKey);
+      } else {
+        // Fallback to original message or default error
+        translatedMessage =
+          errorMessage || t("auth.error.verificationCodeInvalid");
+      }
+
+      showToast(translatedMessage, "error");
     } finally {
       setLoading(false);
     }
@@ -90,21 +109,41 @@ export function EmailVerificationModal({
       });
 
       if (response.data.success) {
-        showToast(
-          isRTL
-            ? "تم إرسال رمز التحقق بنجاح"
-            : "Verification code sent successfully",
-          "success"
-        );
+        showToast(t("auth.error.resendCodeSuccess"), "success");
       }
     } catch (error: any) {
       console.error("Resend error:", error);
-      const errorMessage =
-        error.response?.data?.message ||
-        (isRTL
-          ? "حدث خطأ أثناء إرسال رمز التحقق"
-          : "Error sending verification code");
-      showToast(errorMessage, "error");
+      const errorCode = error.response?.data?.code;
+      const errorMessage = error.response?.data?.message;
+      const remainingMinutes = error.response?.data?.remainingMinutes;
+
+      // Translate error messages based on error code
+      let translatedMessage = errorMessage;
+      let translationKey = "";
+
+      if (errorCode === "RATE_LIMIT_EXCEEDED") {
+        if (remainingMinutes === 1) {
+          translationKey = "auth.error.rateLimitExceededSingular";
+          translatedMessage = t(translationKey);
+        } else {
+          translationKey = "auth.error.rateLimitExceeded";
+          translatedMessage = t(translationKey).replace(
+            "{minutes}",
+            remainingMinutes?.toString() || "1"
+          );
+        }
+      } else if (errorCode === "VERIFICATION_EMAIL_FAILED") {
+        translationKey = "auth.error.resendCodeFailed";
+        translatedMessage = t(translationKey);
+      } else if (errorCode === "SERVER_ERROR") {
+        translationKey = "auth.error.serverError";
+        translatedMessage = t(translationKey);
+      } else {
+        // Fallback to original message or default error
+        translatedMessage = errorMessage || t("auth.error.resendCodeFailed");
+      }
+
+      showToast(translatedMessage, "error");
     } finally {
       setResending(false);
     }
@@ -181,7 +220,7 @@ export function EmailVerificationModal({
         <div className="text-center text-sm text-gray-500 dark:text-gray-400">
           <p>
             {isRTL
-              ? "لم تستلم الرمز؟ تحقق من مجلد الرسائل المزعجة أو"
+              ? "لم تستلم الرمز؟ تحقق من مجلد الرسائل غير المرغوب بها في بريدك أو"
               : "Didn't receive the code? Check your spam folder or"}
           </p>
           <button

@@ -59,7 +59,8 @@ api.interceptors.response.use(
       // Don't redirect if:
       // - On public pages
       // - Request was for notifications (handled by NotificationContext with retry)
-      const isNotificationRequest = error.config?.url?.includes("/notifications");
+      const isNotificationRequest =
+        error.config?.url?.includes("/notifications");
 
       if (
         typeof window !== "undefined" &&
@@ -207,6 +208,7 @@ export const endpoints = {
     restaurant: (restaurantId: string) => `/public/restaurant/${restaurantId}`,
     health: "/public/health",
     plans: "/public/plans",
+    contact: "/public/contact",
   },
 
   // Sections

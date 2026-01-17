@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -12,17 +12,29 @@ interface ForgotPasswordModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (email: string) => void;
+  initialEmail?: string;
 }
 
 export function ForgotPasswordModal({
   isOpen,
   onClose,
   onSuccess,
+  initialEmail = "",
 }: ForgotPasswordModalProps) {
   const { t, isRTL } = useLanguage();
   const { showToast } = useToast();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Initialize email when modal opens or initialEmail changes
+  useEffect(() => {
+    if (isOpen && initialEmail) {
+      setEmail(initialEmail);
+    } else if (!isOpen) {
+      // Reset email when modal closes
+      setEmail("");
+    }
+  }, [isOpen, initialEmail]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,12 +67,41 @@ export function ForgotPasswordModal({
       }
     } catch (error: any) {
       console.error("Forgot password error:", error);
-      const errorMessage =
-        error.response?.data?.message ||
-        (isRTL
-          ? "حدث خطأ أثناء إرسال رمز إعادة التعيين"
-          : "Error sending reset code");
-      showToast(errorMessage, "error");
+      const errorCode = error.response?.data?.code;
+      const errorMessage = error.response?.data?.message;
+      const remainingMinutes = error.response?.data?.remainingMinutes;
+      
+      // Translate error messages based on error code
+      let translatedMessage = errorMessage;
+      
+      if (errorCode === "USER_NOT_FOUND") {
+        translatedMessage = t("auth.error.userNotFound");
+      } else if (errorCode === "RATE_LIMIT_EXCEEDED") {
+        if (remainingMinutes === 1) {
+          translatedMessage = t("auth.error.rateLimitExceededSingular");
+        } else {
+          translatedMessage = t("auth.error.rateLimitExceeded").replace(
+            "{minutes}",
+            remainingMinutes?.toString() || "1"
+          );
+        }
+      } else if (errorCode === "PASSWORD_RESET_EMAIL_FAILED") {
+        translatedMessage = t("auth.error.verificationCodeFailed");
+      } else if (errorCode === "SERVER_ERROR") {
+        translatedMessage = t("auth.error.serverError");
+      } else if (errorMessage && (errorMessage.toLowerCase().includes("user not found") || errorMessage.toLowerCase().includes("المستخدم غير موجود"))) {
+        // Fallback: if message contains "user not found" but no code
+        translatedMessage = t("auth.error.userNotFound");
+      } else {
+        // Fallback to original message or default error
+        translatedMessage =
+          errorMessage ||
+          (isRTL
+            ? "حدث خطأ أثناء إرسال رمز إعادة التعيين"
+            : "Error sending reset code");
+      }
+      
+      showToast(translatedMessage, "error");
     } finally {
       setLoading(false);
     }

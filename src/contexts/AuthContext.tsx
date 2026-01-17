@@ -105,7 +105,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       currentPath.startsWith("/order/") ||
       currentPath.startsWith("/auth/login") ||
       currentPath.startsWith("/auth/register") ||
-      currentPath.startsWith("/kitchen/login");
+      currentPath.startsWith("/kitchen/login") ||
+      currentPath === "/contact" ||
+      currentPath.startsWith("/contact");
 
     // If user is authenticated and on login page, redirect them
     if (
@@ -131,9 +133,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       currentPath.startsWith("/dashboard") ||
       currentPath.startsWith("/kitchen");
 
-    // Always check authentication, even for public pages, to maintain session state
+    // Only check authentication for protected pages to avoid 401 errors on public pages
+    // For public pages, we skip the auth check to avoid unnecessary API calls and 401 errors
+    if (!isProtectedPage) {
+      // Public page - skip auth check to avoid 401 errors
+      // User state will remain null for public pages unless already set
+      console.log("🌐 Public page, skipping auth check to avoid 401 errors");
+      setLoading(false);
+      return;
+    }
+
+    // Check authentication only for protected pages (dashboard, admin, kitchen)
     try {
-      console.log("🔐 Checking auth with httpOnly cookie");
+      console.log("🔐 Checking auth with httpOnly cookie (protected page)");
       console.log("📡 Fetching user profile...");
       const response = await api.get("/auth/me");
       console.log("✅ User profile fetched:", response.data.data.user);
@@ -281,8 +293,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         headers: error.response?.headers,
         data: error.response?.data,
       });
-      const message = error.response?.data?.message || "Login failed";
-      toast.error(message);
+
+      // Don't show toast here - let the login page component handle translation
+      // The error message will be translated in the login page component
       throw error;
     } finally {
       setLoading(false);

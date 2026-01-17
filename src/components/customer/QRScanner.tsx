@@ -19,10 +19,22 @@ export default function QRScanner({ restaurantId }: QRScannerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const jsQRRef = useRef<any>(null);
 
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [currentCamera, setCurrentCamera] = useState<"back" | "front">("back");
+  const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
+
+  // Load jsQR dynamically to avoid SSR issues
+  useEffect(() => {
+    if (typeof window !== "undefined" && !jsQRRef.current) {
+      import("jsqr").then((module) => {
+        jsQRRef.current = module.default;
+      });
+    }
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -31,23 +43,144 @@ export default function QRScanner({ restaurantId }: QRScannerProps) {
     };
   }, []);
 
+  // Start QR detection when video is ready (only once)
+  useEffect(() => {
+    if (isScanning && videoRef.current && streamRef.current && !intervalRef.current) {
+      const video = videoRef.current;
+      
+      // Wait for video to be ready before starting detection
+      const handleCanPlay = () => {
+        console.log("Video can play, starting QR detection");
+        if (!intervalRef.current) {
+          startQRDetection();
+        }
+      };
+      
+      if (video.readyState >= 2) {
+        // Video is already ready
+        startQRDetection();
+      } else {
+        // Wait for video to be ready
+        video.addEventListener("canplay", handleCanPlay, { once: true });
+        
+        // Fallback timeout
+        const timeout = setTimeout(() => {
+          if (!intervalRef.current && video.readyState >= 2) {
+            console.log("Starting QR detection (fallback timeout)");
+            startQRDetection();
+          }
+        }, 1000);
+        
+        return () => {
+          video.removeEventListener("canplay", handleCanPlay);
+          clearTimeout(timeout);
+        };
+      }
+    }
+  }, [isScanning]);
+
   const startScanning = async () => {
     try {
       setError(null);
+      console.log("Starting camera...");
 
-      // Request camera permission
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" }, // Use back camera on mobile
-      });
+      // Request camera permission - explicitly use back camera (environment)
+      // This ensures we use the rear camera on mobile devices for QR scanning
+      const constraints: MediaStreamConstraints = {
+        video: {
+          facingMode: currentCamera === "back" ? "environment" : "user",
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+      };
 
+      // Try to get devices list to ensure we're using the correct camera
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(
+          (device) => device.kind === "videoinput"
+        );
+        
+        // Store available cameras for switching
+        setAvailableCameras(videoDevices);
+        
+        if (currentCamera === "back") {
+          // Find back camera
+          const backCamera = videoDevices.find(
+            (device) =>
+              device.label.toLowerCase().includes("back") ||
+              device.label.toLowerCase().includes("rear") ||
+              device.label.toLowerCase().includes("environment")
+          );
+
+          if (backCamera && backCamera.deviceId) {
+            constraints.video = {
+              ...(constraints.video as MediaTrackConstraints),
+              deviceId: { exact: backCamera.deviceId },
+            };
+            console.log("Using back camera:", backCamera.label);
+          } else if (videoDevices.length > 1) {
+            constraints.video = {
+              ...(constraints.video as MediaTrackConstraints),
+              deviceId: { exact: videoDevices[1].deviceId },
+            };
+            console.log("Using second camera device (likely back camera)");
+          }
+        } else {
+          // Find front camera
+          const frontCamera = videoDevices.find(
+            (device) =>
+              device.label.toLowerCase().includes("front") ||
+              device.label.toLowerCase().includes("user") ||
+              device.label.toLowerCase().includes("facing")
+          );
+
+          if (frontCamera && frontCamera.deviceId) {
+            constraints.video = {
+              ...(constraints.video as MediaTrackConstraints),
+              deviceId: { exact: frontCamera.deviceId },
+            };
+            console.log("Using front camera:", frontCamera.label);
+          } else if (videoDevices.length > 0) {
+            constraints.video = {
+              ...(constraints.video as MediaTrackConstraints),
+              deviceId: { exact: videoDevices[0].deviceId },
+            };
+            console.log("Using first camera device (likely front camera)");
+          }
+        }
+      } catch (deviceError) {
+        console.warn("Could not enumerate devices, using facingMode:", deviceError);
+        // Fall back to facingMode if device enumeration fails
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      console.log("Camera stream obtained:", stream);
+
+      // Store stream in ref
+      streamRef.current = stream;
+
+      // Set scanning state to render video element
+      setIsScanning(true);
+      setHasPermission(true);
+
+      // Wait for React to render video element
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // Bind stream directly to video element (CRITICAL: do this after setIsScanning)
       if (videoRef.current) {
+        console.log("Binding stream to video element directly");
         videoRef.current.srcObject = stream;
-        streamRef.current = stream;
-        setIsScanning(true);
-        setHasPermission(true);
-
-        // Start QR code detection
-        startQRDetection();
+        
+        // Play video immediately
+        try {
+          await videoRef.current.play();
+          console.log("Video playing successfully");
+        } catch (playError) {
+          console.error("Error playing video:", playError);
+        }
+      } else {
+        console.error("Video ref is null after render");
       }
     } catch (err: any) {
       console.error("Camera access error:", err);
@@ -78,6 +211,99 @@ export default function QRScanner({ restaurantId }: QRScannerProps) {
     setIsScanning(false);
   };
 
+  const switchCamera = async () => {
+    if (!isScanning || !streamRef.current) {
+      console.warn("Cannot switch camera: not scanning or no stream");
+      return;
+    }
+
+    // If we don't have cameras list yet, try to get it
+    let camerasToUse = availableCameras;
+    if (camerasToUse.length < 2) {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(
+          (device) => device.kind === "videoinput"
+        );
+        if (videoDevices.length >= 2) {
+          setAvailableCameras(videoDevices);
+          camerasToUse = videoDevices;
+        } else {
+          console.warn("Less than 2 cameras available, cannot switch");
+          return;
+        }
+      } catch (err) {
+        console.error("Error enumerating devices for switch:", err);
+        return;
+      }
+    }
+
+    try {
+      // Stop current stream
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+      }
+
+      // Toggle camera
+      const newCamera = currentCamera === "back" ? "front" : "back";
+      setCurrentCamera(newCamera);
+
+      // Get constraints for new camera
+      const constraints: MediaStreamConstraints = {
+        video: {
+          facingMode: newCamera === "back" ? "environment" : "user",
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+      };
+
+      // Try to use specific device ID
+      const targetCamera = newCamera === "back"
+        ? camerasToUse.find(
+            (device: MediaDeviceInfo) =>
+              device.label.toLowerCase().includes("back") ||
+              device.label.toLowerCase().includes("rear") ||
+              device.label.toLowerCase().includes("environment")
+          ) || (camerasToUse.length > 1 ? camerasToUse[1] : camerasToUse[0])
+        : camerasToUse.find(
+            (device: MediaDeviceInfo) =>
+              device.label.toLowerCase().includes("front") ||
+              device.label.toLowerCase().includes("user") ||
+              device.label.toLowerCase().includes("facing")
+          ) || camerasToUse[0];
+
+      if (targetCamera && targetCamera.deviceId) {
+        constraints.video = {
+          ...(constraints.video as MediaTrackConstraints),
+          deviceId: { exact: targetCamera.deviceId },
+        };
+        console.log(`Switching to ${newCamera} camera:`, targetCamera.label);
+      }
+
+      // Get new stream
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      streamRef.current = stream;
+
+      // Update video element directly
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        try {
+          await videoRef.current.play();
+          console.log("Video playing after camera switch");
+        } catch (err) {
+          console.error("Error playing video after switch:", err);
+        }
+      }
+    } catch (err: any) {
+      console.error("Error switching camera:", err);
+      setError(
+        isRTL
+          ? "فشل في التبديل بين الكاميرات"
+          : "Failed to switch camera"
+      );
+    }
+  };
+
   const startQRDetection = () => {
     intervalRef.current = setInterval(() => {
       if (videoRef.current && canvasRef.current) {
@@ -85,33 +311,37 @@ export default function QRScanner({ restaurantId }: QRScannerProps) {
         const canvas = canvasRef.current;
         const context = canvas.getContext("2d");
 
-        if (context) {
+        if (context && video.readyState === video.HAVE_ENOUGH_DATA) {
           canvas.width = video.videoWidth;
           canvas.height = video.videoHeight;
           context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-          // Simple QR code detection (you might want to use a library like jsQR)
           const imageData = context.getImageData(
             0,
             0,
             canvas.width,
             canvas.height
           );
-          // For now, we'll use a simple approach - in production, use jsQR library
-          detectQRCode(imageData);
+
+          // Use jsQR library to detect QR code
+          if (jsQRRef.current) {
+            const code = jsQRRef.current(
+              imageData.data,
+              imageData.width,
+              imageData.height,
+              {
+                inversionAttempts: "dontInvert",
+              }
+            );
+
+            if (code && code.data) {
+              console.log("QR code detected:", code.data);
+              handleQRCodeDetected(code.data);
+            }
+          }
         }
       }
-    }, 1000); // Check every second
-  };
-
-  const detectQRCode = (imageData: ImageData) => {
-    // This is a simplified version. In production, use jsQR library:
-    // import jsQR from 'jsqr';
-    // const code = jsQR(imageData.data, imageData.width, imageData.height);
-
-    // For demo purposes, we'll simulate QR detection
-    // In real implementation, parse the QR code and extract tableNumber
-    console.log("QR detection running...");
+    }, 250); // Check every 250ms for better responsiveness
   };
 
   const handleQRCodeDetected = async (qrData: string) => {
@@ -305,19 +535,29 @@ export default function QRScanner({ restaurantId }: QRScannerProps) {
     );
   }
 
+  console.log("Rendering video scanner, isScanning:", isScanning, "stream:", !!streamRef.current, "video:", !!videoRef.current);
+  
   return (
-    <div className="min-h-screen bg-black relative">
+    <div className="fixed inset-0 z-[9999] bg-black" style={{ width: "100vw", height: "100vh" }}>
+      {/* Video element - must be below overlay with proper z-index */}
       <video
         ref={videoRef}
         autoPlay
         playsInline
         muted
-        className="w-full h-full object-cover"
+        className="absolute inset-0 w-full h-full object-cover"
+        style={{ 
+          width: "100%", 
+          height: "100%", 
+          objectFit: "cover",
+          zIndex: 0,
+          backgroundColor: "#000"
+        }}
       />
       <canvas ref={canvasRef} className="hidden" />
 
-      {/* Overlay with scanning frame */}
-      <div className="absolute inset-0 flex items-center justify-center">
+      {/* Overlay with scanning frame - must be above video */}
+      <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
         <div className="w-64 h-64 border-4 border-white border-dashed rounded-lg relative">
           <div className="absolute top-2 left-2 right-2 h-1 bg-white animate-pulse"></div>
           <div className="absolute bottom-2 left-2 right-2 h-1 bg-white animate-pulse"></div>
@@ -326,21 +566,55 @@ export default function QRScanner({ restaurantId }: QRScannerProps) {
         </div>
       </div>
 
-      {/* Instructions */}
-      <div className="absolute bottom-8 left-4 right-4 text-center">
+      {/* Instructions and Controls - must be above overlay */}
+      <div className="absolute bottom-8 left-4 right-4 text-center z-20 pointer-events-auto">
         <p
-          className="text-white text-lg font-medium mb-2"
+          className="text-white text-lg font-medium mb-3"
           dir={isRTL ? "rtl" : "ltr"}
         >
           {isRTL ? "وجه الكاميرا نحو رمز QR" : "Point camera at QR code"}
         </p>
-        <Button
-          onClick={stopScanning}
-          variant="outline"
-          className="bg-white text-black hover:bg-gray-100"
-        >
-          {isRTL ? "إلغاء" : "Cancel"}
-        </Button>
+        <div className="flex gap-3 justify-center items-center">
+          {/* Show switch button if we have multiple cameras OR if we're scanning (camera is active) */}
+          {(availableCameras.length > 1 || (isScanning && streamRef.current)) && (
+            <Button
+              onClick={switchCamera}
+              variant="outline"
+              className="bg-white/90 text-black hover:bg-white flex items-center gap-2"
+              title={isRTL 
+                ? `التبديل إلى الكاميرا ${currentCamera === "back" ? "الأمامية" : "الخلفية"}`
+                : `Switch to ${currentCamera === "back" ? "front" : "back"} camera`
+              }
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+              <span className="text-sm">
+                {isRTL 
+                  ? (currentCamera === "back" ? "أمامية" : "خلفية")
+                  : (currentCamera === "back" ? "Front" : "Back")
+                }
+              </span>
+            </Button>
+          )}
+          <Button
+            onClick={stopScanning}
+            variant="outline"
+            className="bg-white text-black hover:bg-gray-100"
+          >
+            {isRTL ? "إلغاء" : "Cancel"}
+          </Button>
+        </div>
       </div>
     </div>
   );
