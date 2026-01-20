@@ -686,7 +686,11 @@ export default function CustomerMenuPage() {
         // Don't set error state, just log it - currencies are optional
       }
     } catch (error: any) {
-      const message = error.response?.data?.message || "Failed to load menu";
+      let message = error.response?.data?.message || "Failed to load menu";
+      // Use Arabic message if available and user is using Arabic
+      if (error.response?.data?.messageAr && isRTL) {
+        message = error.response.data.messageAr;
+      }
       setError(message);
     } finally {
       setLoading(false);

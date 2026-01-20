@@ -34,6 +34,7 @@ interface User {
         name: string;
         nameAr?: string;
         type: string;
+        billingPeriod?: string;
         price: number;
         duration: number;
       };
@@ -46,6 +47,7 @@ interface Plan {
   name: string;
   nameAr?: string;
   type: string;
+  billingPeriod?: string;
   price: number;
   duration: number;
   maxCategories: number;
@@ -245,6 +247,17 @@ export default function UsersPage() {
     fetchPlans();
   }, []);
 
+  // Update selectedUser when users list changes (e.g., after canceling subscription)
+  useEffect(() => {
+    if (selectedUser && showViewSubscriptionsModal && users.length > 0) {
+      const updatedUser = users.find((u) => u.id === selectedUser.id);
+      if (updatedUser && JSON.stringify(updatedUser) !== JSON.stringify(selectedUser)) {
+        setSelectedUser(updatedUser);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [users, showViewSubscriptionsModal]);
+
   // Reset pagination when filters change
   useEffect(() => {
     if (searchTerm || roleFilter !== "ALL" || statusFilter !== "ALL") {
@@ -433,6 +446,45 @@ export default function UsersPage() {
         "error"
       );
     }
+  };
+
+  const handleCancelSubscription = async (subscriptionId: string) => {
+    showConfirm({
+      title: isRTL ? "إلغاء الاشتراك" : "Cancel Subscription",
+      message: isRTL
+        ? "هل أنت متأكد من إلغاء هذا الاشتراك؟"
+        : "Are you sure you want to cancel this subscription?",
+      confirmText: isRTL ? "إلغاء الاشتراك" : "Cancel Subscription",
+      cancelText: isRTL ? "رجوع" : "Go Back",
+      confirmVariant: "danger",
+      onConfirm: async () => {
+        try {
+          await api.put(`/admin/subscriptions/${subscriptionId}/cancel`);
+          showToast(
+            isRTL
+              ? "تم إلغاء الاشتراك بنجاح"
+              : "Subscription cancelled successfully",
+            "success"
+          );
+
+          // Refresh users data to show updated subscriptions
+          if (searchTerm || roleFilter !== "ALL" || statusFilter !== "ALL") {
+            await searchUsers(1, false);
+          } else {
+            await fetchUsers(1, false);
+          }
+          // selectedUser will be updated automatically via useEffect when users changes
+        } catch (error: any) {
+          showToast(
+            error.response?.data?.message ||
+              (isRTL
+                ? "حدث خطأ أثناء إلغاء الاشتراك"
+                : "Error cancelling subscription"),
+            "error"
+          );
+        }
+      },
+    });
   };
 
   const clearFilters = () => {
@@ -1325,8 +1377,15 @@ export default function UsersPage() {
                     {plans.map((plan) => (
                       <option key={plan.id} value={plan.id}>
                         {isRTL && plan.nameAr ? plan.nameAr : plan.name} -
-                        {plan.price} {isRTL ? "ل.س" : "SYP"} / {plan.duration}{" "}
-                        {isRTL ? "يوم" : "days"}
+                        {plan.price} {isRTL ? "ل.س" : "SYP"} /{" "}
+                        {plan.billingPeriod === "YEARLY"
+                          ? isRTL
+                            ? "سنوياً"
+                            : "yearly"
+                          : isRTL
+                            ? "شهرياً"
+                            : "monthly"}{" "}
+                        ({plan.duration} {isRTL ? "يوم" : "days"})
                       </option>
                     ))}
                   </select>
@@ -1526,8 +1585,15 @@ export default function UsersPage() {
                                           {subscription.plan.type} -{" "}
                                           {subscription.plan.price}{" "}
                                           {isRTL ? "ل.س" : "SYP"} /{" "}
-                                          {subscription.plan.duration}{" "}
-                                          {isRTL ? "يوم" : "days"}
+                                          {subscription.plan.billingPeriod === "YEARLY"
+                                            ? isRTL
+                                              ? "سنوياً"
+                                              : "yearly"
+                                            : isRTL
+                                              ? "شهرياً"
+                                              : "monthly"}{" "}
+                                          ({subscription.plan.duration}{" "}
+                                          {isRTL ? "يوم" : "days"})
                                         </p>
                                       </div>
                                     </div>
@@ -1577,6 +1643,37 @@ export default function UsersPage() {
                                       </span>
                                     </div>
                                   </div>
+
+                                  {/* Cancel Subscription Button */}
+                                  {subscription.status === "ACTIVE" && (
+                                    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+                                      <Button
+                                        variant="danger"
+                                        size="sm"
+                                        onClick={() =>
+                                          handleCancelSubscription(subscription.id)
+                                        }
+                                        className={`w-full flex items-center justify-center ${isRTL ? "flex-row-reverse" : "flex-row"}`}
+                                      >
+                                        <svg
+                                          className={`w-4 h-4 ${isRTL ? "ml-2" : "mr-2"}`}
+                                          fill="none"
+                                          viewBox="0 0 24 24"
+                                          stroke="currentColor"
+                                        >
+                                          <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M6 18L18 6M6 6l12 12"
+                                          />
+                                        </svg>
+                                        {isRTL
+                                          ? "إلغاء الاشتراك"
+                                          : "Cancel Subscription"}
+                                      </Button>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             ))}

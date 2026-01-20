@@ -19,6 +19,7 @@ interface Plan {
   nameAr: string;
   description: string;
   descriptionAr: string;
+  billingPeriod?: string;
   price: string;
   currency: string;
   duration: number;
@@ -55,6 +56,7 @@ export default function HomePage() {
   const router = useRouter();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedBillingPeriod, setSelectedBillingPeriod] = useState<string>("MONTHLY");
   const [contactSection, setContactSection] = useState<ContactSection | null>(
     null
   );
@@ -975,6 +977,32 @@ export default function HomePage() {
                     </>
                   )}
                 </h2>
+                
+                {/* Billing Period Tabs */}
+                <div className="flex justify-center mt-6 mb-4">
+                  <div className="inline-flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+                    <button
+                      onClick={() => setSelectedBillingPeriod("MONTHLY")}
+                      className={`px-6 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                        selectedBillingPeriod === "MONTHLY"
+                          ? "bg-white dark:bg-gray-600 text-tm-blue dark:text-tm-orange shadow-sm"
+                          : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                      }`}
+                    >
+                      {isRTL ? "شهري" : "Monthly"}
+                    </button>
+                    <button
+                      onClick={() => setSelectedBillingPeriod("YEARLY")}
+                      className={`px-6 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                        selectedBillingPeriod === "YEARLY"
+                          ? "bg-white dark:bg-gray-600 text-tm-blue dark:text-tm-orange shadow-sm"
+                          : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                      }`}
+                    >
+                      {isRTL ? "سنوي" : "Yearly"}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -985,7 +1013,17 @@ export default function HomePage() {
             </div>
           ) : (
             <div className="row grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-              {plans.map((plan, index) => (
+              {plans
+                .filter((plan) => {
+                  // Filter by billing period
+                  if (selectedBillingPeriod === "MONTHLY") {
+                    return plan.billingPeriod === "MONTHLY" || !plan.billingPeriod;
+                  } else if (selectedBillingPeriod === "YEARLY") {
+                    return plan.billingPeriod === "YEARLY";
+                  }
+                  return true;
+                })
+                .map((plan, index) => (
                 <div
                   key={plan.id}
                   className={`col-lg-3 ${index === 1 ? "lg:transform lg:scale-105" : ""} h-full`}
@@ -1011,13 +1049,22 @@ export default function HomePage() {
                       <em className="text-3xl font-bold text-tm-blue">
                         {formatCurrency(Number(plan.price), plan.currency)}
                       </em>
-                      {plan.duration > 0 && (
-                        <span className="block text-gray-500 dark:text-gray-400 text-sm mt-2">
-                          {isRTL
-                            ? `لمدة ${plan.duration} يوم`
-                            : `for ${plan.duration} days`}
-                        </span>
-                      )}
+                      <span className="block text-gray-500 dark:text-gray-400 text-sm mt-2">
+                        {plan.billingPeriod === "YEARLY"
+                          ? isRTL
+                            ? "سنوياً"
+                            : "per year"
+                          : isRTL
+                            ? "شهرياً"
+                            : "per month"}
+                        {plan.duration > 0 && (
+                          <span className="ml-1">
+                            ({isRTL
+                              ? `لمدة ${plan.duration} يوم`
+                              : `for ${plan.duration} days`})
+                          </span>
+                        )}
+                      </span>
                     </div>
 
                     <ul className="space-y-3 mb-8 flex-1">
@@ -1093,6 +1140,100 @@ export default function HomePage() {
                           </span>
                         </li>
                       )}
+                      {plan.features && plan.features.length > 0 && plan.features
+                        .filter((feature) => {
+                          const featureLower = feature.toLowerCase();
+                          
+                          // Always show special features
+                          if (feature === "KITCHEN_DISPLAY_SYSTEM" || 
+                              feature === "External Orders" || 
+                              feature === "Priority Support") {
+                            return true;
+                          }
+                          
+                          // Skip features that are already displayed as static items
+                          // Skip if it matches maxTables, maxCategories, or maxItems (already shown above)
+                          if (feature.includes(`${plan.maxTables} Tables`) ||
+                              feature.includes(`${plan.maxCategories} Categories`) ||
+                              feature.includes(`${plan.maxItems} Items per Category`) ||
+                              feature.includes(`${plan.maxItems} Items`)) {
+                            return false;
+                          }
+                          
+                          // Skip Custom Theme if canCustomizeTheme is true (already shown above)
+                          if (plan.canCustomizeTheme && (
+                            featureLower.includes("custom theme") ||
+                            featureLower.includes("theme") ||
+                            feature === "Custom Theme"
+                          )) {
+                            return false;
+                          }
+                          
+                          return true;
+                        })
+                        .map((feature, idx) => {
+                          // Translate specific features
+                          let displayFeature = feature;
+                          
+                          if (feature === "KITCHEN_DISPLAY_SYSTEM") {
+                            displayFeature = isRTL ? "لوحة المطبخ" : "Kitchen Display System";
+                          } else if (feature === "External Orders") {
+                            displayFeature = isRTL ? "طلبات خارجية" : "External Orders";
+                          } else if (feature === "Priority Support") {
+                            displayFeature = isRTL ? "دعم ذو أولوية" : "Priority Support";
+                          } else if (feature.includes("Unlimited Tables")) {
+                            displayFeature = isRTL ? "طاولات غير محدودة" : "Unlimited Tables";
+                          } else if (feature.includes("Unlimited Categories")) {
+                            displayFeature = isRTL ? "فئات غير محدودة" : "Unlimited Categories";
+                          } else if (feature.includes("Unlimited Items")) {
+                            displayFeature = isRTL ? "أصناف غير محدودة" : "Unlimited Items";
+                          } else if (feature.includes("Unlimited")) {
+                            displayFeature = isRTL ? feature.replace(/Unlimited/gi, "غير محدود") : feature;
+                          } else if (feature.includes("1 Month Duration")) {
+                            displayFeature = isRTL ? "مدة شهر واحد" : "1 Month Duration";
+                          } else if (feature.match(/\d+\s+Month\s+Duration/)) {
+                            const months = feature.match(/(\d+)\s+Month/)?.[1];
+                            displayFeature = isRTL 
+                              ? `مدة ${months} ${months === "1" ? "شهر" : "أشهر"}`
+                              : feature;
+                          } else if (feature.includes("Month Duration")) {
+                            displayFeature = isRTL ? "مدة شهرية" : "Month Duration";
+                          } else if (feature.match(/\d+\s+Month/)) {
+                            const months = feature.match(/(\d+)\s+Month/)?.[1];
+                            displayFeature = isRTL 
+                              ? `${months} ${months === "1" ? "شهر" : "أشهر"}`
+                              : feature;
+                          } else if (feature.includes("Month")) {
+                            displayFeature = isRTL ? feature.replace(/Month/gi, "شهر") : feature;
+                          } else if (feature.includes("Duration")) {
+                            displayFeature = isRTL ? feature.replace(/Duration/gi, "مدة") : feature;
+                          } else if (feature.includes("Tables")) {
+                            displayFeature = isRTL ? feature.replace(/Tables/gi, "طاولة") : feature;
+                          } else if (feature.includes("Categories")) {
+                            displayFeature = isRTL ? feature.replace(/Categories/gi, "فئة") : feature;
+                          } else if (feature.includes("Items")) {
+                            displayFeature = isRTL ? feature.replace(/Items/gi, "صنف") : feature;
+                          }
+                          
+                          return (
+                            <li key={idx} className="flex items-center">
+                              <svg
+                                className="h-5 w-5 text-green-500 mr-3"
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                              <span className="text-gray-700 dark:text-gray-300">
+                                {displayFeature}
+                              </span>
+                            </li>
+                          );
+                        })}
                     </ul>
 
                     <div className="main-blue-button-hover text-center mt-auto">

@@ -18,6 +18,7 @@ interface Plan {
   description?: string;
   descriptionAr?: string;
   type: string;
+  billingPeriod?: string;
   price: number;
   currency: string;
   duration: number;
@@ -40,6 +41,7 @@ export default function PlansPage() {
   const { showConfirm } = useConfirmDialog();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedBillingPeriod, setSelectedBillingPeriod] = useState<string>("ALL");
   const [showModal, setShowModal] = useState(false);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
   const [formData, setFormData] = useState({
@@ -48,6 +50,7 @@ export default function PlansPage() {
     description: "",
     descriptionAr: "",
     type: "BASIC",
+    billingPeriod: "MONTHLY",
     price: 0,
     currency: "USD",
     duration: 30,
@@ -192,6 +195,7 @@ export default function PlansPage() {
       description: plan.description || "",
       descriptionAr: plan.descriptionAr || "",
       type: plan.type,
+      billingPeriod: plan.billingPeriod || "MONTHLY",
       price: Number(plan.price),
       currency: plan.currency || "USD",
       duration: plan.duration,
@@ -213,6 +217,7 @@ export default function PlansPage() {
       description: "",
       descriptionAr: "",
       type: "BASIC",
+      billingPeriod: "MONTHLY",
       price: 0,
       currency: "USD",
       duration: 30,
@@ -291,8 +296,55 @@ export default function PlansPage() {
           </Button>
         </div>
 
+        {/* Billing Period Tabs */}
+        <div className="flex justify-center mb-8">
+          <div className="inline-flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+            <button
+              onClick={() => setSelectedBillingPeriod("ALL")}
+              className={`px-6 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                selectedBillingPeriod === "ALL"
+                  ? "bg-white dark:bg-gray-600 text-tm-blue dark:text-tm-orange shadow-sm"
+                  : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+              }`}
+            >
+              {isRTL ? "الكل" : "All"}
+            </button>
+            <button
+              onClick={() => setSelectedBillingPeriod("MONTHLY")}
+              className={`px-6 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                selectedBillingPeriod === "MONTHLY"
+                  ? "bg-white dark:bg-gray-600 text-tm-blue dark:text-tm-orange shadow-sm"
+                  : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+              }`}
+            >
+              {isRTL ? "شهري" : "Monthly"}
+            </button>
+            <button
+              onClick={() => setSelectedBillingPeriod("YEARLY")}
+              className={`px-6 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                selectedBillingPeriod === "YEARLY"
+                  ? "bg-white dark:bg-gray-600 text-tm-blue dark:text-tm-orange shadow-sm"
+                  : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+              }`}
+            >
+              {isRTL ? "سنوي" : "Yearly"}
+            </button>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {plans.map((plan) => (
+          {plans
+            .filter((plan) => {
+              if (selectedBillingPeriod === "ALL") return true;
+              if (selectedBillingPeriod === "MONTHLY") {
+                return plan.billingPeriod === "MONTHLY" || !plan.billingPeriod;
+              }
+              if (selectedBillingPeriod === "YEARLY") {
+                return plan.billingPeriod === "YEARLY";
+              }
+              return true;
+            })
+            .map((plan) => (
             <Card key={plan.id} className="p-6">
               <div className="flex justify-between items-start mb-4">
                 <div>
@@ -335,7 +387,14 @@ export default function PlansPage() {
                   : formatCurrency(plan.price, plan.currency)}
                 {!plan.isFree && (
                   <span className="text-sm text-gray-600 dark:text-gray-400 font-normal">
-                    /{plan.duration} {isRTL ? "يوم" : "days"}
+                    /{plan.billingPeriod === "YEARLY"
+                      ? isRTL
+                        ? "سنوياً"
+                        : "yearly"
+                      : isRTL
+                        ? "شهرياً"
+                        : "monthly"}{" "}
+                    ({plan.duration} {isRTL ? "يوم" : "days"})
                   </span>
                 )}
               </div>
@@ -567,6 +626,25 @@ export default function PlansPage() {
                           <option value="BASIC">BASIC</option>
                           <option value="PREMIUM">PREMIUM</option>
                           <option value="ENTERPRISE">ENTERPRISE</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          {isRTL ? "نوع الفترة" : "Billing Period"}
+                        </label>
+                        <select
+                          value={formData.billingPeriod}
+                          onChange={(e) =>
+                            setFormData({ ...formData, billingPeriod: e.target.value })
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        >
+                          <option value="MONTHLY">
+                            {isRTL ? "شهرية" : "Monthly"}
+                          </option>
+                          <option value="YEARLY">
+                            {isRTL ? "سنوية" : "Yearly"}
+                          </option>
                         </select>
                       </div>
                       <Input

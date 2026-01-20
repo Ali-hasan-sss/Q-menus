@@ -48,8 +48,8 @@ interface Order {
       currency?: string;
       category?: {
         id: string;
-        name: string;
-        nameAr?: string;
+      name: string;
+      nameAr?: string;
       };
     };
   }[];
@@ -172,7 +172,7 @@ export default function ReportsPage() {
     currencyOverride?: string | null
   ) => {
     try {
-      setLoading(true);
+        setLoading(true);
 
       // Use currencyOverride if provided, otherwise use current restaurantCurrency state
       const currentCurrency =
@@ -206,7 +206,7 @@ export default function ReportsPage() {
       if (response.data.success) {
         // Use orders as-is from backend - totalPrice is already calculated and stored correctly
         const fetchedOrders = response.data.data.orders;
-        setOrders(fetchedOrders);
+          setOrders(fetchedOrders);
 
         // تحديث pagination info
         if (response.data.data.pagination) {
@@ -823,25 +823,25 @@ export default function ReportsPage() {
               </div>
 
               <div className="flex flex-col md:flex-row gap-3 md:gap-2 items-stretch md:items-center w-full md:w-auto">
-                {/* Custom Date Range */}
+              {/* Custom Date Range */}
                 <div className="flex gap-2 items-center w-full md:w-auto">
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
                     className="flex-1 md:flex-none px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-                    placeholder={isRTL ? "من" : "From"}
-                  />
+                  placeholder={isRTL ? "من" : "From"}
+                />
                   <span className="text-gray-500 dark:text-gray-400 hidden sm:inline">
                     -
                   </span>
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
                     className="flex-1 md:flex-none px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-                    placeholder={isRTL ? "إلى" : "To"}
-                  />
+                  placeholder={isRTL ? "إلى" : "To"}
+                />
                 </div>
 
                 {/* Export Buttons */}
@@ -1325,7 +1325,7 @@ export default function ReportsPage() {
                   />
                 </svg>
               </button>
-            </div>
+    </div>
 
             <div className="space-y-4">
               <div>

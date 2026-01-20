@@ -14,6 +14,8 @@ interface Plan {
   nameAr: string;
   description?: string;
   descriptionAr?: string;
+  type?: string;
+  billingPeriod?: string;
   price: string;
   currency: string;
   duration: number;
@@ -68,6 +70,7 @@ export default function SubscriptionPage() {
   const [subscriptions, setSubscriptions] = useState<UserSubscription[]>([]);
   const [open, setOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
+  const [selectedBillingPeriod, setSelectedBillingPeriod] = useState<string>("ALL");
   const [restaurant, setRestaurant] = useState<{
     name: string;
     nameAr?: string;
@@ -195,9 +198,59 @@ export default function SubscriptionPage() {
       : "";
     const userEmail = user?.email || "غير محدد";
 
+    // Get plan type
+    const planType = selectedPlan.type || "BASIC";
+    const planTypeText = isRTL
+      ? planType === "BASIC"
+        ? "أساسية"
+        : planType === "PREMIUM"
+          ? "مميزة"
+          : planType === "ENTERPRISE"
+            ? "مؤسسية"
+            : planType === "FREE"
+              ? "مجانية"
+              : planType
+      : planType;
+
+    // Get billing period
+    const billingPeriodText = selectedPlan.billingPeriod === "YEARLY"
+      ? isRTL ? "سنوية" : "Yearly"
+      : isRTL ? "شهرية" : "Monthly";
+
+    // Format price
+    const formattedPrice = Number(selectedPlan.price).toLocaleString();
+    const priceText = `${formattedPrice} ${selectedPlan.currency === "SYP" ? (isRTL ? "ل.س" : "SYP") : selectedPlan.currency}`;
+
+    // Format duration
+    const durationText = selectedPlan.duration > 0
+      ? isRTL
+        ? `${selectedPlan.duration} ${selectedPlan.duration === 1 ? "يوم" : "يوم"}`
+        : `${selectedPlan.duration} ${selectedPlan.duration === 1 ? "day" : "days"}`
+      : isRTL ? "غير محدود" : "Unlimited";
+
     const msg = isRTL
-      ? `المستخدم صاحب الإيميل ${userEmail} صاحب مطعم ${restaurantName} يريد تفعيل اشتراك بالخطة ${planName}`
-      : `User with email ${userEmail}, owner of restaurant ${restaurantName}, wants to activate subscription to plan ${planName}`;
+      ? `مرحباً، أريد الاشتراك في الخطة التالية:
+
+📋 اسم الخطة: ${planName}
+🏷️ نوع الخطة: ${planTypeText}
+💰 السعر: ${priceText}
+📅 نوع الفترة: ${billingPeriodText}
+⏱️ المدة: ${durationText}
+🏪 اسم المطعم: ${restaurantName}
+📧 الإيميل: ${userEmail}
+
+يرجى تفعيل الاشتراك. شكراً لكم!`
+      : `Hello, I would like to subscribe to the following plan:
+
+📋 Plan Name: ${planName}
+🏷️ Plan Type: ${planTypeText}
+💰 Price: ${priceText}
+📅 Billing Period: ${billingPeriodText}
+⏱️ Duration: ${durationText}
+🏪 Restaurant Name: ${restaurantName}
+📧 Email: ${userEmail}
+
+Please activate the subscription. Thank you!`;
     const encoded = encodeURIComponent(msg);
     return `https://wa.me/${adminPhone}?text=${encoded}`;
   }, [selectedPlan, user, restaurant, adminPhone, isRTL]);
@@ -315,9 +368,56 @@ export default function SubscriptionPage() {
         onClose={() => setOpen(false)}
         title={isRTL ? "اختر خطة" : "Choose a plan"}
       >
+        {/* Billing Period Selector */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            {isRTL ? "نوع الفترة" : "Billing Period"}
+          </label>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setSelectedBillingPeriod("ALL")}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                selectedBillingPeriod === "ALL"
+                  ? "bg-primary-600 text-white"
+                  : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+              }`}
+            >
+              {isRTL ? "الكل" : "All"}
+            </button>
+            <button
+              onClick={() => setSelectedBillingPeriod("MONTHLY")}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                selectedBillingPeriod === "MONTHLY"
+                  ? "bg-primary-600 text-white"
+                  : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+              }`}
+            >
+              {isRTL ? "شهرية" : "Monthly"}
+            </button>
+            <button
+              onClick={() => setSelectedBillingPeriod("YEARLY")}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                selectedBillingPeriod === "YEARLY"
+                  ? "bg-primary-600 text-white"
+                  : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+              }`}
+            >
+              {isRTL ? "سنوية" : "Yearly"}
+            </button>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {plans
-            .filter((p) => !(p.isFree === true || p.price === "0"))
+            .filter((p) => {
+              // Filter out free plans
+              if (p.isFree === true || p.price === "0") return false;
+              // Filter by billing period if selected
+              if (selectedBillingPeriod !== "ALL") {
+                return p.billingPeriod === selectedBillingPeriod;
+              }
+              return true;
+            })
             .map((p) => (
               <Card
                 key={p.id}
@@ -332,9 +432,22 @@ export default function SubscriptionPage() {
                     {isRTL ? p.descriptionAr || p.description : p.description}
                   </p>
                 )}
-                <p className="text-tm-blue font-bold">
-                  {p.price} {p.currency}
-                </p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-tm-blue font-bold">
+                    {p.price} {p.currency}
+                  </p>
+                  {p.billingPeriod && (
+                    <span className="text-xs text-gray-500 dark:text-gray-400 px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">
+                      {p.billingPeriod === "MONTHLY"
+                        ? isRTL
+                          ? "شهرية"
+                          : "Monthly"
+                        : isRTL
+                          ? "سنوية"
+                          : "Yearly"}
+                    </span>
+                  )}
+                </div>
                 <div className="mt-4">
                   {selectedPlan?.id === p.id ? (
                     <a
