@@ -427,10 +427,10 @@ export function MenuItem({
 
       {/* Modal for item details */}
       {showModal && (
-        <div className="fixed inset-0 z-[100] bg-black bg-opacity-50  flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-lg overflow-hidden">
+        <div className="fixed inset-0 z-[100] bg-black bg-opacity-50 flex items-center justify-center p-4 pb-safe">
+          <div className="bg-white w-full max-w-md rounded-lg overflow-hidden flex flex-col max-h-[85vh]">
             {/* Modal Header */}
-            <div className="p-4 border-b border-gray-200">
+            <div className="p-4 border-b border-gray-200 flex-shrink-0">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-black">
                   {isRTL ? item.nameAr || item.name : item.name}
@@ -440,7 +440,7 @@ export function MenuItem({
                     e.stopPropagation();
                     setShowModal(false);
                   }}
-                  className="text-gray-400 hover:text-gray-600 "
+                  className="text-gray-400 hover:text-gray-600"
                 >
                   <svg
                     className="w-6 h-6"
@@ -459,8 +459,8 @@ export function MenuItem({
               </div>
             </div>
 
-            {/* Modal Content */}
-            <div className="p-4  space-y-4">
+            {/* Modal Content - Scrollable */}
+            <div className="p-4 space-y-4 overflow-y-auto flex-1">
               {/* Item Image */}
               {item.image && (
                 <div className="w-full h-48 relative overflow-hidden rounded-lg">
@@ -657,39 +657,40 @@ export function MenuItem({
                 />
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex  gap-3 pt-4">
-                <Button
-                  variant="outline"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowModal(false);
-                  }}
-                  className="flex-1"
-                >
-                  {isRTL ? "إلغاء" : "Cancel"}
-                </Button>
-                <Button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleAddToOrder();
-                  }}
-                  className="flex-1"
-                  style={{
-                    backgroundColor:
-                      theme?.primaryColor || "var(--theme-primary)",
-                    color: theme?.textColor || "#ffffff",
-                    borderColor: theme?.primaryColor || "var(--theme-primary)",
-                  }}
-                >
-                  {isRTL ? "إضافة" : "Add"} {quantity} -{" "}
-                  {formatCurrencyWithLanguage(
-                    calculateItemTotal(item, quantity, selectedExtras),
-                    currency || item.currency || "USD",
-                    language
-                  )}
-                </Button>
-              </div>
+            </div>
+
+            {/* Action Buttons - Fixed at bottom */}
+            <div className="flex gap-3 p-4 pt-3 border-t border-gray-200 flex-shrink-0 pb-safe">
+              <Button
+                variant="outline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowModal(false);
+                }}
+                className="flex-1"
+              >
+                {isRTL ? "إلغاء" : "Cancel"}
+              </Button>
+              <Button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleAddToOrder();
+                }}
+                className="flex-1"
+                style={{
+                  backgroundColor:
+                    theme?.primaryColor || "var(--theme-primary)",
+                  color: theme?.textColor || "#ffffff",
+                  borderColor: theme?.primaryColor || "var(--theme-primary)",
+                }}
+              >
+                {isRTL ? "إضافة" : "Add"} {quantity} -{" "}
+                {formatCurrencyWithLanguage(
+                  calculateItemTotal(item, quantity, selectedExtras),
+                  currency || item.currency || "USD",
+                  language
+                )}
+              </Button>
             </div>
           </div>
         </div>

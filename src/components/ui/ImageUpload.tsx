@@ -26,6 +26,12 @@ export function ImageUpload({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showGallery, setShowGallery] = useState(false);
+  const [sizeInfo, setSizeInfo] = useState<{
+    original: { bytes: number; formatted: string };
+    compressed: { bytes: number; formatted: string };
+    uploaded: { bytes: number; formatted: string };
+    compressionSuccess: boolean;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = async (
@@ -40,15 +46,7 @@ export function ImageUpload({
       return;
     }
 
-    // Validate file size (5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      setError(
-        isRTL
-          ? "حجم الملف يجب أن يكون أقل من 5 ميجابايت"
-          : "File size must be less than 5MB"
-      );
-      return;
-    }
+    // Note: File size validation happens on server after compression
 
     setError(null);
     setUploading(true);
@@ -66,8 +64,14 @@ export function ImageUpload({
 
       if (result.success) {
         onChange(result.data.url);
+        // Save size information if available
+        if (result.data.sizes) {
+          setSizeInfo(result.data.sizes);
+        }
       } else {
-        setError(isRTL ? "فشل في رفع الصورة" : "Failed to upload image");
+        // Show server error message (may include size validation after compression)
+        setError(result.message || (isRTL ? "فشل في رفع الصورة" : "Failed to upload image"));
+        setSizeInfo(null);
       }
     } catch (err) {
       console.error("Upload error:", err);
@@ -104,15 +108,18 @@ export function ImageUpload({
 
       if (result.success) {
         onChange(null);
+        setSizeInfo(null);
       } else {
         console.error("Delete error:", result.message);
         // Even if delete fails on server, remove from UI
         onChange(null);
+        setSizeInfo(null);
       }
     } catch (err) {
       console.error("Delete error:", err);
       // Even if delete fails, remove from UI
       onChange(null);
+      setSizeInfo(null);
     }
   };
 
@@ -193,8 +200,8 @@ export function ImageUpload({
               <p className="text-xs">
                 {placeholder ||
                   (isRTL
-                    ? "PNG, JPG, GIF حتى 5 ميجابايت"
-                    : "PNG, JPG, GIF up to 5MB")}
+                    ? "PNG, JPG, GIF - سيتم ضغط الصورة قبل الرفع"
+                    : "PNG, JPG, GIF - image will be compressed before upload")}
               </p>
             </div>
           </div>
@@ -208,6 +215,38 @@ export function ImageUpload({
               className="w-full h-48 object-cover"
             />
           </div>
+
+          {/* Size information */}
+          {sizeInfo && (
+            <div className="text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg space-y-1">
+              <div className="font-medium mb-2">
+                {isRTL ? "معلومات حجم الصورة:" : "Image Size Information:"}
+              </div>
+              <div className="grid grid-cols-1 gap-1">
+                <div className="flex justify-between">
+                  <span>{isRTL ? "الحجم الأصلي:" : "Original Size:"}</span>
+                  <span className="font-medium">{sizeInfo.original.formatted}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>
+                    {isRTL ? "الحجم بعد الضغط:" : "Size After Compression:"}
+                  </span>
+                  <span className="font-medium">
+                    {sizeInfo.compressed.formatted}
+                    {!sizeInfo.compressionSuccess && (
+                      <span className="text-orange-600 dark:text-orange-400 ml-1">
+                        ({isRTL ? "استخدم الأصل" : "used original"})
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>{isRTL ? "الحجم بعد الرفع:" : "Size After Upload:"}</span>
+                  <span className="font-medium">{sizeInfo.uploaded.formatted}</span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Action buttons - always visible */}
           <div className="flex gap-2 justify-center">
@@ -300,6 +339,8 @@ export function ImageUpload({
           onSelect={(url) => {
             onChange(url);
             setShowGallery(false);
+            // Clear size info when selecting from gallery (no size info available)
+            setSizeInfo(null);
           }}
           onClose={() => setShowGallery(false)}
           currentImage={value}

@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import cloudinary from "cloudinary";
 import sharp from "sharp";
 
+// Set maximum duration for this route (5 minutes)
+export const maxDuration = 300;
+
 // Configure Cloudinary
 cloudinary.v2.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "",
@@ -84,26 +87,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file size
-    const maxSize = Number(process.env.MAX_FILE_SIZE) || 5 * 1024 * 1024;
-    if (file.size > maxSize) {
-      const maxSizeMB = Math.round(maxSize / (1024 * 1024));
-      return NextResponse.json(
-        {
-          success: false,
-          message: `File size must be less than ${maxSizeMB}MB`,
-        },
-        { status: 400 }
-      );
-    }
-
     // Convert File to Buffer
     const bytes = await file.arrayBuffer();
     const originalBuffer = Buffer.from(bytes);
 
     // Compress and optimize image before uploading
-    let processedBuffer: Buffer;
+    let processedBuffer: Buffer | null = null;
+    let compressionSuccess = false;
     const fileType = file.type.toLowerCase();
+    const maxSizeAfterCompression = Number(process.env.MAX_FILE_SIZE) || 5 * 1024 * 1024; // 5MB after compression
     
     try {
       // Create sharp instance
@@ -134,6 +126,7 @@ export async function POST(request: NextRequest) {
             mozjpeg: true, // Use mozjpeg for better compression
           })
           .toBuffer();
+        compressionSuccess = true;
       } else if (fileType === "image/png") {
         processedBuffer = await sharpInstance
           .png({
@@ -142,6 +135,7 @@ export async function POST(request: NextRequest) {
             adaptiveFiltering: true,
           })
           .toBuffer();
+        compressionSuccess = true;
       } else if (fileType === "image/webp") {
         processedBuffer = await sharpInstance
           .webp({
@@ -149,9 +143,11 @@ export async function POST(request: NextRequest) {
             effort: 6, // Higher effort = better compression (0-6)
           })
           .toBuffer();
+        compressionSuccess = true;
       } else if (fileType === "image/gif") {
         // GIF files - just resize if needed, don't compress much
         processedBuffer = await sharpInstance.gif().toBuffer();
+        compressionSuccess = true;
       } else {
         // Fallback: convert to JPEG with compression
         processedBuffer = await sharpInstance
@@ -160,6 +156,12 @@ export async function POST(request: NextRequest) {
             progressive: true,
           })
           .toBuffer();
+        compressionSuccess = true;
+      }
+
+      // Verify compression success by checking if buffer is valid
+      if (!processedBuffer || processedBuffer.length === 0) {
+        throw new Error("Compression produced empty buffer");
       }
 
       // Log compression stats
@@ -175,32 +177,71 @@ export async function POST(request: NextRequest) {
       );
     } catch (compressionError) {
       console.warn(
-        "⚠️ Failed to compress image, using original:",
+        "⚠️ Failed to compress image, will use original:",
         compressionError
       );
-      // If compression fails, use original buffer
+      compressionSuccess = false;
+      // Will use original buffer after size check
+    }
+
+    // Check file size AFTER compression (or use original if compression failed)
+    const finalBuffer = compressionSuccess && processedBuffer ? processedBuffer : originalBuffer;
+    const finalSize = finalBuffer.length;
+    
+    if (finalSize > maxSizeAfterCompression) {
+      const maxSizeMB = Math.round(maxSizeAfterCompression / (1024 * 1024));
+      const actualSizeMB = (finalSize / (1024 * 1024)).toFixed(2);
+      
+      return NextResponse.json(
+        {
+          success: false,
+          message: `File size after compression is ${actualSizeMB}MB, which exceeds the maximum allowed size of ${maxSizeMB}MB`,
+        },
+        { status: 400 }
+      );
+    }
+
+    // If compression failed, use original buffer
+    if (!compressionSuccess || !processedBuffer) {
+      console.log("📸 Using original image (compression failed)");
       processedBuffer = originalBuffer;
     }
 
-    // Upload compressed image to Cloudinary
-    const result = await new Promise((resolve, reject) => {
-      cloudinary.v2.uploader
-        .upload_stream(
-          {
-            folder: "mymenus-images",
-            resource_type: "auto",
-            transformation: [{ width: 1000, height: 1000, crop: "limit" }],
-            // Additional quality optimization
-            quality: "auto:good", // Cloudinary's auto quality
-            fetch_format: "auto", // Auto format (webp if supported)
-          },
-          (error, result) => {
-            if (error) reject(error);
-            else resolve(result);
-          }
-        )
-        .end(processedBuffer);
-    });
+    // Upload compressed image to Cloudinary with timeout
+    const uploadTimeout = 120000; // 2 minutes timeout
+    const uploadStartTime = Date.now();
+    
+    const result = await Promise.race([
+      new Promise((resolve, reject) => {
+        cloudinary.v2.uploader
+          .upload_stream(
+            {
+              folder: "mymenus-images",
+              resource_type: "auto",
+              transformation: [{ width: 1000, height: 1000, crop: "limit" }],
+              // Additional quality optimization
+              quality: "auto:good", // Cloudinary's auto quality
+              fetch_format: "auto", // Auto format (webp if supported)
+            },
+            (error, result) => {
+              if (error) {
+                console.error("Cloudinary upload error:", error);
+                reject(error);
+              } else {
+                const uploadTime = Date.now() - uploadStartTime;
+                console.log(`✅ Image uploaded to Cloudinary in ${uploadTime}ms`);
+                resolve(result);
+              }
+            }
+          )
+          .end(processedBuffer);
+      }),
+      new Promise((_, reject) => {
+        setTimeout(() => {
+          reject(new Error(`Upload timeout after ${uploadTimeout / 1000} seconds`));
+        }, uploadTimeout);
+      }),
+    ]);
 
     if (!result || typeof result !== "object" || !("secure_url" in result)) {
       console.error("Cloudinary upload failed - no URL returned");
@@ -215,22 +256,67 @@ export async function POST(request: NextRequest) {
 
     const cloudinaryResult = result as any;
 
+    // Calculate sizes in bytes and readable format
+    const originalSizeBytes = originalBuffer.length;
+    const compressedSizeBytes = processedBuffer ? processedBuffer.length : originalSizeBytes;
+    const uploadedSizeBytes = cloudinaryResult.bytes || compressedSizeBytes;
+
+    // Format sizes for display
+    const formatSize = (bytes: number) => {
+      if (bytes < 1024) return `${bytes} B`;
+      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
+      return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+    };
+
     return NextResponse.json({
       success: true,
       message: "Image uploaded successfully",
       data: {
         url: cloudinaryResult.secure_url,
         publicId: cloudinaryResult.public_id,
+        sizes: {
+          original: {
+            bytes: originalSizeBytes,
+            formatted: formatSize(originalSizeBytes),
+          },
+          compressed: {
+            bytes: compressedSizeBytes,
+            formatted: formatSize(compressedSizeBytes),
+          },
+          uploaded: {
+            bytes: uploadedSizeBytes,
+            formatted: formatSize(uploadedSizeBytes),
+          },
+          compressionSuccess: compressionSuccess,
+        },
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Upload error:", error);
+    
+    // Handle specific error types
+    let errorMessage = "Failed to upload image";
+    let statusCode = 500;
+    
+    if (error?.error?.message === "Request Timeout" || error?.message?.includes("timeout")) {
+      errorMessage = "Upload timeout - The image is too large or network connection is slow. Please try with a smaller image.";
+      statusCode = 408; // Request Timeout
+    } else if (error?.http_code === 400) {
+      errorMessage = error?.message || "Invalid image file";
+      statusCode = 400;
+    } else if (error?.http_code === 413) {
+      errorMessage = "Image file is too large";
+      statusCode = 413;
+    } else if (error?.message) {
+      errorMessage = error.message;
+    }
+    
     return NextResponse.json(
       {
         success: false,
-        message: "Failed to upload image",
+        message: errorMessage,
       },
-      { status: 500 }
+      { status: statusCode }
     );
   }
 }

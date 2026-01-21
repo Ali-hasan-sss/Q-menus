@@ -539,6 +539,15 @@ html[lang="en"],
   transition-delay: 0.4s;
 }
 
+/* Safe area support for mobile navigation bars */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.mb-safe {
+  margin-bottom: env(safe-area-inset-bottom);
+}
+
 /* Floating animation for decorative bubbles */
 @keyframes float {
   0%,
