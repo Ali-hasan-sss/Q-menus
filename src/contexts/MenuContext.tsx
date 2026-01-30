@@ -99,6 +99,11 @@ interface MenuContextType {
   toggleItemStatus: (id: string) => Promise<void>;
   updateMenuName: (name: string, nameAr?: string) => Promise<void>;
   refreshData: () => Promise<void>;
+  applyDiscountToAll: (discount: number) => Promise<{ updatedCount: number }>;
+  applyDiscountToCategory: (
+    categoryId: string,
+    discount: number,
+  ) => Promise<{ updatedCount: number }>;
 
   // Excel Import Actions
   downloadExcelTemplate: (lang: string) => Promise<Blob>;
@@ -153,7 +158,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<MenuItem[]>([]);
   const [qrCodes, setQrCodes] = useState<QRCode[]>([]);
   const [restaurantQR, setRestaurantQR] = useState<RestaurantQRCode | null>(
-    null
+    null,
   );
   const [restaurantCurrency, setRestaurantCurrency] = useState<string>("USD");
   const [loading, setLoading] = useState(false);
@@ -198,7 +203,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
         }
         console.log(
           "✅ Categories loaded:",
-          response.data.data.categories.length
+          response.data.data.categories.length,
         );
         // Clear items to ensure clean state
         setItems([]);
@@ -251,7 +256,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
         setItems((prevItems) => {
           // Remove existing items for this category first
           const filteredItems = prevItems.filter(
-            (item) => item.categoryId !== categoryId
+            (item) => item.categoryId !== categoryId,
           );
           // Add new items
           return [...filteredItems, ...categoryItems];
@@ -259,7 +264,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error: any) {
       setError(
-        error.response?.data?.message || "Failed to fetch category items"
+        error.response?.data?.message || "Failed to fetch category items",
       );
       console.error("Error fetching category items:", error);
     } finally {
@@ -283,7 +288,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
         // Don't set error state for plan limit errors - let the UI handle them
         if (
           !error.response?.data?.message?.includes(
-            "maximum number of categories"
+            "maximum number of categories",
           )
         ) {
           const errorMessage =
@@ -293,7 +298,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
         throw error; // Re-throw the original error to preserve response data
       }
     },
-    []
+    [],
   );
 
   // Update category
@@ -305,7 +310,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
         if (response.data.success) {
           const updatedCategory = response.data.data.category;
           setCategories((prev) =>
-            prev.map((cat) => (cat.id === id ? updatedCategory : cat))
+            prev.map((cat) => (cat.id === id ? updatedCategory : cat)),
           );
           return updatedCategory;
         }
@@ -317,7 +322,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
         throw new Error(errorMessage);
       }
     },
-    []
+    [],
   );
 
   // Delete category
@@ -343,8 +348,8 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
         if (response.data.success) {
           setCategories((prev) =>
             prev.map((cat) =>
-              cat.id === id ? { ...cat, isActive: !cat.isActive } : cat
-            )
+              cat.id === id ? { ...cat, isActive: !cat.isActive } : cat,
+            ),
           );
         }
       } catch (error: any) {
@@ -354,7 +359,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
         console.error("Error toggling category status:", error);
       }
     },
-    []
+    [],
   );
 
   // Create item
@@ -381,7 +386,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
         throw error; // Re-throw the original error to preserve response data
       }
     },
-    []
+    [],
   );
 
   // Update item
@@ -393,7 +398,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
         if (response.data.success) {
           const updatedItem = response.data.data.menuItem;
           setItems((prev) =>
-            prev.map((item) => (item.id === id ? updatedItem : item))
+            prev.map((item) => (item.id === id ? updatedItem : item)),
           );
           return updatedItem;
         }
@@ -405,7 +410,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
         throw new Error(errorMessage);
       }
     },
-    []
+    [],
   );
 
   // Delete item
@@ -430,8 +435,8 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
       if (response.data.success) {
         setItems((prev) =>
           prev.map((item) =>
-            item.id === id ? { ...item, isAvailable: !item.isAvailable } : item
-          )
+            item.id === id ? { ...item, isAvailable: !item.isAvailable } : item,
+          ),
         );
       }
     } catch (error: any) {
@@ -477,7 +482,36 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
         throw new Error(errorMessage);
       }
     },
-    []
+    [],
+  );
+
+  // Apply discount to all menu items
+  const applyDiscountToAll = useCallback(
+    async (discount: number): Promise<{ updatedCount: number }> => {
+      const response = await api.post("/menu/discount/all", { discount });
+      if (response.data.success) {
+        return response.data.data;
+      }
+      throw new Error(response.data?.message || "Failed to apply discount");
+    },
+    [],
+  );
+
+  // Apply discount to category items
+  const applyDiscountToCategory = useCallback(
+    async (
+      categoryId: string,
+      discount: number,
+    ): Promise<{ updatedCount: number }> => {
+      const response = await api.post(`/menu/discount/category/${categoryId}`, {
+        discount,
+      });
+      if (response.data.success) {
+        return response.data.data;
+      }
+      throw new Error(response.data?.message || "Failed to apply discount");
+    },
+    [],
   );
 
   // QR Code functions
@@ -515,7 +549,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
         throw new Error(errorMessage);
       }
     },
-    []
+    [],
   );
 
   const createRestaurantQR =
@@ -545,8 +579,8 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
       if (response.data.success) {
         setQrCodes((prev) =>
           prev.map((qr) =>
-            qr.id === qrId ? { ...qr, isActive: !qr.isActive } : qr
-          )
+            qr.id === qrId ? { ...qr, isActive: !qr.isActive } : qr,
+          ),
         );
       }
     } catch (error: any) {
@@ -571,13 +605,13 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
             !(qrCodes.find((qr) => qr.id === qrId) as any)?.isOccupied;
 
           console.log(
-            `✅ [Frontend] Updating QR code state - QR ID: ${qrId}, New isOccupied: ${newIsOccupied}`
+            `✅ [Frontend] Updating QR code state - QR ID: ${qrId}, New isOccupied: ${newIsOccupied}`,
           );
 
           setQrCodes((prev) =>
             prev.map((qr) =>
-              qr.id === qrId ? { ...qr, isOccupied: newIsOccupied } : qr
-            )
+              qr.id === qrId ? { ...qr, isOccupied: newIsOccupied } : qr,
+            ),
           );
 
           // Dispatch custom event to notify other components
@@ -590,11 +624,11 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
         setError(errorMessage);
         console.error(
           "❌ [Frontend] Error toggling table occupied status:",
-          error
+          error,
         );
       }
     },
-    [qrCodes]
+    [qrCodes],
   );
 
   const deleteQRCode = useCallback(async (qrId: string): Promise<void> => {
@@ -630,7 +664,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
         throw new Error(errorMessage);
       }
     },
-    []
+    [],
   );
 
   const bulkCreateSequentialQRCodes = useCallback(
@@ -655,7 +689,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
         throw new Error(errorMessage);
       }
     },
-    [fetchQRCodes]
+    [fetchQRCodes],
   );
 
   const bulkDeleteQRCodes = useCallback(
@@ -675,7 +709,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
         throw new Error(errorMessage);
       }
     },
-    []
+    [],
   );
 
   // Refresh all data (categories only for better performance)
@@ -741,7 +775,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
   };
 
   const importExcelFile = async (
-    file: File
+    file: File,
   ): Promise<{ categoriesCreated: number; itemsCreated: number }> => {
     try {
       const formData = new FormData();
@@ -790,6 +824,8 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
     toggleItemStatus,
     updateMenuName,
     refreshData,
+    applyDiscountToAll,
+    applyDiscountToCategory,
 
     // Excel Import Actions
     downloadExcelTemplate,

@@ -660,7 +660,7 @@ export function MenuItem({
             </div>
 
             {/* Action Buttons - Fixed at bottom */}
-            <div className="flex gap-3 p-4 pt-3 border-t border-gray-200 flex-shrink-0 pb-safe">
+            <div className="flex gap-3 p-4 pt-3 border-t border-gray-200 flex-shrink-0 pb-modal-actions">
               <Button
                 variant="outline"
                 onClick={(e) => {

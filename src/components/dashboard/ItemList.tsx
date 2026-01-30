@@ -43,6 +43,7 @@ interface ItemListProps {
   onToggleItemStatus: (itemId: string) => void;
   onCreateItem: () => void;
   onReorderItems: () => void;
+  onApplyDiscountToCategory?: () => void;
 }
 
 export function ItemList({
@@ -56,6 +57,7 @@ export function ItemList({
   onToggleItemStatus,
   onCreateItem,
   onReorderItems,
+  onApplyDiscountToCategory,
 }: ItemListProps) {
   const { t, isRTL, language } = useLanguage();
   const [showStickyBackButton, setShowStickyBackButton] = useState(false);
@@ -121,7 +123,34 @@ export function ItemList({
             )}
           </div>
         </div>
-        <div className="flex gap-2 flex-shrink-0">
+        <div className="flex flex-wrap gap-2 flex-shrink-0">
+          {onApplyDiscountToCategory && items.length > 0 && (
+            <Button
+              onClick={onApplyDiscountToCategory}
+              variant="outline"
+              className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-2 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/10 dark:text-green-400 dark:hover:text-green-300"
+            >
+              <svg
+                className="h-3 w-3 sm:h-4 sm:w-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
+                />
+              </svg>
+              <span className="hidden xs:inline">
+                {t("item.discountCategory") || "Discount Category"}
+              </span>
+              <span className="xs:hidden">
+                {t("item.discount") || "Discount"}
+              </span>
+            </Button>
+          )}
           <Button
             onClick={onReorderItems}
             variant="outline"
@@ -227,7 +256,7 @@ export function ItemList({
                   {formatCurrencyWithLanguage(
                     item.price,
                     restaurantCurrency,
-                    language
+                    language,
                   )}
                 </p>
                 <div className="h-8 overflow-hidden">

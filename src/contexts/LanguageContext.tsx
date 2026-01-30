@@ -12,7 +12,7 @@ interface LanguageContextType {
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(
-  undefined
+  undefined,
 );
 
 // Translation keys - in a real app, these would come from a translation service
@@ -46,7 +46,8 @@ const translations = {
 
     // Auth Error Messages - Login
     "auth.error.invalidCredentials": "بيانات الدخول غير صحيحة",
-    "auth.error.loginRateLimitExceeded": "تم تجاوز عدد محاولات تسجيل الدخول المسموح بها. يرجى المحاولة مرة أخرى بعد 5 دقائق",
+    "auth.error.loginRateLimitExceeded":
+      "تم تجاوز عدد محاولات تسجيل الدخول المسموح بها. يرجى المحاولة مرة أخرى بعد 5 دقائق",
     "auth.error.userNotFound": "المستخدم غير موجود",
     "auth.error.userInactive": "الحساب غير نشط",
     "auth.error.loginFailed": "فشل تسجيل الدخول",
@@ -106,7 +107,8 @@ const translations = {
     "contact.error.fillAllFields": "الرجاء ملء جميع الحقول قبل الإرسال.",
     "contact.error.invalidEmail": "البريد الإلكتروني غير صحيح",
     "contact.error.sendFailed": "حدث خطأ أثناء إرسال الرسالة",
-    "contact.error.sendFailedRetry": "حدث خطأ أثناء إرسال الرسالة. يرجى المحاولة لاحقاً",
+    "contact.error.sendFailedRetry":
+      "حدث خطأ أثناء إرسال الرسالة. يرجى المحاولة لاحقاً",
 
     // Common
     "common.save": "حفظ",
@@ -153,6 +155,8 @@ const translations = {
 
     // Items
     "item.title": "إدارة الأصناف",
+    "item.discountCategory": "انشاء خصم على الفئة",
+    "item.discount": "خصم لعناصر الفئة",
     "item.add": "إضافة صنف",
     "item.edit": "تعديل الصنف",
     "item.name": " اسم الصنف (انجليزي)",
@@ -335,7 +339,8 @@ const translations = {
 
     // Auth Error Messages - Login
     "auth.error.invalidCredentials": "Invalid credentials",
-    "auth.error.loginRateLimitExceeded": "Too many login attempts. Please try again after 5 minutes",
+    "auth.error.loginRateLimitExceeded":
+      "Too many login attempts. Please try again after 5 minutes",
     "auth.error.userNotFound": "User not found",
     "auth.error.userInactive": "Account is inactive",
     "auth.error.loginFailed": "Login failed",
@@ -388,11 +393,13 @@ const translations = {
     "auth.passwordReset.resendCodeSuccess": "Reset code resent successfully",
 
     // Contact Us Messages
-    "contact.success.messageSent": "Your message has been sent successfully. We will contact you soon",
+    "contact.success.messageSent":
+      "Your message has been sent successfully. We will contact you soon",
     "contact.error.fillAllFields": "Please fill all fields before sending.",
     "contact.error.invalidEmail": "Invalid email address",
     "contact.error.sendFailed": "An error occurred while sending the message",
-    "contact.error.sendFailedRetry": "An error occurred while sending the message. Please try again later",
+    "contact.error.sendFailedRetry":
+      "An error occurred while sending the message. Please try again later",
 
     // Common
     "common.save": "Save",
@@ -439,6 +446,8 @@ const translations = {
 
     // Items
     "item.title": "Items Management",
+    "item.discountCategory": "Create Discount for Category",
+    "item.discount": "Discount for Category Items",
     "item.add": "Add Item",
     "item.edit": "Edit Item",
     "item.name": "Item Name (English)",

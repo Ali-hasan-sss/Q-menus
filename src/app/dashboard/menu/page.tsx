@@ -14,6 +14,7 @@ import { CategoryFormModal } from "@/components/dashboard/CategoryFormModal";
 import { CategoryReorderModal } from "@/components/dashboard/CategoryReorderModal";
 import { ItemReorderModal } from "@/components/dashboard/ItemReorderModal";
 import { ItemFormModal } from "@/components/dashboard/ItemFormModal";
+import { DiscountModal } from "@/components/dashboard/DiscountModal";
 import { ThemeEditor } from "@/components/dashboard/ThemeEditor";
 import { ExcelImportButton } from "@/components/dashboard/ExcelImportButton";
 import { api } from "@/lib/api";
@@ -75,15 +76,17 @@ export default function MenuPage() {
     fetchItems,
     refreshData,
     resetAllCategories,
+    applyDiscountToAll,
+    applyDiscountToCategory,
   } = useMenu();
   const { showConfirm } = useConfirmDialog();
   const { showToast } = useToast();
 
   const [activeTab, setActiveTab] = useState<"categories" | "theme">(
-    "categories"
+    "categories",
   );
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(
-    null
+    null,
   );
 
   // Handle tab from URL parameter
@@ -116,7 +119,7 @@ export default function MenuPage() {
 
     // Load items for this category if not already loaded
     const categoryItems = items.filter(
-      (item) => item.categoryId === category.id
+      (item) => item.categoryId === category.id,
     );
     if (categoryItems.length === 0) {
       await fetchCategoryItems(category.id);
@@ -134,6 +137,8 @@ export default function MenuPage() {
     useState(false);
   const [showItemModal, setShowItemModal] = useState(false);
   const [showItemReorderModal, setShowItemReorderModal] = useState(false);
+  const [showDiscountModal, setShowDiscountModal] = useState(false);
+  const [discountMode, setDiscountMode] = useState<"all" | "category">("all");
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
 
@@ -142,7 +147,7 @@ export default function MenuPage() {
       await createCategory(data);
       showToast(
         isRTL ? "تم إضافة الفئة بنجاح" : "Category added successfully",
-        "success"
+        "success",
       );
     } catch (error: any) {
       let errorMessage =
@@ -154,7 +159,7 @@ export default function MenuPage() {
         const { limit, current } = error.response?.data || {};
         errorMessage = t("dashboard.categoryLimitReached").replace(
           "{limit}",
-          limit || "N/A"
+          limit || "N/A",
         );
       } else if (errorMessage.includes("No active subscription")) {
         errorMessage = t("dashboard.noActiveSubscription");
@@ -170,13 +175,13 @@ export default function MenuPage() {
         await updateCategory(editingCategory.id, data);
         showToast(
           isRTL ? "تم تحديث الفئة بنجاح" : "Category updated successfully",
-          "success"
+          "success",
         );
       } catch (error: any) {
         showToast(
           error.response?.data?.message ||
             (isRTL ? "حدث خطأ أثناء تحديث الفئة" : "Error updating category"),
-          "error"
+          "error",
         );
       }
     }
@@ -187,7 +192,7 @@ export default function MenuPage() {
       await createItem(data);
       showToast(
         isRTL ? "تم إضافة العنصر بنجاح" : "Item added successfully",
-        "success"
+        "success",
       );
     } catch (error: any) {
       let errorMessage =
@@ -199,7 +204,7 @@ export default function MenuPage() {
         const { limit, current } = error.response?.data || {};
         errorMessage = t("dashboard.itemLimitReached").replace(
           "{limit}",
-          limit || "N/A"
+          limit || "N/A",
         );
       } else if (errorMessage.includes("No active subscription")) {
         errorMessage = t("dashboard.noActiveSubscription");
@@ -215,13 +220,13 @@ export default function MenuPage() {
         await updateItem(editingItem.id, data);
         showToast(
           isRTL ? "تم تحديث العنصر بنجاح" : "Item updated successfully",
-          "success"
+          "success",
         );
       } catch (error: any) {
         showToast(
           error.response?.data?.message ||
             (isRTL ? "حدث خطأ أثناء تحديث العنصر" : "Error updating item"),
-          "error"
+          "error",
         );
       }
     }
@@ -255,13 +260,13 @@ export default function MenuPage() {
           }
           showToast(
             isRTL ? "تم حذف الفئة بنجاح" : "Category deleted successfully",
-            "success"
+            "success",
           );
         } catch (error: any) {
           showToast(
             error.response?.data?.message ||
               (isRTL ? "حدث خطأ أثناء حذف الفئة" : "Error deleting category"),
-            "error"
+            "error",
           );
         }
       },
@@ -283,13 +288,13 @@ export default function MenuPage() {
           await deleteItem(itemId);
           showToast(
             isRTL ? "تم حذف العنصر بنجاح" : "Item deleted successfully",
-            "success"
+            "success",
           );
         } catch (error: any) {
           showToast(
             error.response?.data?.message ||
               (isRTL ? "حدث خطأ أثناء حذف العنصر" : "Error deleting item"),
-            "error"
+            "error",
           );
         }
       },
@@ -312,8 +317,44 @@ export default function MenuPage() {
     setShowCategoryReorderModal(false);
     setShowItemModal(false);
     setShowItemReorderModal(false);
+    setShowDiscountModal(false);
     setEditingCategory(null);
     setEditingItem(null);
+  };
+
+  const handleApplyDiscountToAll = () => {
+    setDiscountMode("all");
+    setShowDiscountModal(true);
+  };
+
+  const handleApplyDiscountToCategory = () => {
+    setDiscountMode("category");
+    setShowDiscountModal(true);
+  };
+
+  const handleDiscountSubmit = async (discount: number) => {
+    if (discountMode === "all") {
+      await applyDiscountToAll(discount);
+      showToast(
+        isRTL
+          ? `تم تطبيق خصم ${discount}% على كامل القائمة`
+          : `Discount of ${discount}% applied to all menu items`,
+        "success",
+      );
+      fetchCategories();
+      if (selectedCategory) {
+        fetchCategoryItems(selectedCategory.id);
+      }
+    } else if (discountMode === "category" && selectedCategory) {
+      await applyDiscountToCategory(selectedCategory.id, discount);
+      showToast(
+        isRTL
+          ? `تم تطبيق خصم ${discount}% على أصناف الفئة`
+          : `Discount of ${discount}% applied to category items`,
+        "success",
+      );
+      fetchCategoryItems(selectedCategory.id);
+    }
   };
 
   const handleReorderCategories = () => {
@@ -353,13 +394,13 @@ export default function MenuPage() {
           setSelectedCategory(null);
           showToast(
             isRTL ? "تم إعادة تعيين القائمة بنجاح" : "Menu reset successfully",
-            "success"
+            "success",
           );
         } catch (error: any) {
           showToast(
             error.response?.data?.message ||
               (isRTL ? "حدث خطأ أثناء إعادة التعيين" : "Error resetting menu"),
-            "error"
+            "error",
           );
         }
       },
@@ -450,6 +491,7 @@ export default function MenuPage() {
                   onCreateCategory={() => setShowCategoryModal(true)}
                   onReorderCategories={handleReorderCategories}
                   onResetAll={handleResetAll}
+                  onApplyDiscountToAll={handleApplyDiscountToAll}
                 />
               ) : (
                 <ItemList
@@ -463,6 +505,7 @@ export default function MenuPage() {
                   onToggleItemStatus={toggleItemStatus}
                   onCreateItem={() => setShowItemModal(true)}
                   onReorderItems={handleReorderItems}
+                  onApplyDiscountToCategory={handleApplyDiscountToCategory}
                 />
               )}
             </div>
@@ -517,6 +560,30 @@ export default function MenuPage() {
         onClose={closeModals}
         items={selectedCategory ? getCategoryItems() : []}
         onReorder={handleItemsReordered}
+      />
+
+      <DiscountModal
+        isOpen={showDiscountModal}
+        onClose={closeModals}
+        onSubmit={handleDiscountSubmit}
+        title={
+          discountMode === "all"
+            ? isRTL
+              ? "خصم لكامل القائمة"
+              : "Discount for All Menu Items"
+            : isRTL
+              ? `خصم لأصناف ${selectedCategory?.name || ""}`
+              : `Discount for ${selectedCategory?.name || ""} Items`
+        }
+        description={
+          discountMode === "all"
+            ? isRTL
+              ? "أدخل نسبة الخصم لتطبيقها على جميع أصناف القائمة (0 لإزالة الخصم)"
+              : "Enter discount percentage to apply to all menu items (0 to remove discount)"
+            : isRTL
+              ? "أدخل نسبة الخصم لتطبيقها على أصناف هذه الفئة (0 لإزالة الخصم)"
+              : "Enter discount percentage to apply to this category's items (0 to remove discount)"
+        }
       />
     </div>
   );
