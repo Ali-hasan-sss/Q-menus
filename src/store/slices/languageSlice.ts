@@ -1,6 +1,6 @@
 "use client";
 
-import { createSlice } from "@reduxjs/toolkit";
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { translations } from "@/contexts/LanguageContext";
 
 export type Language = "AR" | "EN";
@@ -17,11 +17,11 @@ const languageSlice = createSlice({
   name: "language",
   initialState,
   reducers: {
-    setLanguage: (state, action: { payload: Language }) => {
+    setLanguage: (state, action: PayloadAction<Language>) => {
       state.language = action.payload;
     },
-    initLanguage: (state, action: { payload?: Language }) => {
-      state.language = action.payload || "AR";
+    initLanguage: (state, action: PayloadAction<Language | undefined>) => {
+      state.language = action.payload ?? "AR";
     },
   },
 });

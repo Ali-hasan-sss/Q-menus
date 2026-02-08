@@ -22,20 +22,7 @@ import { Button } from "@/components/ui/Button";
 import { useLanguage } from "@/store/hooks/useLanguage";
 import { getLocalizedName } from "@/lib/utils";
 import { api } from "@/lib/api";
-
-interface MenuItem {
-  id: string;
-  name: string;
-  nameAr?: string;
-  description?: string;
-  descriptionAr?: string;
-  price: number;
-  currency: string;
-  image?: string;
-  sortOrder: number;
-  categoryId: string;
-  isAvailable: boolean;
-}
+import type { MenuItem } from "@/store/slices/menuSlice";
 
 interface ItemReorderModalProps {
   isOpen: boolean;

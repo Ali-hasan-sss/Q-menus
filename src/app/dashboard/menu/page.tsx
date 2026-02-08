@@ -19,38 +19,7 @@ import { DiscountModal } from "@/components/dashboard/DiscountModal";
 import { ThemeEditor } from "@/components/dashboard/ThemeEditor";
 import { ExcelImportButton } from "@/components/dashboard/ExcelImportButton";
 import { api } from "@/lib/api";
-
-interface Category {
-  id: string;
-  name: string;
-  nameAr?: string;
-  description?: string;
-  descriptionAr?: string;
-  image?: string;
-  isActive: boolean;
-  sortOrder: number;
-  createdAt: string;
-  _count: {
-    items: number;
-  };
-}
-
-interface MenuItem {
-  id: string;
-  name: string;
-  nameAr?: string;
-  description?: string;
-  descriptionAr?: string;
-  price: number;
-  image?: string;
-  isAvailable: boolean;
-  sortOrder: number;
-  categoryId: string;
-  category: {
-    name: string;
-    nameAr?: string;
-  };
-}
+import type { Category, MenuItem } from "@/store/slices/menuSlice";
 
 export default function MenuPage() {
   const { user } = useAuth();

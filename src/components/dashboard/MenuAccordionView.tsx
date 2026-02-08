@@ -18,30 +18,7 @@ import {
   Percent,
   Plus,
 } from "lucide-react";
-
-interface Category {
-  id: string;
-  name: string;
-  nameAr?: string;
-  description?: string;
-  image?: string;
-  isActive: boolean;
-  sortOrder: number;
-  _count: { items: number };
-}
-
-interface MenuItem {
-  id: string;
-  name: string;
-  nameAr?: string;
-  description?: string;
-  price: number;
-  image?: string;
-  isAvailable: boolean;
-  sortOrder: number;
-  categoryId: string;
-  category: { name: string; nameAr?: string };
-}
+import type { Category, MenuItem } from "@/store/slices/menuSlice";
 
 interface MenuAccordionViewProps {
   categories: Category[];
