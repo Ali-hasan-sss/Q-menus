@@ -5,8 +5,11 @@ import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { ImageUpload } from "@/components/ui/ImageUpload";
-import { useLanguage } from "@/contexts/LanguageContext";
-import { formatCurrencyWithLanguage } from "@/lib/utils";
+import { useLanguage } from "@/store/hooks/useLanguage";
+import {
+  formatCurrencyWithLanguage,
+  getLocalizedName,
+} from "@/lib/utils";
 import { api, endpoints } from "@/lib/api";
 
 interface MenuItem {
@@ -352,7 +355,11 @@ export function ItemFormModal({
                 </option>
                 {kitchenSections.map((section) => (
                   <option key={section.id} value={section.id}>
-                    {isRTL && section.nameAr ? section.nameAr : section.name}
+                    {getLocalizedName(
+                      section.name,
+                      section.nameAr,
+                      isRTL ? "AR" : "EN"
+                    )}
                   </option>
                 ))}
               </select>

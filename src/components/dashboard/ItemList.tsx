@@ -4,8 +4,11 @@ import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import Switch from "@/components/ui/Switch";
-import { useLanguage } from "@/contexts/LanguageContext";
-import { formatCurrencyWithLanguage } from "@/lib/utils";
+import { useLanguage } from "@/store/hooks/useLanguage";
+import {
+  formatCurrencyWithLanguage,
+  getLocalizedName,
+} from "@/lib/utils";
 import { ArrowLeft, ArrowRight, Edit, Trash2 } from "lucide-react";
 
 interface MenuItem {
@@ -60,6 +63,7 @@ export function ItemList({
   onApplyDiscountToCategory,
 }: ItemListProps) {
   const { t, isRTL, language } = useLanguage();
+  const lang = language === "AR" ? "AR" : "EN";
   const [showStickyBackButton, setShowStickyBackButton] = useState(false);
 
   useEffect(() => {
@@ -95,7 +99,9 @@ export function ItemList({
         </Button>
         <div>
           <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-            {selectedCategory?.name} {t("menu.items") || "Items"}
+            {selectedCategory
+              ? `${getLocalizedName(selectedCategory.name, selectedCategory.nameAr, lang)} ${t("menu.items") || "Items"}`
+              : ""}
           </h3>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             {items.length} {t("menu.itemsInCategory")}
@@ -114,13 +120,13 @@ export function ItemList({
           )}
           <div className="min-w-0 flex-1">
             <h4 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white truncate">
-              {selectedCategory?.name}
+              {selectedCategory &&
+                getLocalizedName(
+                  selectedCategory.name,
+                  selectedCategory.nameAr,
+                  lang
+                )}
             </h4>
-            {selectedCategory?.nameAr && (
-              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 truncate">
-                {selectedCategory.nameAr}
-              </p>
-            )}
           </div>
         </div>
         <div className="flex flex-wrap gap-2 flex-shrink-0">
@@ -224,13 +230,8 @@ export function ItemList({
               <div className="flex justify-between items-start mb-3">
                 <div className="flex-1 min-w-0">
                   <h4 className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                    {item.name}
+                    {getLocalizedName(item.name, item.nameAr, lang)}
                   </h4>
-                  {item.nameAr && (
-                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 truncate">
-                      {item.nameAr}
-                    </p>
-                  )}
                 </div>
                 <Switch
                   checked={item.isAvailable}

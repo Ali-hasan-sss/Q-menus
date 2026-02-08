@@ -3,8 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useLanguage } from "@/contexts/LanguageContext";
-import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/store/hooks/useLanguage";
+import { useAuth } from "@/store/hooks/useAuth";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { Button } from "@/components/ui/Button";
@@ -12,6 +12,21 @@ import { Card } from "@/components/ui/Card";
 import { api, publicApi } from "@/lib/api";
 import { number } from "zod";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import {
+  CheckCircle2,
+  ClipboardList,
+  MessageCircle,
+  BarChart3,
+  Monitor,
+  FileText,
+  Languages,
+  CircleDollarSign,
+  LayoutList,
+  Star,
+  Target,
+  Eye,
+  Check,
+} from "lucide-react";
 
 interface Plan {
   id: string;
@@ -277,13 +292,7 @@ export default function HomePage() {
                   </h4>
                   <div className="icon mb-4 flex justify-center">
                     <div className="w-16 h-16 bg-tm-blue rounded-full flex items-center justify-center">
-                      <svg
-                        className="w-8 h-8 text-white"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
+                      <CheckCircle2 className="w-8 h-8 text-white" strokeWidth={2} />
                     </div>
                   </div>
                   <p className="text-gray-600 dark:text-gray-300">
@@ -304,13 +313,7 @@ export default function HomePage() {
                   </h4>
                   <div className="icon mb-4 flex justify-center">
                     <div className="w-16 h-16 bg-tm-orange rounded-full flex items-center justify-center">
-                      <svg
-                        className="w-8 h-8 text-white"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path d="M3 3a2 2 0 012-2h2l1 2h6a2 2 0 012 2v2H5a2 2 0 00-2 2v8H2V5a2 2 0 011-1.732V3z" />
-                      </svg>
+                      <ClipboardList className="w-8 h-8 text-white" strokeWidth={2} />
                     </div>
                   </div>
                   <p className="text-gray-600 dark:text-gray-300">
@@ -329,13 +332,7 @@ export default function HomePage() {
                   </h4>
                   <div className="icon mb-4 flex justify-center">
                     <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center">
-                      <svg
-                        className="w-8 h-8 text-white"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path d="M4 3h12a1 1 0 011 1v7H3V4a1 1 0 011-1zm-1 9h14v3a1 1 0 01-1 1H8l-3 2v-2H4a1 1 0 01-1-1v-3z" />
-                      </svg>
+                      <MessageCircle className="w-8 h-8 text-white" strokeWidth={2} />
                     </div>
                   </div>
                   <p className="text-gray-600 dark:text-gray-300">
@@ -354,13 +351,7 @@ export default function HomePage() {
                   </h4>
                   <div className="icon mb-4 flex justify-center">
                     <div className="w-16 h-16 bg-purple-500 rounded-full flex items-center justify-center">
-                      <svg
-                        className="w-8 h-8 text-white"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path d="M3 3h2v14H3V3zm4 6h2v8H7V9zm4-4h2v12h-2V5zm4 2h2v10h-2V7z" />
-                      </svg>
+                      <BarChart3 className="w-8 h-8 text-white" strokeWidth={2} />
                     </div>
                   </div>
                   <p className="text-gray-600 dark:text-gray-300">
@@ -379,19 +370,7 @@ export default function HomePage() {
                   </h4>
                   <div className="icon mb-4 flex justify-center">
                     <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center">
-                      <svg
-                        className="w-8 h-8 text-white"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                        />
-                      </svg>
+                      <Monitor className="w-8 h-8 text-white" strokeWidth={2} />
                     </div>
                   </div>
                   <p className="text-gray-600 dark:text-gray-300">
@@ -412,19 +391,7 @@ export default function HomePage() {
                   </h4>
                   <div className="icon mb-4 flex justify-center">
                     <div className="w-16 h-16 bg-indigo-500 rounded-full flex items-center justify-center">
-                      <svg
-                        className="w-8 h-8 text-white"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                        />
-                      </svg>
+                      <FileText className="w-8 h-8 text-white" strokeWidth={2} />
                     </div>
                   </div>
                   <p className="text-gray-600 dark:text-gray-300">
@@ -443,19 +410,7 @@ export default function HomePage() {
                   </h4>
                   <div className="icon mb-4 flex justify-center">
                     <div className="w-16 h-16 bg-cyan-500 rounded-full flex items-center justify-center">
-                      <svg
-                        className="w-8 h-8 text-white"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"
-                        />
-                      </svg>
+                      <Languages className="w-8 h-8 text-white" strokeWidth={2} />
                     </div>
                   </div>
                   <p className="text-gray-600 dark:text-gray-300">
@@ -474,19 +429,7 @@ export default function HomePage() {
                   </h4>
                   <div className="icon mb-4 flex justify-center">
                     <div className="w-16 h-16 bg-yellow-500 rounded-full flex items-center justify-center">
-                      <svg
-                        className="w-8 h-8 text-white"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                      </svg>
+                      <CircleDollarSign className="w-8 h-8 text-white" strokeWidth={2} />
                     </div>
                   </div>
                   <p className="text-gray-600 dark:text-gray-300">
@@ -575,13 +518,7 @@ export default function HomePage() {
                       <div className="count-area-content">
                         <div className="icon mb-4 flex justify-center">
                           <div className="w-16 h-16 bg-tm-blue rounded-full flex items-center justify-center">
-                            <svg
-                              className="w-8 h-8 text-white"
-                              fill="currentColor"
-                              viewBox="0 0 20 20"
-                            >
-                              <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
+                            <CheckCircle2 className="w-8 h-8 text-white" strokeWidth={2} />
                           </div>
                         </div>
                         <div className="count-digit text-2xl font-bold text-tm-blue mb-2">
@@ -606,13 +543,7 @@ export default function HomePage() {
                       <div className="count-area-content">
                         <div className="icon mb-4 flex justify-center">
                           <div className="w-16 h-16 bg-tm-orange rounded-full flex items-center justify-center">
-                            <svg
-                              className="w-8 h-8 text-white"
-                              fill="currentColor"
-                              viewBox="0 0 20 20"
-                            >
-                              <path d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" />
-                            </svg>
+                            <LayoutList className="w-8 h-8 text-white" strokeWidth={2} />
                           </div>
                         </div>
                         <div className="count-digit text-2xl font-bold text-tm-orange mb-2">
@@ -637,13 +568,7 @@ export default function HomePage() {
                       <div className="count-area-content">
                         <div className="icon mb-4 flex justify-center">
                           <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center">
-                            <svg
-                              className="w-8 h-8 text-white"
-                              fill="currentColor"
-                              viewBox="0 0 20 20"
-                            >
-                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                            </svg>
+                            <Star className="w-8 h-8 text-white" strokeWidth={2} />
                           </div>
                         </div>
                         <div className="count-digit text-2xl font-bold text-green-500 mb-2">
@@ -712,19 +637,7 @@ export default function HomePage() {
               <div className="bg-gradient-to-br from-tm-blue/10 to-tm-blue/5 dark:from-tm-blue/20 dark:to-tm-blue/10 p-8 rounded-lg h-full border border-tm-blue/20 dark:border-tm-blue/30">
                 <div className="flex items-center gap-4 mb-6">
                   <div className="w-16 h-16 bg-tm-blue rounded-full flex items-center justify-center flex-shrink-0">
-                    <svg
-                      className="w-8 h-8 text-white"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
+                    <Target className="w-8 h-8 text-white" strokeWidth={2} />
                   </div>
                   <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
                     {isRTL ? "مهمتنا" : "Our Mission"}
@@ -746,25 +659,7 @@ export default function HomePage() {
               <div className="bg-gradient-to-br from-tm-orange/10 to-tm-orange/5 dark:from-tm-orange/20 dark:to-tm-orange/10 p-8 rounded-lg h-full border border-tm-orange/20 dark:border-tm-orange/30">
                 <div className="flex items-center gap-4 mb-6">
                   <div className="w-16 h-16 bg-tm-orange rounded-full flex items-center justify-center flex-shrink-0">
-                    <svg
-                      className="w-8 h-8 text-white"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                      />
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                      />
-                    </svg>
+                    <Eye className="w-8 h-8 text-white" strokeWidth={2} />
                   </div>
                   <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
                     {isRTL ? "رؤيتنا" : "Our Vision"}
@@ -1069,17 +964,7 @@ export default function HomePage() {
 
                     <ul className="space-y-3 mb-8 flex-1">
                       <li className="flex items-center">
-                        <svg
-                          className="h-5 w-5 text-green-500 mr-3"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
+                        <Check className="h-5 w-5 text-green-500 mr-3 flex-shrink-0" strokeWidth={2.5} />
                         <span className="text-gray-700 dark:text-gray-300">
                           {isRTL
                             ? `${plan.maxTables} طاولة`
@@ -1087,17 +972,7 @@ export default function HomePage() {
                         </span>
                       </li>
                       <li className="flex items-center">
-                        <svg
-                          className="h-5 w-5 text-green-500 mr-3"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
+                        <Check className="h-5 w-5 text-green-500 mr-3 flex-shrink-0" strokeWidth={2.5} />
                         <span className="text-gray-700 dark:text-gray-300">
                           {isRTL
                             ? `${plan.maxCategories} فئة`
@@ -1105,17 +980,7 @@ export default function HomePage() {
                         </span>
                       </li>
                       <li className="flex items-center">
-                        <svg
-                          className="h-5 w-5 text-green-500 mr-3"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
+                        <Check className="h-5 w-5 text-green-500 mr-3 flex-shrink-0" strokeWidth={2.5} />
                         <span className="text-gray-700 dark:text-gray-300">
                           {isRTL
                             ? `${plan.maxItems} عنصر لكل فئة`
@@ -1124,17 +989,7 @@ export default function HomePage() {
                       </li>
                       {plan.canCustomizeTheme && (
                         <li className="flex items-center">
-                          <svg
-                            className="h-5 w-5 text-green-500 mr-3"
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path
-                              fillRule="evenodd"
-                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
+                          <Check className="h-5 w-5 text-green-500 mr-3 flex-shrink-0" strokeWidth={2.5} />
                           <span className="text-gray-700 dark:text-gray-300">
                             {isRTL ? "تخصيص التصميم" : "Custom Design"}
                           </span>
@@ -1217,17 +1072,7 @@ export default function HomePage() {
                           
                           return (
                             <li key={idx} className="flex items-center">
-                              <svg
-                                className="h-5 w-5 text-green-500 mr-3"
-                                fill="currentColor"
-                                viewBox="0 0 20 20"
-                              >
-                                <path
-                                  fillRule="evenodd"
-                                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                  clipRule="evenodd"
-                                />
-                              </svg>
+                              <Check className="h-5 w-5 text-green-500 mr-3 flex-shrink-0" strokeWidth={2.5} />
                               <span className="text-gray-700 dark:text-gray-300">
                                 {displayFeature}
                               </span>

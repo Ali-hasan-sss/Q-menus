@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/contexts/AuthContext";
-import { useLanguage } from "@/contexts/LanguageContext";
-import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useAuth } from "@/store/hooks/useAuth";
+import { useLanguage } from "@/store/hooks/useLanguage";
+import { useConfirmDialog } from "@/store/hooks/useConfirmDialog";
 import { useSocket } from "@/contexts/SocketContext";
 import { useAdminNotifications } from "@/contexts/AdminNotificationContext";
 import { api } from "@/lib/api";

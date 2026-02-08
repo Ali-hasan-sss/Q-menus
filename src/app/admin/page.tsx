@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/contexts/AuthContext";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useAuth } from "@/store/hooks/useAuth";
+import { useLanguage } from "@/store/hooks/useLanguage";
 import { api } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
 import AdminNavbar from "@/components/admin/AdminNavbar";

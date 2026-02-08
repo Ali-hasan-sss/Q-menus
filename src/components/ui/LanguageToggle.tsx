@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/store/hooks/useLanguage";
 import { Button } from "./Button";
 import { GlobeIcon } from "lucide-react";
 

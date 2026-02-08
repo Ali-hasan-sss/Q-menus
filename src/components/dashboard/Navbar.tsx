@@ -3,14 +3,14 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useAuth } from "@/contexts/AuthContext";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useAuth } from "@/store/hooks/useAuth";
+import { useLanguage } from "@/store/hooks/useLanguage";
 import { useSocket } from "@/contexts/SocketContext";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { Button } from "@/components/ui/Button";
 import { LanguageToggle } from "@/components/ui/LanguageToggle";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
-import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useConfirmDialog } from "@/store/hooks/useConfirmDialog";
 import { Logo } from "@/components/ui/Logo";
 
 const navigation = [

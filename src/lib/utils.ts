@@ -199,6 +199,26 @@ export function getDirection(text: string): "ltr" | "rtl" {
   return isRTL(text) ? "rtl" : "ltr";
 }
 
+/**
+ * Returns display name with user's language first, secondary language in parentheses.
+ * @param name - English name
+ * @param nameAr - Arabic name (optional)
+ * @param language - User's language ("AR" | "EN")
+ */
+export function getLocalizedName(
+  name: string,
+  nameAr?: string | null,
+  language: string = "EN"
+): string {
+  const isArabic = language === "AR";
+  const primary = isArabic && nameAr ? nameAr : name;
+  const secondary = isArabic && nameAr ? name : nameAr;
+  if (secondary) {
+    return `${primary} (${secondary})`;
+  }
+  return primary;
+}
+
 export function formatCurrencyWithLanguage(
   amount: number,
   currency: string = "USD",

@@ -2,7 +2,8 @@
 
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/store/hooks/useLanguage";
+import { getLocalizedName } from "@/lib/utils";
 
 interface Menu {
   id: string;
@@ -16,7 +17,8 @@ interface MenuHeaderProps {
 }
 
 export function MenuHeader({ menu, onEditMenu }: MenuHeaderProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const lang = language === "AR" ? "AR" : "EN";
 
   if (!menu) return null;
 
@@ -25,13 +27,8 @@ export function MenuHeader({ menu, onEditMenu }: MenuHeaderProps) {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-            {menu.name}
+            {getLocalizedName(menu.name, menu.nameAr, lang)}
           </h2>
-          {menu.nameAr && (
-            <p className="text-gray-600 dark:text-gray-400 mt-1">
-              {menu.nameAr}
-            </p>
-          )}
         </div>
         <Button variant="outline" onClick={onEditMenu}>
           {t("menu.editMenu") || "Edit Menu Name"}

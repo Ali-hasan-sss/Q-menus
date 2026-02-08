@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useLanguage } from "@/contexts/LanguageContext";
-import { useToast } from "@/components/ui/Toast";
-import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useLanguage } from "@/store/hooks/useLanguage";
+import { useToast } from "@/store/hooks/useToast";
+import { useConfirmDialog } from "@/store/hooks/useConfirmDialog";
 import { api } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";

@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { formatDateTime, formatCurrencyWithLanguage } from "@/lib/utils";
 import { useCustomerSocket } from "@/contexts/CustomerSocketContext";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/store/hooks/useLanguage";
 import html2canvas from "html2canvas";
 
 interface OrderItem {

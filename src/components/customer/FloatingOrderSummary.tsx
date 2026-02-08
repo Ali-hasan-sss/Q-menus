@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { OrderSummary } from "./OrderSummary";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/store/hooks/useLanguage";
 import { formatCurrencyWithLanguage } from "@/lib/utils";
 
 interface OrderItem {

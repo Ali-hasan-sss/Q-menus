@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/store/hooks/useLanguage";
 import { api } from "@/lib/api";
 import { Button } from "./Button";
 import { Input } from "./Input";

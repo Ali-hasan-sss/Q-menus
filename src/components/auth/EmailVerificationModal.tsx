@@ -3,9 +3,9 @@
 import { useState, useEffect } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { useToast } from "@/components/ui/Toast";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { CodeInput } from "@/components/ui/CodeInput";
+import { useToast } from "@/store/hooks/useToast";
+import { useLanguage } from "@/store/hooks/useLanguage";
 import { api } from "@/lib/api";
 
 interface EmailVerificationModalProps {
@@ -149,11 +149,6 @@ export function EmailVerificationModal({
     }
   };
 
-  const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, "").slice(0, 6);
-    setVerificationCode(value);
-  };
-
   return (
     <Modal
       isOpen={isOpen}
@@ -170,19 +165,14 @@ export function EmailVerificationModal({
           <p className="font-semibold text-primary-600">{email}</p>
         </div>
 
-        <div>
+        <div dir="ltr">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             {isRTL ? "رمز التحقق" : "Verification Code"}
           </label>
-          <Input
-            type="text"
+          <CodeInput
             value={verificationCode}
-            onChange={handleCodeChange}
-            placeholder={
-              isRTL ? "أدخل الرمز المكون من 6 أرقام" : "Enter 6-digit code"
-            }
-            className="text-center text-2xl tracking-widest"
-            maxLength={6}
+            onChange={setVerificationCode}
+            aria-label={isRTL ? "رمز التحقق" : "Verification code"}
           />
         </div>
 

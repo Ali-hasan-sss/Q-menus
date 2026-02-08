@@ -2,7 +2,8 @@
 
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/store/hooks/useLanguage";
+import { getLocalizedName } from "@/lib/utils";
 
 interface Category {
   id: string;
@@ -42,7 +43,8 @@ export function CategoryList({
   onResetAll,
   onApplyDiscountToAll,
 }: CategoryListProps) {
-  const { t, isRTL } = useLanguage();
+  const { t, isRTL, language } = useLanguage();
+  const lang = language === "AR" ? "AR" : "EN";
 
   return (
     <div>
@@ -190,13 +192,8 @@ export function CategoryList({
               <div className="flex justify-between items-start mb-3">
                 <div className="flex-1 min-w-0">
                   <h4 className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                    {category.name}
+                    {getLocalizedName(category.name, category.nameAr, lang)}
                   </h4>
-                  {category.nameAr && (
-                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 truncate">
-                      {category.nameAr}
-                    </p>
-                  )}
                 </div>
                 <span
                   className={`px-2 py-1 text-xs rounded-full ${

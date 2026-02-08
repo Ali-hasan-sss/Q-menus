@@ -3,9 +3,9 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/store/hooks/useLanguage";
 import { useTheme } from "next-themes";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/store/hooks/useAuth";
 import { Logo } from "@/components/ui/Logo";
 import { Button } from "@/components/ui/Button";
 import { LanguageToggle } from "@/components/ui/LanguageToggle";
@@ -22,6 +22,7 @@ export default function Header() {
 
   const navigation = [
     { name: isRTL ? "الرئيسية" : "Home", href: "#home" },
+    { name: isRTL ? "ابحث عن مطعم" : "Find a restaurant", href: "/discover" },
     { name: isRTL ? "الخدمات" : "Services", href: "#services" },
     { name: isRTL ? "المميزات" : "Features", href: "#features" },
     { name: isRTL ? "الخطط" : "Plans", href: "#plans" },
@@ -63,7 +64,7 @@ export default function Header() {
   };
 
   const handleNavClick = (href: string) => {
-    if (href === "/contact") {
+    if (href.startsWith("/")) {
       window.location.href = href;
     } else if (pathname !== "/") {
       window.location.href = `/${href}`;
@@ -90,7 +91,8 @@ export default function Header() {
                 key={item.name}
                 onClick={() => handleNavClick(item.href)}
                 className={`relative pb-1 text-sm font-medium transition-colors ${
-                  pathname === "/contact" && item.href === "/contact"
+                  (pathname === "/contact" && item.href === "/contact") ||
+                  (pathname === "/discover" && item.href === "/discover")
                     ? "text-tm-orange"
                     : activeSection === item.href.replace("#", "") &&
                         pathname === "/"
@@ -101,6 +103,7 @@ export default function Header() {
                 {item.name}
                 {/* 🔸 الخط البرتقالي تحت التب النشط */}
                 {(pathname === "/contact" && item.href === "/contact") ||
+                (pathname === "/discover" && item.href === "/discover") ||
                 (pathname === "/" &&
                   activeSection === item.href.replace("#", "")) ? (
                   <span className="absolute left-0 bottom-0 w-full h-[2px] bg-tm-orange rounded-full"></span>
@@ -176,7 +179,8 @@ export default function Header() {
                   key={item.name}
                   onClick={() => handleNavClick(item.href)}
                   className={`block w-full text-left px-3 py-2 rounded-md text-base font-medium ${
-                    pathname === "/contact" && item.href === "/contact"
+                    (pathname === "/contact" && item.href === "/contact") ||
+                    (pathname === "/discover" && item.href === "/discover")
                       ? "text-tm-orange"
                       : activeSection === item.href.replace("#", "") &&
                           pathname === "/"

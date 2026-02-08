@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/store/hooks/useLanguage";
 import { Logo } from "@/components/ui/Logo";
 import { publicApi, endpoints } from "@/lib/api";
 

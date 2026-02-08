@@ -1,14 +1,12 @@
 "use client";
 
 import { ThemeProvider } from "next-themes";
-import { LanguageProvider } from "@/contexts/LanguageContext";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { ReduxProvider } from "@/components/providers/ReduxProvider";
 import { SocketProvider } from "@/contexts/SocketContext";
 import { CustomerSocketProvider } from "@/contexts/CustomerSocketContext";
-import { MenuProvider } from "@/contexts/MenuContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
-import { ToastProvider } from "@/components/ui/Toast";
-import { ConfirmDialogProvider } from "@/components/ui/ConfirmDialog";
+import { ToastContainer } from "@/components/ui/ToastContainer";
+import { ConfirmDialogModal } from "@/components/ui/ConfirmDialogModal";
 
 interface ProvidersProps {
   children: React.ReactNode;
@@ -23,21 +21,17 @@ export function Providers({ children }: ProvidersProps) {
       disableTransitionOnChange={true}
       storageKey="theme"
     >
-      <LanguageProvider>
-        <AuthProvider>
-          <SocketProvider>
-            <CustomerSocketProvider>
-              <MenuProvider>
-                <NotificationProvider>
-                  <ToastProvider>
-                    <ConfirmDialogProvider>{children}</ConfirmDialogProvider>
-                  </ToastProvider>
-                </NotificationProvider>
-              </MenuProvider>
-            </CustomerSocketProvider>
-          </SocketProvider>
-        </AuthProvider>
-      </LanguageProvider>
+      <ReduxProvider>
+        <SocketProvider>
+          <CustomerSocketProvider>
+            <NotificationProvider>
+                {children}
+                <ToastContainer />
+                <ConfirmDialogModal />
+              </NotificationProvider>
+          </CustomerSocketProvider>
+        </SocketProvider>
+      </ReduxProvider>
     </ThemeProvider>
   );
 }

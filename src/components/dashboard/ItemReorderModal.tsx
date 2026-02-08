@@ -19,7 +19,8 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/store/hooks/useLanguage";
+import { getLocalizedName } from "@/lib/utils";
 import { api } from "@/lib/api";
 
 interface MenuItem {
@@ -44,7 +45,8 @@ interface ItemReorderModalProps {
 }
 
 function SortableItem({ item }: { item: MenuItem }) {
-  const { t, isRTL } = useLanguage();
+  const { t, isRTL, language } = useLanguage();
+  const lang = language === "AR" ? "AR" : "EN";
   const {
     attributes,
     listeners,
@@ -94,13 +96,8 @@ function SortableItem({ item }: { item: MenuItem }) {
         <div className="flex items-center justify-between">
           <div>
             <h4 className="text-sm font-medium text-gray-900 dark:text-white truncate">
-              {item.name}
+              {getLocalizedName(item.name, item.nameAr, lang)}
             </h4>
-            {item.nameAr && (
-              <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
-                {item.nameAr}
-              </p>
-            )}
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-gray-900 dark:text-white">

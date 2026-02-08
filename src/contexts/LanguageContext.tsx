@@ -15,8 +15,8 @@ const LanguageContext = createContext<LanguageContextType | undefined>(
   undefined,
 );
 
-// Translation keys - in a real app, these would come from a translation service
-const translations = {
+// Translation keys - exported for use in Redux
+export const translations = {
   AR: {
     // Navigation
     "nav.dashboard": "لوحة التحكم",

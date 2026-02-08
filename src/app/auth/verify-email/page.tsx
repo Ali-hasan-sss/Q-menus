@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/contexts/AuthContext";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useAuth } from "@/store/hooks/useAuth";
+import { useLanguage } from "@/store/hooks/useLanguage";
 import { EmailVerificationModal } from "@/components/auth/EmailVerificationModal";
 import { Card } from "@/components/ui/Card";
 import Header from "@/components/layout/Header";

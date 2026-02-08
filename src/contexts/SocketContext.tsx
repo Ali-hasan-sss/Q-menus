@@ -8,7 +8,7 @@ import React, {
   useRef,
 } from "react";
 import { io, Socket } from "socket.io-client";
-import { useAuth } from "./AuthContext";
+import { useAuth } from "@/store/hooks/useAuth";
 
 interface SocketContextType {
   socket: Socket | null;

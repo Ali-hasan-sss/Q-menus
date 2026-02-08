@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAuth } from "@/contexts/AuthContext";
-import { useLanguage } from "@/contexts/LanguageContext";
-import { useMenu } from "@/contexts/MenuContext";
-import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useAuth } from "@/store/hooks/useAuth";
+import { useLanguage } from "@/store/hooks/useLanguage";
+import { useMenu } from "@/store/hooks/useMenu";
+import { useConfirmDialog } from "@/store/hooks/useConfirmDialog";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { useToast } from "@/components/ui/Toast";
+import { useToast } from "@/store/hooks/useToast";
 import jsPDF from "jspdf";
 
 function QRPageContent() {

@@ -206,6 +206,12 @@ export const endpoints = {
     searchMenu: (restaurantId: string, query: string) =>
       `/public/menu/${restaurantId}/search?q=${encodeURIComponent(query)}`,
     restaurant: (restaurantId: string) => `/public/restaurant/${restaurantId}`,
+    restaurants: (query?: string) =>
+      query
+        ? `/public/restaurants?q=${encodeURIComponent(query)}`
+        : "/public/restaurants",
+    searchItems: (query: string) =>
+      `/public/search/items?q=${encodeURIComponent(query)}`,
     health: "/public/health",
     plans: "/public/plans",
     contact: "/public/contact",

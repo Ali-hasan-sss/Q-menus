@@ -4,8 +4,8 @@ import { useState, useEffect } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { useToast } from "@/components/ui/Toast";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useToast } from "@/store/hooks/useToast";
+import { useLanguage } from "@/store/hooks/useLanguage";
 import { api } from "@/lib/api";
 
 interface ForgotPasswordModalProps {

@@ -19,7 +19,8 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/store/hooks/useLanguage";
+import { getLocalizedName } from "@/lib/utils";
 import { api } from "@/lib/api";
 
 interface Category {
@@ -110,7 +111,7 @@ function SortableCategoryItem({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
           <h3 className="font-medium text-gray-900 dark:text-gray-100 truncate">
-            {isRTL && category.nameAr ? category.nameAr : category.name}
+            {getLocalizedName(category.name, category.nameAr, isRTL ? "AR" : "EN")}
           </h3>
         </div>
         <div className="flex items-center gap-2 flex-wrap">

@@ -2,11 +2,22 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/store/hooks/useLanguage";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import { publicApi, endpoints } from "@/lib/api";
 import toast from "react-hot-toast";
+import {
+  Phone,
+  MapPin,
+  MessageCircle,
+  Share2,
+  ImageIcon,
+  Video,
+  Send,
+  Briefcase,
+  Globe,
+} from "lucide-react";
 
 interface SectionAttribute {
   key: string;
@@ -28,7 +39,7 @@ interface ContactSection {
 
 export default function ContactPage() {
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [message, setMessage] = useState("");
   const [contactSection, setContactSection] = useState<ContactSection | null>(
     null
@@ -58,7 +69,7 @@ export default function ContactPage() {
 
   // Extract contact info from attributes
   const attributes = (contactSection?.attributes || []) as SectionAttribute[];
-  const phone =
+  const contactSectionPhone =
     attributes.length > 1
       ? (isRTL ? attributes[1].valueAr : attributes[1].value).replace(/\D/g, "") // Remove non-digits
       : "963994488858"; // Fallback
@@ -77,98 +88,45 @@ export default function ContactPage() {
   );
   const whatsappPhone = whatsappLink
     ? (isRTL ? whatsappLink.valueAr : whatsappLink.value).replace(/\D/g, "")
-    : phone;
+    : contactSectionPhone;
 
-  // Helper function to get social media icon based on key name
-  const getSocialIcon = (key: string, href: string) => {
+  // Helper function to get social media icon based on key name (Lucide icons)
+  const getSocialIcon = (key: string) => {
     const keyLower = key.toLowerCase();
+    const iconClass = "h-6 w-6 transition-colors";
 
     if (keyLower.includes("facebook") || keyLower.includes("فيسبوك")) {
-      return (
-        <svg
-          className="h-6 w-6 text-blue-600 hover:text-blue-700 transition-colors"
-          fill="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path d="M22.675 0h-21.35C.597 0 0 .598 0 1.333v21.334C0 23.403.597 24 1.325 24H12.82v-9.294H9.692v-3.622h3.128V8.413c0-3.1 1.893-4.788 4.657-4.788 1.324 0 2.462.099 2.795.143v3.24l-1.918.001c-1.505 0-1.797.716-1.797 1.767v2.318h3.59l-.467 3.622h-3.123V24h6.127C23.403 24 24 23.403 24 22.667V1.333C24 .598 23.403 0 22.675 0z" />
-        </svg>
-      );
+      return <Share2 className={`${iconClass} text-blue-600 hover:text-blue-700`} strokeWidth={2} />;
     }
-
     if (keyLower.includes("instagram") || keyLower.includes("انستغرام")) {
-      return (
-        <svg
-          className="h-6 w-6 text-pink-600 hover:text-pink-700 transition-colors"
-          fill="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path d="M7.75 2h8.5A5.75 5.75 0 0 1 22 7.75v8.5A5.75 5.75 0 0 1 16.25 22h-8.5A5.75 5.75 0 0 1 2 16.25v-8.5A5.75 5.75 0 0 1 7.75 2zm0 1.5A4.25 4.25 0 0 0 3.5 7.75v8.5A4.25 4.25 0 0 0 7.75 20.5h8.5A4.25 4.25 0 0 0 20.5 16.25v-8.5A4.25 4.25 0 0 0 16.25 3.5h-8.5zm4.25 3A5.25 5.25 0 1 1 6.75 12 5.25 5.25 0 0 1 12 6.5zm0 1.5A3.75 3.75 0 1 0 15.75 12 3.75 3.75 0 0 0 12 8zm5.5-.25a1 1 0 1 1 1-1 1 1 0 0 1-1 1z" />
-        </svg>
-      );
+      return <ImageIcon className={`${iconClass} text-pink-600 hover:text-pink-700`} strokeWidth={2} />;
     }
-
     if (keyLower.includes("youtube") || keyLower.includes("يوتيوب")) {
-      return (
-        <svg
-          className="h-6 w-6 text-red-600 hover:text-red-700 transition-colors"
-          fill="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path d="M23.498 6.186a2.998 2.998 0 0 0-2.114-2.115C19.217 3.5 12 3.5 12 3.5s-7.217 0-9.384.571A2.998 2.998 0 0 0 .502 6.186 31.46 31.46 0 0 0 0 12a31.46 31.46 0 0 0 .502 5.814 2.998 2.998 0 0 0 2.114 2.115C4.783 20.5 12 20.5 12 20.5s7.217 0 9.384-.571a2.998 2.998 0 0 0 2.114-2.115A31.46 31.46 0 0 0 24 12a31.46 31.46 0 0 0-.502-5.814zM9.75 15.568V8.432L15.818 12l-6.068 3.568z" />
-        </svg>
-      );
+      return <Video className={`${iconClass} text-red-600 hover:text-red-700`} strokeWidth={2} />;
     }
-
     if (
       keyLower.includes("twitter") ||
       keyLower.includes("تويتر") ||
       keyLower.includes("x")
     ) {
-      return (
-        <svg
-          className="h-6 w-6 text-gray-600 hover:text-gray-800 transition-colors"
-          fill="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-        </svg>
-      );
+      return <Send className={`${iconClass} text-gray-600 hover:text-gray-800`} strokeWidth={2} />;
     }
-
     if (keyLower.includes("linkedin") || keyLower.includes("لينكد إن")) {
-      return (
-        <svg
-          className="h-6 w-6 text-blue-500 hover:text-blue-600 transition-colors"
-          fill="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
-        </svg>
-      );
+      return <Briefcase className={`${iconClass} text-blue-500 hover:text-blue-600`} strokeWidth={2} />;
     }
-
-    // Default icon for unknown social media
-    return (
-      <svg
-        className="h-6 w-6 text-gray-600 hover:text-gray-800 transition-colors"
-        fill="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
-      </svg>
-    );
+    return <Globe className={`${iconClass} text-gray-600 hover:text-gray-800`} strokeWidth={2} />;
   };
 
   const handleSend = async () => {
-    if (!name || !email || !message) {
+    if (!name || !phone || !message) {
       toast.error(t("contact.error.fillAllFields"));
       return;
     }
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      toast.error(t("contact.error.invalidEmail"));
+    // Validate phone: 10 digits starting with 09
+    const phoneRegex = /^09\d{8}$/;
+    if (!phoneRegex.test(phone.trim())) {
+      toast.error(isRTL ? "رقم الهاتف غير صحيح. يجب أن يكون 10 أرقام تبدأ بـ 09" : "Invalid phone. Must be 10 digits starting with 09");
       return;
     }
 
@@ -176,17 +134,15 @@ export default function ContactPage() {
     try {
       const response = await publicApi.post(endpoints.public.contact, {
         name,
-        email,
+        phone: phone.trim(),
         message,
         lang: language || (isRTL ? "ar" : "en"),
       });
 
       if (response.data.success) {
-        // Use translation instead of backend message to ensure consistency
         toast.success(t("contact.success.messageSent"));
-        // Clear form
         setName("");
-        setEmail("");
+        setPhone("");
         setMessage("");
       } else {
         toast.error(
@@ -208,7 +164,7 @@ export default function ContactPage() {
       <Header />
       <div
         id="contact"
-        className="relative min-h-screen flex flex-col lg:flex-row items-stretch overflow-hidden bg-gradient-to-br from-blue-50 via-white to-blue-100 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800"
+        className="relative min-h-screen flex flex-col lg:flex-row items-stretch overflow-hidden bg-gradient-to-br from-blue-50 via-white to-blue-100 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 -mt-24 md:-mt-28 pt-24 md:pt-28"
       >
         {/* فقاعات زخرفية */}
         <div className="absolute top-10 left-10 w-16 h-16 bg-tm-blue/20 rounded-full blur-2xl animate-pulse"></div>
@@ -281,15 +237,20 @@ export default function ContactPage() {
             </div>
             <div className="mb-6">
               <label className="block text-gray-700 dark:text-gray-200 mb-2">
-                {isRTL ? "البريد الإلكتروني" : "Email"}
+                {isRTL ? "رقم الهاتف" : "Phone Number"}
               </label>
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="tel"
+                inputMode="numeric"
+                maxLength={10}
+                value={phone}
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
                 className="w-full p-3 border border-gray-300 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-tm-blue bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100"
-                placeholder="example@email.com"
+                placeholder="09xxxxxxxx"
               />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {isRTL ? "10 أرقام تبدأ بـ 09" : "10 digits starting with 09"}
+              </p>
             </div>
             <div className="mb-6">
               <label className="block text-gray-700 dark:text-gray-200 mb-2">
@@ -326,14 +287,8 @@ export default function ContactPage() {
             {/* رقم الهاتف */}
             {attributes.length > 1 && (
               <div className="flex items-center justify-center lg:justify-start gap-3">
-                <svg
-                  className="w-6 h-6 text-tm-blue"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07A19.5 19.5 0 0 1 3.15 9.18 19.8 19.8 0 0 1 .08.55 2 2 0 0 1 2.05 0h3a2 2 0 0 1 2 1.72c.12.81.3 1.6.54 2.36a2 2 0 0 1-.45 2.11L6 7a16 16 0 0 0 7 7l.79-.79a2 2 0 0 1 2.11-.45c.76.24 1.55.42 2.36.54A2 2 0 0 1 22 16.92z" />
-                </svg>
-                <a href={`tel:${phone}`} className="hover:text-tm-orange">
+                <Phone className="w-6 h-6 text-tm-blue flex-shrink-0" strokeWidth={2} />
+                <a href={`tel:${contactSectionPhone}`} className="hover:text-tm-orange">
                   {isRTL ? attributes[1].valueAr : attributes[1].value}
                 </a>
               </div>
@@ -341,13 +296,7 @@ export default function ContactPage() {
 
             {/* واتساب */}
             <div className="flex items-center justify-center lg:justify-start gap-3">
-              <svg
-                className="w-6 h-6 text-green-500"
-                fill="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path d="M20.52 3.48A11.9 11.9 0 0 0 12.05 0a11.9 11.9 0 0 0-8.47 3.48A11.9 11.9 0 0 0 0 11.95c0 2.1.54 4.15 1.57 5.97L0 24l6.22-1.64a11.88 11.88 0 0 0 5.83 1.49h.01c6.6 0 11.95-5.35 11.95-11.94a11.9 11.9 0 0 0-3.49-8.43zM12.05 21.5a9.54 9.54 0 0 1-4.85-1.32l-.35-.2-3.69.97.98-3.59-.23-.37a9.44 9.44 0 0 1-1.44-5.04c0-5.26 4.28-9.54 9.55-9.54a9.47 9.47 0 0 1 9.54 9.54c0 5.26-4.28 9.54-9.54 9.54zm5.26-7.14c-.29-.14-1.7-.84-1.96-.94-.26-.1-.45-.14-.63.14-.19.29-.72.94-.89 1.13-.17.19-.33.21-.62.07-.29-.14-1.23-.45-2.35-1.45-.87-.77-1.45-1.72-1.62-2-.17-.29-.02-.44.13-.58.13-.13.29-.33.43-.49.14-.16.19-.29.29-.48.1-.19.05-.36-.02-.51-.07-.14-.63-1.52-.86-2.09-.23-.56-.47-.49-.63-.5h-.54c-.19 0-.51.07-.78.36-.26.29-1 1-.96 2.42.05 1.42 1.03 2.8 1.17 2.99.14.19 2.02 3.1 4.9 4.35.68.29 1.21.46 1.63.59.68.22 1.3.19 1.79.12.55-.08 1.7-.69 1.94-1.36.24-.68.24-1.26.17-1.36-.07-.1-.26-.17-.55-.31z" />
-              </svg>
+              <MessageCircle className="w-6 h-6 text-green-500 flex-shrink-0" strokeWidth={2} />
               <a
                 href={`https://wa.me/${whatsappPhone}`}
                 target="_blank"
@@ -361,13 +310,7 @@ export default function ContactPage() {
             {/* العنوان */}
             {attributes.length > 0 && (
               <div className="flex items-center justify-center lg:justify-start gap-3">
-                <svg
-                  className="w-6 h-6 text-red-500"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M12 2C8.14 2 5 5.14 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.86-3.14-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5z" />
-                </svg>
+                <MapPin className="w-6 h-6 text-red-500 flex-shrink-0" strokeWidth={2} />
                 <span>{address}</span>
               </div>
             )}
@@ -388,7 +331,7 @@ export default function ContactPage() {
                       title={key}
                       aria-label={key}
                     >
-                      {getSocialIcon(attr.key, href)}
+                      {getSocialIcon(attr.key)}
                     </a>
                   );
                 })}

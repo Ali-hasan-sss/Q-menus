@@ -8,7 +8,7 @@ import React, {
   useCallback,
 } from "react";
 import { api } from "@/lib/api";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/store/hooks/useAuth";
 import { useSocket } from "@/contexts/SocketContext";
 
 interface Notification {

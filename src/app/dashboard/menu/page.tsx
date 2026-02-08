@@ -1,15 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
-import { useAuth } from "@/contexts/AuthContext";
-import { useLanguage } from "@/contexts/LanguageContext";
-import { useMenu } from "@/contexts/MenuContext";
-import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { useToast } from "@/components/ui/Toast";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useAuth } from "@/store/hooks/useAuth";
+import { useLanguage } from "@/store/hooks/useLanguage";
+import { useMenu } from "@/store/hooks/useMenu";
+import { useConfirmDialog } from "@/store/hooks/useConfirmDialog";
+import { useToast } from "@/store/hooks/useToast";
 import { MenuTabs } from "@/components/dashboard/MenuTabs";
 import { CategoryList } from "@/components/dashboard/CategoryList";
 import { ItemList } from "@/components/dashboard/ItemList";
+import { MenuAccordionView } from "@/components/dashboard/MenuAccordionView";
 import { CategoryFormModal } from "@/components/dashboard/CategoryFormModal";
 import { CategoryReorderModal } from "@/components/dashboard/CategoryReorderModal";
 import { ItemReorderModal } from "@/components/dashboard/ItemReorderModal";
@@ -55,6 +56,8 @@ export default function MenuPage() {
   const { user } = useAuth();
   const { t, isRTL } = useLanguage();
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const {
     menu,
     categories,
@@ -85,9 +88,12 @@ export default function MenuPage() {
   const [activeTab, setActiveTab] = useState<"categories" | "theme">(
     "categories",
   );
+  const [viewMode, setViewMode] = useState<"grid" | "accordion">("grid");
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(
     null,
   );
+  const [expandedAccordionCategoryId, setExpandedAccordionCategoryId] =
+    useState<string | null>(null);
 
   // Handle tab from URL parameter
   useEffect(() => {
@@ -99,22 +105,49 @@ export default function MenuPage() {
     }
   }, [searchParams]);
 
+  // Sync selectedCategory from URL (for browser back + direct links)
+  useEffect(() => {
+    const categoryId = searchParams.get("category");
+    if (viewMode !== "grid") return;
+    if (!categoryId) {
+      setSelectedCategory(null);
+      return;
+    }
+    const category = categories.find((c) => c.id === categoryId);
+    if (category) {
+      setSelectedCategory(category);
+      const categoryItems = items.filter((item) => item.categoryId === categoryId);
+      if (categoryItems.length === 0) {
+        fetchCategoryItems(categoryId);
+      }
+    } else {
+      setSelectedCategory(null);
+    }
+  }, [searchParams, categories, viewMode, fetchCategoryItems, items]);
+
+  // Update URL when selectedCategory changes (grid view only)
+  const updateUrlForCategory = (categoryId: string | null, push = false) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (categoryId) {
+      params.set("category", categoryId);
+    } else {
+      params.delete("category");
+    }
+    const query = params.toString();
+    const href = query ? `${pathname}?${query}` : pathname;
+    (push ? router.push : router.replace)(href, { scroll: false });
+  };
+
   // Ensure data is loaded when component mounts - only run once
   useEffect(() => {
-    console.log("📊 Menu Page - Initial load check:", {
-      categoriesLength: categories.length,
-      user: !!user,
-      loading,
-    });
-    // If no categories are loaded and user is authenticated, fetch data
     if (categories.length === 0 && user && !loading) {
-      console.log("🔄 No categories found, fetching data...");
       fetchCategories();
     }
   }, []); // Empty dependency array to run only once
 
-  // Handle category click
+  // Handle category click (grid view)
   const handleCategoryClick = async (category: Category) => {
+    updateUrlForCategory(category.id, true); // push for browser back support
     setSelectedCategory(category);
 
     // Load items for this category if not already loaded
@@ -126,9 +159,20 @@ export default function MenuPage() {
     }
   };
 
-  // Handle back to categories
+  // Handle accordion category expand
+  const handleAccordionCategoryExpand = async (category: Category) => {
+    setExpandedAccordionCategoryId(category.id);
+    const categoryItems = items.filter(
+      (item) => item.categoryId === category.id,
+    );
+    if (categoryItems.length === 0) {
+      await fetchCategoryItems(category.id);
+    }
+  };
+
+  // Handle back to categories (browser back returns to categories list)
   const handleBackToCategories = () => {
-    setSelectedCategory(null);
+    router.back();
   };
 
   // Modal states
@@ -139,6 +183,13 @@ export default function MenuPage() {
   const [showItemReorderModal, setShowItemReorderModal] = useState(false);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [discountMode, setDiscountMode] = useState<"all" | "category">("all");
+  const [discountTargetCategory, setDiscountTargetCategory] =
+    useState<Category | null>(null);
+  const [reorderItemsTargetCategory, setReorderItemsTargetCategory] =
+    useState<Category | null>(null);
+  const [itemFormCategoryId, setItemFormCategoryId] = useState<string | null>(
+    null,
+  );
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
 
@@ -320,6 +371,9 @@ export default function MenuPage() {
     setShowDiscountModal(false);
     setEditingCategory(null);
     setEditingItem(null);
+    setDiscountTargetCategory(null);
+    setReorderItemsTargetCategory(null);
+    setItemFormCategoryId(null);
   };
 
   const handleApplyDiscountToAll = () => {
@@ -327,8 +381,9 @@ export default function MenuPage() {
     setShowDiscountModal(true);
   };
 
-  const handleApplyDiscountToCategory = () => {
+  const handleApplyDiscountToCategory = (category?: Category) => {
     setDiscountMode("category");
+    setDiscountTargetCategory(category || selectedCategory || null);
     setShowDiscountModal(true);
   };
 
@@ -345,15 +400,15 @@ export default function MenuPage() {
       if (selectedCategory) {
         fetchCategoryItems(selectedCategory.id);
       }
-    } else if (discountMode === "category" && selectedCategory) {
-      await applyDiscountToCategory(selectedCategory.id, discount);
+    } else if (discountMode === "category" && discountTargetCategory) {
+      await applyDiscountToCategory(discountTargetCategory.id, discount);
       showToast(
         isRTL
           ? `تم تطبيق خصم ${discount}% على أصناف الفئة`
           : `Discount of ${discount}% applied to category items`,
         "success",
       );
-      fetchCategoryItems(selectedCategory.id);
+      fetchCategoryItems(discountTargetCategory.id);
     }
   };
 
@@ -361,7 +416,8 @@ export default function MenuPage() {
     setShowCategoryReorderModal(true);
   };
 
-  const handleReorderItems = () => {
+  const handleReorderItems = (category?: Category) => {
+    setReorderItemsTargetCategory(category || selectedCategory || null);
     setShowItemReorderModal(true);
   };
 
@@ -372,10 +428,9 @@ export default function MenuPage() {
   };
 
   const handleItemsReordered = () => {
-    // The API call is handled inside the modal
-    // We just need to refresh the items list
-    if (selectedCategory) {
-      fetchItems(selectedCategory.id);
+    const targetCat = reorderItemsTargetCategory || selectedCategory;
+    if (targetCat) {
+      fetchCategoryItems(targetCat.id);
     }
   };
 
@@ -474,6 +529,8 @@ export default function MenuPage() {
             onTabChange={(tab) => {
               setActiveTab(tab);
               setSelectedCategory(null);
+              setExpandedAccordionCategoryId(null);
+              if (tab === "theme") updateUrlForCategory(null);
             }}
             categoriesCount={categories.length}
           />
@@ -481,7 +538,73 @@ export default function MenuPage() {
           {/* Categories Tab */}
           {activeTab === "categories" && (
             <div>
-              {!selectedCategory ? (
+              {/* View mode toggle - only when categories exist */}
+              {categories.length > 0 && (
+                <div
+                  className={`flex items-center gap-2 mb-4 ${isRTL ? "flex-row-reverse justify-end" : ""}`}
+                >
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    {isRTL ? "طريقة العرض:" : "View:"}
+                  </span>
+                  <div className="flex rounded-lg border border-gray-200 dark:border-gray-600 overflow-hidden">
+                    <button
+                      onClick={() => {
+                        setViewMode("grid");
+                        setExpandedAccordionCategoryId(null);
+                      }}
+                      className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                        viewMode === "grid"
+                          ? "bg-primary-600 text-white"
+                          : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      }`}
+                      title={isRTL ? "شبكة" : "Grid"}
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
+                        />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setViewMode("accordion");
+                        setSelectedCategory(null);
+                        updateUrlForCategory(null);
+                      }}
+                      className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                        viewMode === "accordion"
+                          ? "bg-primary-600 text-white"
+                          : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      }`}
+                      title={isRTL ? "أكوارديون" : "Accordion"}
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4 6h16M4 12h16M4 18h16"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {viewMode === "grid" && !selectedCategory ? (
                 <CategoryList
                   categories={categories}
                   onCategoryClick={handleCategoryClick}
@@ -493,7 +616,7 @@ export default function MenuPage() {
                   onResetAll={handleResetAll}
                   onApplyDiscountToAll={handleApplyDiscountToAll}
                 />
-              ) : (
+              ) : viewMode === "grid" && selectedCategory ? (
                 <ItemList
                   items={getCategoryItems()}
                   selectedCategory={getSelectedCategory()}
@@ -503,9 +626,46 @@ export default function MenuPage() {
                   onEditItem={handleEditItem}
                   onDeleteItem={handleDeleteItem}
                   onToggleItemStatus={toggleItemStatus}
-                  onCreateItem={() => setShowItemModal(true)}
+                  onCreateItem={() => {
+                    setItemFormCategoryId(selectedCategory?.id || null);
+                    setShowItemModal(true);
+                  }}
                   onReorderItems={handleReorderItems}
                   onApplyDiscountToCategory={handleApplyDiscountToCategory}
+                />
+              ) : (
+                <MenuAccordionView
+                  categories={categories}
+                  items={items}
+                  loadingItems={loadingItems}
+                  restaurantCurrency={restaurantCurrency}
+                  expandedCategoryId={expandedAccordionCategoryId}
+                  onCategoryExpand={handleAccordionCategoryExpand}
+                  onCategoryCollapse={() =>
+                    setExpandedAccordionCategoryId(null)
+                  }
+                  onEditCategory={handleEditCategory}
+                  onDeleteCategory={handleDeleteCategory}
+                  onToggleCategoryStatus={toggleCategoryStatus}
+                  onEditItem={handleEditItem}
+                  onDeleteItem={handleDeleteItem}
+                  onToggleItemStatus={toggleItemStatus}
+                  onCreateCategory={() => setShowCategoryModal(true)}
+                  onCreateItem={(categoryId) => {
+                    setItemFormCategoryId(categoryId);
+                    setShowItemModal(true);
+                  }}
+                  onReorderItems={(categoryId) => {
+                    const cat = categories.find((c) => c.id === categoryId);
+                    if (cat) handleReorderItems(cat);
+                  }}
+                  onReorderCategories={handleReorderCategories}
+                  onApplyDiscountToAll={handleApplyDiscountToAll}
+                  onApplyDiscountToCategory={(categoryId) => {
+                    const cat = categories.find((c) => c.id === categoryId);
+                    if (cat) handleApplyDiscountToCategory(cat);
+                  }}
+                  onResetAll={handleResetAll}
                 />
               )}
             </div>
@@ -539,7 +699,7 @@ export default function MenuPage() {
         onSubmit={editingItem ? handleUpdateItem : handleCreateItem}
         item={editingItem}
         categories={categories}
-        categoryId={selectedCategory?.id}
+        categoryId={itemFormCategoryId || selectedCategory?.id}
         restaurantCurrency={restaurantCurrency}
         title={
           editingItem
@@ -558,7 +718,15 @@ export default function MenuPage() {
       <ItemReorderModal
         isOpen={showItemReorderModal}
         onClose={closeModals}
-        items={selectedCategory ? getCategoryItems() : []}
+        items={
+          (reorderItemsTargetCategory || selectedCategory)
+            ? items.filter(
+                (i) =>
+                  i.categoryId ===
+                  (reorderItemsTargetCategory || selectedCategory)?.id
+              )
+            : []
+        }
         onReorder={handleItemsReordered}
       />
 
@@ -572,8 +740,8 @@ export default function MenuPage() {
               ? "خصم لكامل القائمة"
               : "Discount for All Menu Items"
             : isRTL
-              ? `خصم لأصناف ${selectedCategory?.name || ""}`
-              : `Discount for ${selectedCategory?.name || ""} Items`
+              ? `خصم لأصناف ${discountTargetCategory?.name || ""}`
+              : `Discount for ${discountTargetCategory?.name || ""} Items`
         }
         description={
           discountMode === "all"
@@ -581,8 +749,8 @@ export default function MenuPage() {
               ? "أدخل نسبة الخصم لتطبيقها على جميع أصناف القائمة (0 لإزالة الخصم)"
               : "Enter discount percentage to apply to all menu items (0 to remove discount)"
             : isRTL
-              ? "أدخل نسبة الخصم لتطبيقها على أصناف هذه الفئة (0 لإزالة الخصم)"
-              : "Enter discount percentage to apply to this category's items (0 to remove discount)"
+              ? `أدخل نسبة الخصم لتطبيقها على أصناف ${discountTargetCategory?.name || "هذه الفئة"} (0 لإزالة الخصم)`
+              : `Enter discount percentage to apply to ${discountTargetCategory?.name || "this category"}'s items (0 to remove discount)`
         }
       />
     </div>

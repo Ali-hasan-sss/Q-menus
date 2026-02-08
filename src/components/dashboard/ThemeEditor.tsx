@@ -33,9 +33,9 @@ if (typeof document !== "undefined") {
   document.head.appendChild(styleSheet);
 }
 
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/store/hooks/useLanguage";
 import { api } from "@/lib/api";
-import { useToast } from "@/components/ui/Toast";
+import { useToast } from "@/store/hooks/useToast";
 import { ImageUpload } from "@/components/ui/ImageUpload";
 import { DEFAULT_THEME, mergeWithDefaultTheme } from "@/lib/defaultTheme";
 import { hexToRgba } from "@/lib/helper";

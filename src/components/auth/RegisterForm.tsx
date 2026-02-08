@@ -2,9 +2,9 @@
 
 import { useRef, useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { useLanguage } from "@/contexts/LanguageContext";
-import { useAuth } from "@/contexts/AuthContext";
-import { useToast } from "@/components/ui/Toast";
+import { useLanguage } from "@/store/hooks/useLanguage";
+import { useAuth } from "@/store/hooks/useAuth";
+import { useToast } from "@/store/hooks/useToast";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -13,6 +13,11 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { Card } from "../ui/Card";
 import { EmailVerificationModal } from "./EmailVerificationModal";
+
+interface RegisterFormProps {
+  /** عند true يُعرض المحتوى بدون Card (للتخطيط المنقسم مع اللوجو) */
+  noCard?: boolean;
+}
 
 interface FormData {
   // Step 1: Personal Information
@@ -45,7 +50,7 @@ const initialFormData: FormData = {
   logo: "",
 };
 
-export default function RegisterForm() {
+export default function RegisterForm({ noCard = false }: RegisterFormProps) {
   const { isRTL, t } = useLanguage();
   const { showToast } = useToast();
   const { loginWithToken } = useAuth();
@@ -423,9 +428,14 @@ export default function RegisterForm() {
     return isStep1Valid && isStep2Valid;
   }, [isStep1Valid, isStep2Valid]);
 
-  return (
-    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <Card className="mt-8 p-6 w-full max-w-lg bg-white dark:bg-gray-800 shadow-xl">
+  const Wrapper = noCard ? "div" : Card;
+  const wrapperClassName = noCard
+    ? "w-full max-w-lg"
+    : "mt-8 p-6 w-full max-w-lg bg-white dark:bg-gray-800 shadow-xl";
+
+  const inner = (
+    <>
+      <Wrapper className={wrapperClassName}>
         <div>
           <h2 className="mt-4 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
             {isRTL ? "أنشئ حساب مطعمك" : "Create your restaurant account"}
@@ -470,7 +480,7 @@ export default function RegisterForm() {
                 </div>
                 <div>
                   <Input
-                    label={isRTL ? "الاسم الأخير" : "Last Name"}
+                    label={isRTL ? "الكنية" : "Last Name"}
                     value={formData.lastName}
                     onChange={(e) =>
                       handleInputChange("lastName", e.target.value)
@@ -739,15 +749,20 @@ export default function RegisterForm() {
             </a>
           </p>
         </div>
-      </Card>
-
-      {/* Email Verification Modal */}
+      </Wrapper>
       <EmailVerificationModal
         isOpen={showEmailVerification}
         onClose={() => setShowEmailVerification(false)}
         email={userEmail || formData.email}
         onVerified={handleEmailVerified}
       />
+    </>
+  );
+
+  if (noCard) return inner;
+  return (
+    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      {inner}
     </div>
   );
 }

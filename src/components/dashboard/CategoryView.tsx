@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { useMenu } from "@/contexts/MenuContext";
+import { useMenu } from "@/store/hooks/useMenu";
+import { useLanguage } from "@/store/hooks/useLanguage";
+import { getLocalizedName } from "@/lib/utils";
 
 interface CategoryViewProps {
   categoryId: string;
@@ -17,6 +19,8 @@ export function CategoryView({
   onEditItem,
 }: CategoryViewProps) {
   const { categories, items } = useMenu();
+  const { language } = useLanguage();
+  const lang = language === "AR" ? "AR" : "EN";
   const [isExpanded, setIsExpanded] = useState(true);
 
   const category = categories.find((cat) => cat.id === categoryId);
@@ -39,13 +43,8 @@ export function CategoryView({
             )}
             <div>
               <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-                {category.name}
+                {getLocalizedName(category.name, category.nameAr, lang)}
               </h3>
-              {category.nameAr && (
-                <p className="text-gray-600 dark:text-gray-400">
-                  {category.nameAr}
-                </p>
-              )}
               <div className="flex items-center gap-4 mt-2">
                 <span
                   className={`px-2 py-1 text-xs rounded-full ${
@@ -108,13 +107,8 @@ export function CategoryView({
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex-1">
                       <h5 className="font-medium text-gray-900 dark:text-white">
-                        {item.name}
+                        {getLocalizedName(item.name, item.nameAr, lang)}
                       </h5>
-                      {item.nameAr && (
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          {item.nameAr}
-                        </p>
-                      )}
                     </div>
                     <span
                       className={`px-2 py-1 text-xs rounded-full ${

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useLanguage } from "@/contexts/LanguageContext";
-import { useToast } from "@/components/ui/Toast";
+import { useLanguage } from "@/store/hooks/useLanguage";
+import { getLocalizedName } from "@/lib/utils";
+import { useToast } from "@/store/hooks/useToast";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { api, endpoints } from "@/lib/api";
@@ -311,18 +312,13 @@ export function KitchenSectionsManager() {
                 ) : (
                   <>
                     <div className="flex-1">
-                      <div className="flex items-center gap-3">
-                        <h4 className="font-semibold text-gray-900 dark:text-white">
-                          {isRTL && section.nameAr
-                            ? section.nameAr
-                            : section.name}
-                        </h4>
-                        {section.nameAr && !isRTL && (
-                          <span className="text-sm text-gray-500 dark:text-gray-400">
-                            ({section.nameAr})
-                          </span>
+                      <h4 className="font-semibold text-gray-900 dark:text-white">
+                        {getLocalizedName(
+                          section.name,
+                          section.nameAr,
+                          isRTL ? "AR" : "EN"
                         )}
-                      </div>
+                      </h4>
                     </div>
                     <div className="flex gap-2 items-center">
                       <button

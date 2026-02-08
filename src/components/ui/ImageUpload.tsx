@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import { Button } from "./Button";
 import { GalleryPicker } from "./GalleryPicker";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/store/hooks/useLanguage";
 
 interface ImageUploadProps {
   value?: string;

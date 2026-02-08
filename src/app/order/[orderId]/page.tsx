@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { publicApi, endpoints } from "@/lib/api";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/store/hooks/useLanguage";
 import { useCustomerSocket } from "@/contexts/CustomerSocketContext";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";

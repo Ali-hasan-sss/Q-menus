@@ -6,11 +6,10 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useAuth } from "@/contexts/AuthContext";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useAuth } from "@/store/hooks/useAuth";
+import { useLanguage } from "@/store/hooks/useLanguage";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { Card } from "@/components/ui/Card";
 import { Logo } from "@/components/ui/Logo";
 import { LanguageToggle } from "@/components/ui/LanguageToggle";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
@@ -18,7 +17,7 @@ import Header from "@/components/layout/Header";
 import { EmailVerificationModal } from "@/components/auth/EmailVerificationModal";
 import { ForgotPasswordModal } from "@/components/auth/ForgotPasswordModal";
 import { ResetPasswordModal } from "@/components/auth/ResetPasswordModal";
-import { useToast } from "@/components/ui/Toast";
+import { useToast } from "@/store/hooks/useToast";
 import { Footer } from "@/components/ui/Footer";
 
 const loginSchema = z.object({
@@ -167,33 +166,21 @@ export default function LoginPage() {
 
   return (
     <>
-      {" "}
       <Header />
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-100 dark:bg-gradient-to-br dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 -mt-24 md:-mt-28 pt-24 md:pt-28 relative overflow-hidden py-12 px-4 sm:px-6 lg:px-8">
-        {/* Decorative bubbles */}
-        <div className="absolute -top-10 -left-10 w-40 h-40 opacity-10 dark:opacity-5 z-0">
-          <div className="w-full h-full bg-gradient-to-br from-blue-500 to-orange-500 rounded-full"></div>
-        </div>
-        <div className="absolute -bottom-10 -right-10 w-56 h-56 opacity-10 dark:opacity-5 z-0">
-          <div className="w-full h-full bg-gradient-to-tr from-orange-500 to-blue-500 rounded-full"></div>
-        </div>
-        <div className="max-w-md w-full space-y-8 relative z-10">
-          {/* Header */}
-
-          {/* Login Form */}
-          <Card className="mt-8 p-6 w-full max-w-lg bg-white dark:bg-gray-800 shadow-xl relative z-10">
-            <div>
-              <h2 className="my-4 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
-                {isRTL
-                  ? "سجّل الدخول إلى حساب مطعمك"
-                  : "Sign in to your restaurant account"}
-              </h2>
-              <p className="text-center text-sm text-gray-600 dark:text-gray-300">
-                {isRTL
-                  ? "QMenus مخصّصة للمطاعم والكافيهات"
-                  : "QMenus is built for restaurants and cafes"}
-              </p>
-            </div>
+      <div className={`min-h-screen flex flex-col lg:flex-row -mt-24 md:-mt-28 pt-24 md:pt-28 ${isRTL ? "lg:flex-row-reverse" : ""}`}>
+        {/* النصف الأول: الفورم بدون حواف — يسار في LTR، يمين في RTL */}
+        <div className="flex-1 flex items-center justify-center px-6 sm:px-10 lg:px-16 py-12 bg-white dark:bg-gray-900">
+          <div className="w-full max-w-md">
+            <h2 className="mb-2 text-3xl font-extrabold text-gray-900 dark:text-white">
+              {isRTL
+                ? "سجّل الدخول إلى حساب مطعمك"
+                : "Sign in to your restaurant account"}
+            </h2>
+            <p className="mb-8 text-sm text-gray-600 dark:text-gray-300">
+              {isRTL
+                ? "QMenus مخصّصة للمطاعم والكافيهات"
+                : "QMenus is built for restaurants and cafes"}
+            </p>
             <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
               <div>
                 <label
@@ -225,7 +212,7 @@ export default function LoginPage() {
               <div>
                 <label
                   htmlFor="password"
-                  className="block  text-sm font-medium text-gray-700 dark:text-gray-300"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
                   {t("auth.password")}
                 </label>
@@ -281,7 +268,7 @@ export default function LoginPage() {
                 <div>
                   <span className="text-sm text-gray-600 dark:text-gray-400">
                     {t("auth.noAccount")}
-                  </span>
+                  </span>{" "}
                   <Link
                     href="/auth/register"
                     className="font-medium text-tm-blue hover:text-tm-orange"
@@ -289,10 +276,10 @@ export default function LoginPage() {
                     {t("auth.register")}
                   </Link>
                 </div>
-                <div className="pt-2 border-t border-gray-200 dark:border-gray-700 relative z-20">
+                <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
                   <Link
                     href="/kitchen/login"
-                    className="relative z-20 inline-flex items-center justify-center gap-2 w-full py-3 px-4 text-base font-semibold text-white bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 dark:from-orange-600 dark:to-orange-700 dark:hover:from-orange-700 dark:hover:to-orange-800 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+                    className="inline-flex items-center justify-center gap-2 w-full py-3 px-4 text-base font-semibold text-white bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 dark:from-orange-600 dark:to-orange-700 dark:hover:from-orange-700 dark:hover:to-orange-800 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
                   >
                     <svg
                       className="w-6 h-6"
@@ -314,7 +301,16 @@ export default function LoginPage() {
                 </div>
               </div>
             </form>
-          </Card>
+          </div>
+        </div>
+
+        {/* النصف الثاني: تدرج ألوان الموقع + اللوجو — يظهر فقط من lg فما فوق */}
+        <div className="hidden lg:flex flex-1 items-center justify-center min-h-0 bg-gradient-to-br from-tm-blue via-blue-100 to-tm-orange dark:from-tm-blue/90 dark:via-gray-800 dark:to-tm-orange/90 px-6 py-0">
+          <div className="flex items-center justify-center w-full drop-shadow-2xl">
+            <div className="scale-150 sm:scale-[1.8] md:scale-[2]">
+              <Logo size="lg" className="opacity-95" />
+            </div>
+          </div>
         </div>
       </div>
       {/* Email Verification Modal */}

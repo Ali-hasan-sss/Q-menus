@@ -1,6 +1,6 @@
 "use client";
 
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useLanguage } from "@/store/hooks/useLanguage";
 import { LanguageToggle } from "@/components/ui/LanguageToggle";
 import { hexToRgba } from "@/lib/helper";
 import { formatCurrencyWithLanguage } from "@/lib/utils";

@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { useAuth } from "@/contexts/AuthContext";
-import { useLanguage } from "@/contexts/LanguageContext";
+import { useAuth } from "@/store/hooks/useAuth";
+import { useLanguage } from "@/store/hooks/useLanguage";
 import { useSocket } from "@/contexts/SocketContext";
-import { useMenu } from "@/contexts/MenuContext";
-import { useToast } from "@/components/ui/Toast";
+import { useMenu } from "@/store/hooks/useMenu";
+import { useToast } from "@/store/hooks/useToast";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import Navbar from "@/components/dashboard/Navbar";

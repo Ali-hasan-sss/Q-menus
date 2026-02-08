@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useLanguage } from "@/contexts/LanguageContext";
-import { useAuth } from "@/contexts/AuthContext";
-import { useToast } from "@/components/ui/Toast";
-import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useLanguage } from "@/store/hooks/useLanguage";
+import { useAuth } from "@/store/hooks/useAuth";
+import { useToast } from "@/store/hooks/useToast";
+import { useConfirmDialog } from "@/store/hooks/useConfirmDialog";
 import Switch from "@/components/ui/Switch";
 import { api } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
