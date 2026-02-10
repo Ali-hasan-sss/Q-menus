@@ -17,17 +17,14 @@ import { MenuLoadingSkeleton } from "@/components/customer/MenuLoadingSkeleton";
 import WaiterRequestButton from "@/components/customer/WaiterRequestButton";
 
 // Dynamically import QRScanner to avoid SSR issues with jsqr
-const QRScanner = dynamic(
-  () => import("@/components/customer/QRScanner"),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="min-h-screen flex items-center justify-center">
-        <LoadingSpinner />
-      </div>
-    ),
-  }
-);
+const QRScanner = dynamic(() => import("@/components/customer/QRScanner"), {
+  ssr: false,
+  loading: () => (
+    <div className="min-h-screen flex items-center justify-center">
+      <LoadingSpinner />
+    </div>
+  ),
+});
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import toast from "react-hot-toast";
@@ -163,7 +160,7 @@ export default function CustomerMenuPage() {
   const [loadingItems, setLoadingItems] = useState(false);
   const [loadingCategory, setLoadingCategory] = useState<string | null>(null);
   const [loadedCategories, setLoadedCategories] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
   const [error, setError] = useState<string | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
@@ -175,14 +172,14 @@ export default function CustomerMenuPage() {
   const [orderId, setOrderId] = useState<string | null>(null);
   const [orderStatus, setOrderStatus] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(
-    null
+    null,
   );
   const selectedCategoryRef = useRef<Category | null>(null);
   const [showOrderSummary, setShowOrderSummary] = useState(false);
   const [pendingOrder, setPendingOrder] = useState<any>(null);
   const [incompleteOrder, setIncompleteOrder] = useState<any>(null);
   const [existingOrderId, setExistingOrderId] = useState<string | null>(
-    addToOrderParam
+    addToOrderParam,
   );
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<MenuItem[]>([]);
@@ -206,7 +203,7 @@ export default function CustomerMenuPage() {
 
   // Background overlay opacity state (load from theme or default)
   const [backgroundOverlayOpacity, setBackgroundOverlayOpacity] = useState(
-    DEFAULT_THEME.backgroundOverlayOpacity
+    DEFAULT_THEME.backgroundOverlayOpacity,
   );
 
   // Function to update CSS custom properties with restaurant theme
@@ -311,7 +308,7 @@ export default function CustomerMenuPage() {
       if (tableNumber && tableNumber !== "DELIVERY" && !addToOrderParam) {
         try {
           const response = await publicApi.get(
-            `/order/incomplete/${restaurantId}?tableNumber=${tableNumber}`
+            `/order/incomplete/${restaurantId}?tableNumber=${tableNumber}`,
           );
           if (
             response.data.success &&
@@ -384,7 +381,7 @@ export default function CustomerMenuPage() {
         setLoadingCategory(null);
         // Mark this category as loaded to prevent infinite loop
         setLoadedCategories(
-          (prev) => new Set(Array.from(prev).concat(selectedCategory.id))
+          (prev) => new Set(Array.from(prev).concat(selectedCategory.id)),
         );
       });
     }
@@ -399,7 +396,7 @@ export default function CustomerMenuPage() {
       }
 
       const response = await publicApi.get(
-        `/order/incomplete/${restaurantId}?tableNumber=${tableNumber}`
+        `/order/incomplete/${restaurantId}?tableNumber=${tableNumber}`,
       );
       if (response.data.success && response.data.data.order) {
         const order = response.data.data.order;
@@ -410,7 +407,7 @@ export default function CustomerMenuPage() {
             "🚫 Incomplete order found:",
             order.id,
             "Status:",
-            order.status
+            order.status,
           );
         }
       }
@@ -452,7 +449,7 @@ export default function CustomerMenuPage() {
       const confirmExit = window.confirm(
         isRTL
           ? "استخدم زر الرجوع ياسفل الشاشة للعودة إلى القائمة"
-          : "Use the back button at the bottom of the screen to return to the menu"
+          : "Use the back button at the bottom of the screen to return to the menu",
       );
 
       if (confirmExit) {
@@ -462,7 +459,7 @@ export default function CustomerMenuPage() {
         window.history.pushState(
           { page: "menu", selectedCategory: null },
           "",
-          window.location.href
+          window.location.href,
         );
       }
     };
@@ -474,7 +471,7 @@ export default function CustomerMenuPage() {
         window.history.replaceState(
           { page: "menu", selectedCategory: selectedCategory?.id || null },
           "",
-          window.location.href
+          window.location.href,
         );
       }
     }
@@ -598,26 +595,26 @@ export default function CustomerMenuPage() {
 
     window.addEventListener(
       "orderStatusUpdate",
-      handleOrderStatusUpdate as EventListener
+      handleOrderStatusUpdate as EventListener,
     );
     window.addEventListener(
       "orderCreated",
-      handleOrderCreated as EventListener
+      handleOrderCreated as EventListener,
     );
     window.addEventListener("order_error", handleOrderError as EventListener);
 
     return () => {
       window.removeEventListener(
         "orderStatusUpdate",
-        handleOrderStatusUpdate as EventListener
+        handleOrderStatusUpdate as EventListener,
       );
       window.removeEventListener(
         "orderCreated",
-        handleOrderCreated as EventListener
+        handleOrderCreated as EventListener,
       );
       window.removeEventListener(
         "order_error",
-        handleOrderError as EventListener
+        handleOrderError as EventListener,
       );
     };
   }, [orderId, pendingOrder, tableNumber]);
@@ -629,7 +626,7 @@ export default function CustomerMenuPage() {
 
       // Load only categories first for better performance
       const response = await publicApi.get(
-        endpoints.public.menuCategories(restaurantId)
+        endpoints.public.menuCategories(restaurantId),
       );
       const { restaurant, categories, menuTheme, currency } =
         response.data.data;
@@ -672,12 +669,12 @@ export default function CustomerMenuPage() {
       // Fetch currency exchanges
       try {
         const currencyResponse = await publicApi.get(
-          `/public/restaurant/${restaurantId}/currency-exchanges`
+          `/public/restaurant/${restaurantId}/currency-exchanges`,
         );
         if (currencyResponse.data.success) {
           // Filter only active currencies
           const activeCurrencies = currencyResponse.data.data.filter(
-            (ce: any) => ce.isActive === true
+            (ce: any) => ce.isActive === true,
           );
           setCurrencyExchanges(activeCurrencies);
         }
@@ -702,7 +699,7 @@ export default function CustomerMenuPage() {
       setLoadingItems(true);
 
       const response = await publicApi.get(
-        endpoints.public.categoryItems(restaurantId, categoryId)
+        endpoints.public.categoryItems(restaurantId, categoryId),
       );
       const { category, items, currency } = response.data.data;
 
@@ -716,9 +713,9 @@ export default function CustomerMenuPage() {
         prevMenus.map((menu) => ({
           ...menu,
           categories: menu.categories.map((cat) =>
-            cat.id === categoryId ? { ...cat, items: items } : cat
+            cat.id === categoryId ? { ...cat, items: items } : cat,
           ),
-        }))
+        })),
       );
 
       // Also update selectedCategory if it's the current one
@@ -748,7 +745,7 @@ export default function CustomerMenuPage() {
     try {
       setIsSearching(true);
       const response = await publicApi.get(
-        endpoints.public.searchMenu(restaurantId, query)
+        endpoints.public.searchMenu(restaurantId, query),
       );
 
       if (response.data.success) {
@@ -781,7 +778,7 @@ export default function CustomerMenuPage() {
     menuItem: MenuItem,
     quantity: number = 1,
     notes?: string,
-    extras?: any
+    extras?: any,
   ) => {
     setOrderItems((prev) => {
       const existingItem = prev.find((item) => item.menuItemId === menuItem.id);
@@ -806,7 +803,7 @@ export default function CustomerMenuPage() {
                 Object.values(menuItem.extras).forEach((group: any) => {
                   if (group.options) {
                     const option = group.options.find(
-                      (opt: any) => opt.id === extraId
+                      (opt: any) => opt.id === extraId,
                     );
                     if (option && option.price) {
                       extrasPrice += option.price;
@@ -838,7 +835,7 @@ export default function CustomerMenuPage() {
                   quantity: item.quantity + quantity,
                   notes: notes || item.notes,
                 }
-              : item
+              : item,
           );
         } else {
           // Different extras, add as new item
@@ -917,7 +914,7 @@ export default function CustomerMenuPage() {
 
     setOrderItems((prev) => {
       const newItems = prev.map((item) =>
-        item.menuItemId === menuItemId ? { ...item, quantity } : item
+        item.menuItemId === menuItemId ? { ...item, quantity } : item,
       );
 
       // Save to localStorage
@@ -942,7 +939,7 @@ export default function CustomerMenuPage() {
       window.history.pushState(
         { page: "menu", selectedCategory: category.id },
         "",
-        window.location.href
+        window.location.href,
       );
     }
   };
@@ -956,7 +953,7 @@ export default function CustomerMenuPage() {
       window.history.replaceState(
         { page: "menu", selectedCategory: null },
         "",
-        window.location.href
+        window.location.href,
       );
     }
   };
@@ -978,7 +975,7 @@ export default function CustomerMenuPage() {
   // Calculate total in selected currency
   const calculateTotalInCurrency = (
     totalInBaseCurrency: number,
-    selectedCurrency: string | null
+    selectedCurrency: string | null,
   ): { amount: number; currency: string } => {
     if (!selectedCurrency || selectedCurrency === restaurantCurrency) {
       return { amount: totalInBaseCurrency, currency: restaurantCurrency };
@@ -987,7 +984,7 @@ export default function CustomerMenuPage() {
     const currencyExchange = currencyExchanges.find(
       (ce) =>
         ce.currency.toUpperCase() === selectedCurrency.toUpperCase() &&
-        ce.isActive
+        ce.isActive,
     );
 
     if (!currencyExchange) {
@@ -1045,7 +1042,7 @@ export default function CustomerMenuPage() {
           `/order/${existingOrderId}/add-items`,
           {
             items: orderItems,
-          }
+          },
         );
 
         if (response.data.success) {
@@ -1231,7 +1228,7 @@ export default function CustomerMenuPage() {
         style={{
           backgroundColor: hexToRgba(
             menuTheme?.backgroundColor || DEFAULT_THEME.backgroundColor,
-            colorOpacity.background
+            colorOpacity.background,
           ),
           backgroundImage: menuTheme?.backgroundImage
             ? `url(${menuTheme.backgroundImage})`
@@ -1244,7 +1241,7 @@ export default function CustomerMenuPage() {
             menuTheme?.backgroundRepeat || DEFAULT_THEME.backgroundRepeat,
           color: hexToRgba(
             menuTheme?.textColor || DEFAULT_THEME.textColor,
-            colorOpacity.text
+            colorOpacity.text,
           ),
           fontFamily: menuTheme?.fontFamily || DEFAULT_THEME.fontFamily,
         }}
@@ -1296,25 +1293,6 @@ export default function CustomerMenuPage() {
               </div>
             )}
 
-            {/* Waiter Request Button - Categories View */}
-            {isAuthorizedAccess && tableNumber !== "DELIVERY" && (
-              <div
-                className={`fixed z-40 ${
-                  orderItems.length > 0
-                    ? "bottom-20 left-1/2 transform -translate-x-1/2"
-                    : "bottom-6 left-1/2 transform -translate-x-1/2"
-                }`}
-              >
-                <WaiterRequestButton
-                  restaurantId={restaurantId}
-                  tableNumber={tableNumber || undefined}
-                  orderType="DINE_IN"
-                  menuTheme={menuTheme}
-                  className="shadow-lg"
-                />
-              </div>
-            )}
-
             {/* Categories View */}
             {!selectedCategory && (
               <div className="animate-fadeIn">
@@ -1332,11 +1310,11 @@ export default function CustomerMenuPage() {
                       style={{
                         backgroundColor: hexToRgba(
                           menuTheme?.backgroundColor || "#ffffff",
-                          0.9
+                          0.9,
                         ),
                         borderColor: hexToRgba(
                           menuTheme?.secondaryColor || "#e5e7eb",
-                          colorOpacity.secondary
+                          colorOpacity.secondary,
                         ),
                       }}
                     />
@@ -1403,7 +1381,7 @@ export default function CustomerMenuPage() {
                       style={{
                         color: hexToRgba(
                           menuTheme?.textColor || "#1f2937",
-                          colorOpacity.text
+                          colorOpacity.text,
                         ),
                       }}
                     >
@@ -1432,7 +1410,7 @@ export default function CustomerMenuPage() {
                       style={{
                         borderColor: hexToRgba(
                           menuTheme?.secondaryColor || "#e5e7eb",
-                          0.3
+                          0.3,
                         ),
                       }}
                     ></div>
@@ -1446,7 +1424,7 @@ export default function CustomerMenuPage() {
                     style={{
                       color: hexToRgba(
                         menuTheme?.textColor || "#1f2937",
-                        colorOpacity.text
+                        colorOpacity.text,
                       ),
                     }}
                   >
@@ -1463,11 +1441,11 @@ export default function CustomerMenuPage() {
                         style={{
                           backgroundColor: hexToRgba(
                             menuTheme?.primaryColor || "#ffffff",
-                            colorOpacity.primary
+                            colorOpacity.primary,
                           ),
                           borderColor: hexToRgba(
                             menuTheme?.secondaryColor || "#e5e7eb",
-                            colorOpacity.secondary
+                            colorOpacity.secondary,
                           ),
                         }}
                         onClick={() => handleCategoryClick(category)}
@@ -1514,7 +1492,7 @@ export default function CustomerMenuPage() {
                             style={{
                               color: hexToRgba(
                                 menuTheme?.textColor || "#1f2937",
-                                colorOpacity.text
+                                colorOpacity.text,
                               ),
                             }}
                           >
@@ -1533,32 +1511,11 @@ export default function CustomerMenuPage() {
                           </p>
                         </div>
                       </div>
-                    ))
+                    )),
                   )}
                 </div>
               </div>
             )}
-
-            {/* Waiter Request Button - Items View */}
-            {isAuthorizedAccess &&
-              tableNumber !== "DELIVERY" &&
-              selectedCategory && (
-                <div
-                  className={`fixed z-40 ${
-                    orderItems.length > 0
-                      ? "bottom-20 left-1/2 transform -translate-x-1/2"
-                      : "bottom-6 left-1/2 transform -translate-x-1/2"
-                  }`}
-                >
-                  <WaiterRequestButton
-                    restaurantId={restaurantId}
-                    tableNumber={tableNumber || undefined}
-                    orderType="DINE_IN"
-                    menuTheme={menuTheme}
-                    className="shadow-lg"
-                  />
-                </div>
-              )}
 
             {/* Items View */}
             {selectedCategory && (
@@ -1572,7 +1529,7 @@ export default function CustomerMenuPage() {
                       style={{
                         color: hexToRgba(
                           menuTheme?.textColor || "#1f2937",
-                          colorOpacity.text
+                          colorOpacity.text,
                         ),
                       }}
                     >
@@ -1585,7 +1542,7 @@ export default function CustomerMenuPage() {
                         style={{
                           color: hexToRgba(
                             menuTheme?.secondaryColor || "#6b7280",
-                            colorOpacity.secondary
+                            colorOpacity.secondary,
                           ),
                         }}
                       >
@@ -1618,11 +1575,11 @@ export default function CustomerMenuPage() {
                           style={{
                             backgroundColor: hexToRgba(
                               menuTheme?.backgroundColor || "#ffffff",
-                              0.9
+                              0.9,
                             ),
                             borderColor: hexToRgba(
                               menuTheme?.secondaryColor || "#e5e7eb",
-                              colorOpacity.secondary
+                              colorOpacity.secondary,
                             ),
                             color: menuTheme?.textColor || "#1f2937",
                           }}
@@ -1688,7 +1645,7 @@ export default function CustomerMenuPage() {
                           descriptionMatch ||
                           descriptionArMatch
                         );
-                      }
+                      },
                     );
 
                     return filteredItems.length > 0 ? (
@@ -1714,7 +1671,7 @@ export default function CustomerMenuPage() {
                           style={{
                             color: hexToRgba(
                               menuTheme?.secondaryColor || "#6b7280",
-                              colorOpacity.secondary
+                              colorOpacity.secondary,
                             ),
                           }}
                         >
@@ -1734,69 +1691,80 @@ export default function CustomerMenuPage() {
                     </p>
                   </div>
                 )}
-                {/* Floating Back Button - Bottom */}
-                <div
-                  className={`fixed z-40 ${
-                    orderItems.length > 0
-                      ? isRTL
-                        ? "bottom-20 right-6"
-                        : "bottom-20 left-6"
-                      : isRTL
-                        ? "bottom-6 right-6"
-                        : "bottom-6 left-6"
-                  }`}
-                >
-                  <button
-                    onClick={handleBackToCategories}
-                    className="shadow-lg hover:shadow-xl rounded-full w-14 h-14 flex items-center justify-center transition-all duration-200"
-                    style={{
-                      backgroundColor:
-                        menuTheme?.accentColor || "var(--theme-accent)",
-                      color: menuTheme?.textColor || "#ffffff",
-                      border: `2px solid ${menuTheme?.secondaryColor || "#2797dd"}`,
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor =
-                        menuTheme?.secondaryColor || "var(--theme-secondary)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor =
-                        menuTheme?.accentColor || "var(--theme-accent)";
-                    }}
-                  >
-                    {isRTL ? (
-                      <svg
-                        className="w-6 h-6"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 5l7 7-7 7"
-                        />
-                      </svg>
-                    ) : (
-                      <svg
-                        className="w-6 h-6"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M15 19l-7-7 7-7"
-                        />
-                      </svg>
-                    )}
-                  </button>
-                </div>
               </div>
             )}
+          </div>
+
+          {/* Fixed bottom actions: Waiter at far left, Back to categories at far right (above order bar when present) */}
+          <div
+            className={`fixed inset-x-0 z-[60] pointer-events-none ${
+              orderItems.length > 0 ? "bottom-36" : "bottom-16"
+            }`}
+          >
+            <div className="absolute left-4 pointer-events-auto">
+              {isAuthorizedAccess && tableNumber !== "DELIVERY" && (
+                <WaiterRequestButton
+                  restaurantId={restaurantId}
+                  tableNumber={tableNumber || undefined}
+                  orderType="DINE_IN"
+                  menuTheme={menuTheme}
+                  className="shadow-lg"
+                />
+              )}
+            </div>
+            <div className="absolute right-4 pointer-events-auto">
+              {selectedCategory && (
+                <button
+                  onClick={handleBackToCategories}
+                  className="shadow-lg hover:shadow-xl rounded-full w-14 h-14 flex items-center justify-center transition-all duration-200"
+                  style={{
+                    backgroundColor:
+                      menuTheme?.accentColor || "var(--theme-accent)",
+                    color: menuTheme?.textColor || "#ffffff",
+                    border: `2px solid ${menuTheme?.secondaryColor || "#2797dd"}`,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor =
+                      menuTheme?.secondaryColor || "var(--theme-secondary)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor =
+                      menuTheme?.accentColor || "var(--theme-accent)";
+                  }}
+                  aria-label={isRTL ? "الرجوع للفئات" : "Back to categories"}
+                >
+                  {isRTL ? (
+                    <svg
+                      className="w-6 h-6"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5l7 7-7 7"
+                      />
+                    </svg>
+                  ) : (
+                    <svg
+                      className="w-6 h-6"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 19l-7-7 7-7"
+                      />
+                    </svg>
+                  )}
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Floating Order Summary */}

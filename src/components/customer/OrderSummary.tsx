@@ -53,6 +53,8 @@ interface OrderSummaryProps {
   currencyExchanges?: CurrencyExchange[];
   selectedPaymentCurrency?: string | null;
   setSelectedPaymentCurrency?: (currency: string | null) => void;
+  /** When true, hide the action buttons row (used when parent renders them in a sticky footer) */
+  hideActionButtons?: boolean;
 }
 
 export function OrderSummary({
@@ -79,6 +81,7 @@ export function OrderSummary({
   currencyExchanges = [],
   selectedPaymentCurrency,
   setSelectedPaymentCurrency,
+  hideActionButtons = false,
 }: OrderSummaryProps) {
   const { language } = useLanguage();
 
@@ -308,44 +311,47 @@ export function OrderSummary({
         </div>
       </div>
 
-      {/* Place Order Button */}
-      <div className="w-full flex items-center gap-2">
-        <Button
-          variant="outline"
-          className="w-full bg-orange-500"
-          size="lg"
-          onClick={onClose}
-          loading={isOrdering}
-          disabled={isOrdering}
-        >
-          {isRTL ? "إلغاء" : "Cancel"}
-        </Button>
-        <Button
-          style={{
-            backgroundColor: theme?.primaryColor || "var(--theme-primary)",
-            color: theme?.textColor || "#ffffff",
-            borderColor: theme?.primaryColor || "var(--theme-primary)",
-          }}
-          className="w-full"
-          size="lg"
-          onClick={onPlaceOrder}
-          disabled={isOrdering}
-        >
-          {isOrdering
-            ? isRTL
-              ? "جاري إرسال الطلب..."
-              : "Placing Order..."
-            : isRTL
-              ? "إرسال الطلب"
-              : "Place Order"}
-        </Button>
-      </div>
-
-      <p className="text-xs text-gray-500 mt-3 text-center">
-        {isRTL
-          ? "سيتم إرسال طلبك إلى المطبخ وستتلقى تحديثات في الوقت الفعلي"
-          : "Your order will be sent to the kitchen and you'll receive updates in real-time"}
-      </p>
+      {/* Place Order Button - hidden when hideActionButtons (parent shows them in sticky footer) */}
+      {!hideActionButtons && (
+        <>
+          <div className="w-full flex items-center gap-2">
+            <Button
+              variant="outline"
+              className="w-full bg-orange-500"
+              size="lg"
+              onClick={onClose}
+              loading={isOrdering}
+              disabled={isOrdering}
+            >
+              {isRTL ? "إلغاء" : "Cancel"}
+            </Button>
+            <Button
+              style={{
+                backgroundColor: theme?.primaryColor || "var(--theme-primary)",
+                color: theme?.textColor || "#ffffff",
+                borderColor: theme?.primaryColor || "var(--theme-primary)",
+              }}
+              className="w-full"
+              size="lg"
+              onClick={onPlaceOrder}
+              disabled={isOrdering}
+            >
+              {isOrdering
+                ? isRTL
+                  ? "جاري إرسال الطلب..."
+                  : "Placing Order..."
+                : isRTL
+                  ? "إرسال الطلب"
+                  : "Place Order"}
+            </Button>
+          </div>
+          <p className="text-xs text-gray-500 mt-3 text-center">
+            {isRTL
+              ? "سيتم إرسال طلبك إلى المطبخ وستتلقى تحديثات في الوقت الفعلي"
+              : "Your order will be sent to the kitchen and you'll receive updates in real-time"}
+          </p>
+        </>
+      )}
     </div>
   );
 }

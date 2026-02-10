@@ -223,11 +223,11 @@ export function ItemFormModal({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title} size="lg">
-      <div className="max-h-[70vh] overflow-y-auto ">
+      <div className="max-h-[70vh] overflow-y-auto px-1 sm:px-0">
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 whitespace-nowrap overflow-hidden text-ellipsis">
                 {t("item.nameAr")} *
               </label>
               <Input
@@ -239,7 +239,7 @@ export function ItemFormModal({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 whitespace-nowrap overflow-hidden text-ellipsis">
                 {t("item.name")} *
               </label>
               <Input
@@ -253,13 +253,11 @@ export function ItemFormModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 whitespace-nowrap overflow-hidden text-ellipsis">
                 {t("item.descriptionAr")}{" "}
-                <span className="text-gray-400 text-sm">
-                  ({t("common.optional") || "Optional"})
-                </span>
+                <span className="text-gray-400">({t("common.optional") || "Optional"})</span>
               </label>
               <Input
                 value={formData.descriptionAr}
@@ -270,11 +268,9 @@ export function ItemFormModal({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 whitespace-nowrap overflow-hidden text-ellipsis">
                 {t("item.description")}{" "}
-                <span className="text-gray-400 text-sm">
-                  ({t("common.optional") || "Optional"})
-                </span>
+                <span className="text-gray-400">({t("common.optional") || "Optional"})</span>
               </label>
               <Input
                 value={formData.description}
@@ -286,9 +282,9 @@ export function ItemFormModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 whitespace-nowrap overflow-hidden text-ellipsis">
                 {t("item.price")}
               </label>
               <Input
@@ -307,11 +303,9 @@ export function ItemFormModal({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 whitespace-nowrap overflow-hidden text-ellipsis">
                 {isRTL ? "الخصم (%)" : "Discount (%)"}{" "}
-                <span className="text-gray-400 text-sm">
-                  ({t("common.optional") || "Optional"})
-                </span>
+                <span className="text-gray-400">({t("common.optional") || "Optional"})</span>
               </label>
               <Input
                 type="number"
@@ -334,11 +328,9 @@ export function ItemFormModal({
           {/* Kitchen Section Selection */}
           {kitchenSections.length > 0 && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 whitespace-nowrap overflow-hidden text-ellipsis">
                 {isRTL ? "قسم المطبخ" : "Kitchen Section"}{" "}
-                <span className="text-gray-400 text-sm">
-                  ({t("common.optional") || "Optional"})
-                </span>
+                <span className="text-gray-400">({t("common.optional") || "Optional"})</span>
               </label>
               <select
                 value={formData.kitchenSectionId}
@@ -372,11 +364,9 @@ export function ItemFormModal({
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 whitespace-nowrap overflow-hidden text-ellipsis">
               {t("item.image") || "Item Image"}{" "}
-              <span className="text-gray-400 text-sm">
-                ({t("common.optional") || "Optional"})
-              </span>
+              <span className="text-gray-400">({t("common.optional") || "Optional"})</span>
             </label>
             <ImageUpload
               value={formData.image}
@@ -387,16 +377,14 @@ export function ItemFormModal({
 
           {/* Extras Field */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2 whitespace-nowrap overflow-hidden text-ellipsis">
               {isRTL ? "الإضافات" : "Extras"}{" "}
-              <span className="text-gray-400 text-sm">
-                ({t("common.optional") || "Optional"})
-              </span>
+              <span className="text-gray-400">({t("common.optional") || "Optional"})</span>
             </label>
 
             {/* Add Extra Form */}
             <div className="mb-4 p-3 border border-gray-200 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-800">
-              <div className="grid grid-cols-2 gap-2 mb-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
                 <Input
                   placeholder={
                     isRTL ? " مثلا اكسترا جبن ، اكسترا لحم" : "Extra name"
@@ -435,7 +423,7 @@ export function ItemFormModal({
             {/* Extras List */}
             {extrasList.length > 0 && (
               <div className="space-y-2">
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                <p className="text-xs font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap overflow-hidden text-ellipsis">
                   {isRTL ? "الإضافات المضافة:" : "Added Extras:"}
                 </p>
                 <div className="space-y-1">

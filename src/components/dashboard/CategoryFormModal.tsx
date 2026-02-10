@@ -90,12 +90,12 @@ export function CategoryFormModal({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={modalTitle} size="lg">
-      <div className="max-h-[70vh] overflow-y-auto pr-2">
-        <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="max-h-[70vh] overflow-y-auto px-1 sm:px-0 pr-2">
+        <form onSubmit={handleSubmit} className="space-y-4">
           {/* اسم الفئة */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 whitespace-nowrap overflow-hidden text-ellipsis">
                 {isRTL ? "اسم الفئة (العربية)" : "Category Name (Arabic)"} *
               </label>
               <Input
@@ -108,7 +108,7 @@ export function CategoryFormModal({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 whitespace-nowrap overflow-hidden text-ellipsis">
                 {isRTL ? "اسم الفئة (الإنجليزية)" : "Category Name (English)"} *
               </label>
               <Input
@@ -123,13 +123,11 @@ export function CategoryFormModal({
           </div>
 
           {/* الوصف */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 whitespace-nowrap overflow-hidden text-ellipsis">
                 {isRTL ? "الوصف (العربية)" : "Description (Arabic)"}{" "}
-                <span className="text-gray-400 text-sm">
-                  ({isRTL ? "اختياري" : "Optional"})
-                </span>
+                <span className="text-gray-400">({isRTL ? "اختياري" : "Optional"})</span>
               </label>
               <Input
                 value={formData.descriptionAr}
@@ -140,11 +138,9 @@ export function CategoryFormModal({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 whitespace-nowrap overflow-hidden text-ellipsis">
                 {isRTL ? "الوصف (الإنجليزية)" : "Description (English)"}{" "}
-                <span className="text-gray-400 text-sm">
-                  ({isRTL ? "اختياري" : "Optional"})
-                </span>
+                <span className="text-gray-400">({isRTL ? "اختياري" : "Optional"})</span>
               </label>
               <Input
                 value={formData.description}
@@ -158,11 +154,9 @@ export function CategoryFormModal({
 
           {/* صورة الفئة */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 whitespace-nowrap overflow-hidden text-ellipsis">
               {isRTL ? "صورة الفئة" : "Category Image"}{" "}
-              <span className="text-gray-400 text-sm">
-                ({isRTL ? "اختياري" : "Optional"})
-              </span>
+              <span className="text-gray-400">({isRTL ? "اختياري" : "Optional"})</span>
             </label>
             <ImageUpload
               value={formData.image}

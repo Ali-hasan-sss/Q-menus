@@ -18,7 +18,7 @@ import {
   MessageCircle,
   BarChart3,
   Monitor,
-  FileText,
+  Search,
   Languages,
   CircleDollarSign,
   LayoutList,
@@ -71,9 +71,10 @@ export default function HomePage() {
   const router = useRouter();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedBillingPeriod, setSelectedBillingPeriod] = useState<string>("MONTHLY");
+  const [selectedBillingPeriod, setSelectedBillingPeriod] =
+    useState<string>("MONTHLY");
   const [contactSection, setContactSection] = useState<ContactSection | null>(
-    null
+    null,
   );
   const [contactLoading, setContactLoading] = useState(true);
   const servicesRef = useRef<HTMLDivElement>(null);
@@ -107,7 +108,7 @@ export default function HomePage() {
           }
         });
       },
-      { threshold: 0.01, rootMargin: "100px" }
+      { threshold: 0.01, rootMargin: "100px" },
     );
 
     const elements = document.querySelectorAll(".animate-on-scroll");
@@ -212,7 +213,9 @@ export default function HomePage() {
                       ? "منصة متكاملة لإنشاء قوائم QR تفاعلية، استقبال الطلبات وإدارتها لحظياً، عرض المطبخ، تقارير المبيعات، وحدود الخطط بحسب حجم عملك."
                       : "All‑in‑one: QR menus, real‑time orders, kitchen display, analytics."}
                   </p>
-                  <div className="down-buttons flex flex-col sm:flex-row gap-4 sm:justify-center lg:justify-start">
+                  <div
+                    className={`down-buttons flex flex-col sm:flex-row gap-4 sm:justify-center ${isRTL ? "lg:justify-end" : "lg:justify-start"}`}
+                  >
                     <div className="main-blue-button-hover">
                       <Link
                         href="/auth/register"
@@ -221,6 +224,14 @@ export default function HomePage() {
                         {isRTL ? "ابدأ الآن" : "Get Started Now"}
                       </Link>
                     </div>
+                    <Link
+                      href="/discover"
+                      className="inline-block border-2 border-tm-orange text-tm-orange hover:bg-tm-orange hover:text-white dark:border-tm-orange dark:text-tm-orange dark:hover:bg-tm-orange dark:hover:text-white font-medium py-3 px-8 rounded-full transition-all duration-300 transform hover:scale-105 text-center"
+                    >
+                      {isRTL
+                        ? "تصفح أطباق المطاعم"
+                        : "Explore Restaurant Dishes"}
+                    </Link>
                   </div>
                 </div>
               </div>
@@ -292,7 +303,10 @@ export default function HomePage() {
                   </h4>
                   <div className="icon mb-4 flex justify-center">
                     <div className="w-16 h-16 bg-tm-blue rounded-full flex items-center justify-center">
-                      <CheckCircle2 className="w-8 h-8 text-white" strokeWidth={2} />
+                      <CheckCircle2
+                        className="w-8 h-8 text-white"
+                        strokeWidth={2}
+                      />
                     </div>
                   </div>
                   <p className="text-gray-600 dark:text-gray-300">
@@ -313,7 +327,10 @@ export default function HomePage() {
                   </h4>
                   <div className="icon mb-4 flex justify-center">
                     <div className="w-16 h-16 bg-tm-orange rounded-full flex items-center justify-center">
-                      <ClipboardList className="w-8 h-8 text-white" strokeWidth={2} />
+                      <ClipboardList
+                        className="w-8 h-8 text-white"
+                        strokeWidth={2}
+                      />
                     </div>
                   </div>
                   <p className="text-gray-600 dark:text-gray-300">
@@ -332,7 +349,10 @@ export default function HomePage() {
                   </h4>
                   <div className="icon mb-4 flex justify-center">
                     <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center">
-                      <MessageCircle className="w-8 h-8 text-white" strokeWidth={2} />
+                      <MessageCircle
+                        className="w-8 h-8 text-white"
+                        strokeWidth={2}
+                      />
                     </div>
                   </div>
                   <p className="text-gray-600 dark:text-gray-300">
@@ -351,7 +371,10 @@ export default function HomePage() {
                   </h4>
                   <div className="icon mb-4 flex justify-center">
                     <div className="w-16 h-16 bg-purple-500 rounded-full flex items-center justify-center">
-                      <BarChart3 className="w-8 h-8 text-white" strokeWidth={2} />
+                      <BarChart3
+                        className="w-8 h-8 text-white"
+                        strokeWidth={2}
+                      />
                     </div>
                   </div>
                   <p className="text-gray-600 dark:text-gray-300">
@@ -386,18 +409,21 @@ export default function HomePage() {
                 >
                   <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                     {isRTL
-                      ? "الفواتير والاشتراكات"
-                      : "Invoices & Subscriptions"}
+                      ? "البحث عن المطاعم"
+                      : "Restaurant Search"}
                   </h4>
                   <div className="icon mb-4 flex justify-center">
                     <div className="w-16 h-16 bg-indigo-500 rounded-full flex items-center justify-center">
-                      <FileText className="w-8 h-8 text-white" strokeWidth={2} />
+                      <Search
+                        className="w-8 h-8 text-white"
+                        strokeWidth={2}
+                      />
                     </div>
                   </div>
                   <p className="text-gray-600 dark:text-gray-300">
                     {isRTL
-                      ? "إدارة الفواتير والاشتراكات بسهولة ومتابعة مدفوعاتك."
-                      : "Manage invoices and subscriptions easily and track your payments."}
+                      ? "قائمتك تصبح متاحة للجميع: يمكن للعملاء الوصول إليك عبر البحث باسم مطعمك أو عبر أصناف وأطباق قائمتك."
+                      : "Your menu becomes discoverable by everyone: customers can find you by your restaurant name or by browsing your categories and dishes."}
                   </p>
                 </div>
 
@@ -410,7 +436,10 @@ export default function HomePage() {
                   </h4>
                   <div className="icon mb-4 flex justify-center">
                     <div className="w-16 h-16 bg-cyan-500 rounded-full flex items-center justify-center">
-                      <Languages className="w-8 h-8 text-white" strokeWidth={2} />
+                      <Languages
+                        className="w-8 h-8 text-white"
+                        strokeWidth={2}
+                      />
                     </div>
                   </div>
                   <p className="text-gray-600 dark:text-gray-300">
@@ -429,7 +458,10 @@ export default function HomePage() {
                   </h4>
                   <div className="icon mb-4 flex justify-center">
                     <div className="w-16 h-16 bg-yellow-500 rounded-full flex items-center justify-center">
-                      <CircleDollarSign className="w-8 h-8 text-white" strokeWidth={2} />
+                      <CircleDollarSign
+                        className="w-8 h-8 text-white"
+                        strokeWidth={2}
+                      />
                     </div>
                   </div>
                   <p className="text-gray-600 dark:text-gray-300">
@@ -518,7 +550,10 @@ export default function HomePage() {
                       <div className="count-area-content">
                         <div className="icon mb-4 flex justify-center">
                           <div className="w-16 h-16 bg-tm-blue rounded-full flex items-center justify-center">
-                            <CheckCircle2 className="w-8 h-8 text-white" strokeWidth={2} />
+                            <CheckCircle2
+                              className="w-8 h-8 text-white"
+                              strokeWidth={2}
+                            />
                           </div>
                         </div>
                         <div className="count-digit text-2xl font-bold text-tm-blue mb-2">
@@ -543,7 +578,10 @@ export default function HomePage() {
                       <div className="count-area-content">
                         <div className="icon mb-4 flex justify-center">
                           <div className="w-16 h-16 bg-tm-orange rounded-full flex items-center justify-center">
-                            <LayoutList className="w-8 h-8 text-white" strokeWidth={2} />
+                            <LayoutList
+                              className="w-8 h-8 text-white"
+                              strokeWidth={2}
+                            />
                           </div>
                         </div>
                         <div className="count-digit text-2xl font-bold text-tm-orange mb-2">
@@ -568,7 +606,10 @@ export default function HomePage() {
                       <div className="count-area-content">
                         <div className="icon mb-4 flex justify-center">
                           <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center">
-                            <Star className="w-8 h-8 text-white" strokeWidth={2} />
+                            <Star
+                              className="w-8 h-8 text-white"
+                              strokeWidth={2}
+                            />
                           </div>
                         </div>
                         <div className="count-digit text-2xl font-bold text-green-500 mb-2">
@@ -872,7 +913,7 @@ export default function HomePage() {
                     </>
                   )}
                 </h2>
-                
+
                 {/* Billing Period Tabs */}
                 <div className="flex justify-center mt-6 mb-4">
                   <div className="inline-flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
@@ -912,186 +953,250 @@ export default function HomePage() {
                 .filter((plan) => {
                   // Filter by billing period
                   if (selectedBillingPeriod === "MONTHLY") {
-                    return plan.billingPeriod === "MONTHLY" || !plan.billingPeriod;
+                    return (
+                      plan.billingPeriod === "MONTHLY" || !plan.billingPeriod
+                    );
                   } else if (selectedBillingPeriod === "YEARLY") {
                     return plan.billingPeriod === "YEARLY";
                   }
                   return true;
                 })
                 .map((plan, index) => (
-                <div
-                  key={plan.id}
-                  className={`col-lg-3 ${index === 1 ? "lg:transform lg:scale-105" : ""} h-full`}
-                >
                   <div
-                    className={`item ${index === 0 ? "first-item" : index === 1 ? "second-item" : "third-item"} p-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 relative ${index === 1 ? "ring-2 ring-tm-orange" : ""} h-full flex flex-col`}
+                    key={plan.id}
+                    className={`col-lg-3 ${index === 1 ? "lg:transform lg:scale-105" : ""} h-full`}
                   >
-                    {index === 1 && (
-                      <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                        <span className="bg-tm-orange text-white px-4 py-1 rounded-full text-sm font-medium">
-                          {isRTL ? "الأكثر شعبية" : "Most Popular"}
+                    <div
+                      className={`item ${index === 0 ? "first-item" : index === 1 ? "second-item" : "third-item"} p-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 relative ${index === 1 ? "ring-2 ring-tm-orange" : ""} h-full flex flex-col`}
+                    >
+                      {index === 1 && (
+                        <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                          <span className="bg-tm-orange text-white px-4 py-1 rounded-full text-sm font-medium">
+                            {isRTL ? "الأكثر شعبية" : "Most Popular"}
+                          </span>
+                        </div>
+                      )}
+
+                      <h4 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 text-center">
+                        {isRTL ? plan.nameAr : plan.name}
+                      </h4>
+                      <p className="text-sm text-gray-600 dark:text-gray-300 mb-4 text-center">
+                        {isRTL ? plan.descriptionAr : plan.description}
+                      </p>
+                      <div className="text-center mb-6">
+                        <em className="text-3xl font-bold text-tm-blue">
+                          {formatCurrency(Number(plan.price), plan.currency)}
+                        </em>
+                        <span className="block text-gray-500 dark:text-gray-400 text-sm mt-2">
+                          {plan.billingPeriod === "YEARLY"
+                            ? isRTL
+                              ? "سنوياً"
+                              : "per year"
+                            : isRTL
+                              ? "شهرياً"
+                              : "per month"}
+                          {plan.duration > 0 && (
+                            <span className="ml-1">
+                              (
+                              {isRTL
+                                ? `لمدة ${plan.duration} يوم`
+                                : `for ${plan.duration} days`}
+                              )
+                            </span>
+                          )}
                         </span>
                       </div>
-                    )}
 
-                    <h4 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 text-center">
-                      {isRTL ? plan.nameAr : plan.name}
-                    </h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-300 mb-4 text-center">
-                      {isRTL ? plan.descriptionAr : plan.description}
-                    </p>
-                    <div className="text-center mb-6">
-                      <em className="text-3xl font-bold text-tm-blue">
-                        {formatCurrency(Number(plan.price), plan.currency)}
-                      </em>
-                      <span className="block text-gray-500 dark:text-gray-400 text-sm mt-2">
-                        {plan.billingPeriod === "YEARLY"
-                          ? isRTL
-                            ? "سنوياً"
-                            : "per year"
-                          : isRTL
-                            ? "شهرياً"
-                            : "per month"}
-                        {plan.duration > 0 && (
-                          <span className="ml-1">
-                            ({isRTL
-                              ? `لمدة ${plan.duration} يوم`
-                              : `for ${plan.duration} days`})
-                          </span>
-                        )}
-                      </span>
-                    </div>
-
-                    <ul className="space-y-3 mb-8 flex-1">
-                      <li className="flex items-center">
-                        <Check className="h-5 w-5 text-green-500 mr-3 flex-shrink-0" strokeWidth={2.5} />
-                        <span className="text-gray-700 dark:text-gray-300">
-                          {isRTL
-                            ? `${plan.maxTables} طاولة`
-                            : `${plan.maxTables} Tables`}
-                        </span>
-                      </li>
-                      <li className="flex items-center">
-                        <Check className="h-5 w-5 text-green-500 mr-3 flex-shrink-0" strokeWidth={2.5} />
-                        <span className="text-gray-700 dark:text-gray-300">
-                          {isRTL
-                            ? `${plan.maxCategories} فئة`
-                            : `${plan.maxCategories} Categories`}
-                        </span>
-                      </li>
-                      <li className="flex items-center">
-                        <Check className="h-5 w-5 text-green-500 mr-3 flex-shrink-0" strokeWidth={2.5} />
-                        <span className="text-gray-700 dark:text-gray-300">
-                          {isRTL
-                            ? `${plan.maxItems} عنصر لكل فئة`
-                            : `${plan.maxItems} Items per Category`}
-                        </span>
-                      </li>
-                      {plan.canCustomizeTheme && (
+                      <ul className="space-y-3 mb-8 flex-1">
                         <li className="flex items-center">
-                          <Check className="h-5 w-5 text-green-500 mr-3 flex-shrink-0" strokeWidth={2.5} />
+                          <Check
+                            className="h-5 w-5 text-green-500 mr-3 flex-shrink-0"
+                            strokeWidth={2.5}
+                          />
                           <span className="text-gray-700 dark:text-gray-300">
-                            {isRTL ? "تخصيص التصميم" : "Custom Design"}
+                            {isRTL
+                              ? `${plan.maxTables} طاولة`
+                              : `${plan.maxTables} Tables`}
                           </span>
                         </li>
-                      )}
-                      {plan.features && plan.features.length > 0 && plan.features
-                        .filter((feature) => {
-                          const featureLower = feature.toLowerCase();
-                          
-                          // Always show special features
-                          if (feature === "KITCHEN_DISPLAY_SYSTEM" || 
-                              feature === "External Orders" || 
-                              feature === "Priority Support") {
-                            return true;
-                          }
-                          
-                          // Skip features that are already displayed as static items
-                          // Skip if it matches maxTables, maxCategories, or maxItems (already shown above)
-                          if (feature.includes(`${plan.maxTables} Tables`) ||
-                              feature.includes(`${plan.maxCategories} Categories`) ||
-                              feature.includes(`${plan.maxItems} Items per Category`) ||
-                              feature.includes(`${plan.maxItems} Items`)) {
-                            return false;
-                          }
-                          
-                          // Skip Custom Theme if canCustomizeTheme is true (already shown above)
-                          if (plan.canCustomizeTheme && (
-                            featureLower.includes("custom theme") ||
-                            featureLower.includes("theme") ||
-                            feature === "Custom Theme"
-                          )) {
-                            return false;
-                          }
-                          
-                          return true;
-                        })
-                        .map((feature, idx) => {
-                          // Translate specific features
-                          let displayFeature = feature;
-                          
-                          if (feature === "KITCHEN_DISPLAY_SYSTEM") {
-                            displayFeature = isRTL ? "لوحة المطبخ" : "Kitchen Display System";
-                          } else if (feature === "External Orders") {
-                            displayFeature = isRTL ? "طلبات خارجية" : "External Orders";
-                          } else if (feature === "Priority Support") {
-                            displayFeature = isRTL ? "دعم ذو أولوية" : "Priority Support";
-                          } else if (feature.includes("Unlimited Tables")) {
-                            displayFeature = isRTL ? "طاولات غير محدودة" : "Unlimited Tables";
-                          } else if (feature.includes("Unlimited Categories")) {
-                            displayFeature = isRTL ? "فئات غير محدودة" : "Unlimited Categories";
-                          } else if (feature.includes("Unlimited Items")) {
-                            displayFeature = isRTL ? "أصناف غير محدودة" : "Unlimited Items";
-                          } else if (feature.includes("Unlimited")) {
-                            displayFeature = isRTL ? feature.replace(/Unlimited/gi, "غير محدود") : feature;
-                          } else if (feature.includes("1 Month Duration")) {
-                            displayFeature = isRTL ? "مدة شهر واحد" : "1 Month Duration";
-                          } else if (feature.match(/\d+\s+Month\s+Duration/)) {
-                            const months = feature.match(/(\d+)\s+Month/)?.[1];
-                            displayFeature = isRTL 
-                              ? `مدة ${months} ${months === "1" ? "شهر" : "أشهر"}`
-                              : feature;
-                          } else if (feature.includes("Month Duration")) {
-                            displayFeature = isRTL ? "مدة شهرية" : "Month Duration";
-                          } else if (feature.match(/\d+\s+Month/)) {
-                            const months = feature.match(/(\d+)\s+Month/)?.[1];
-                            displayFeature = isRTL 
-                              ? `${months} ${months === "1" ? "شهر" : "أشهر"}`
-                              : feature;
-                          } else if (feature.includes("Month")) {
-                            displayFeature = isRTL ? feature.replace(/Month/gi, "شهر") : feature;
-                          } else if (feature.includes("Duration")) {
-                            displayFeature = isRTL ? feature.replace(/Duration/gi, "مدة") : feature;
-                          } else if (feature.includes("Tables")) {
-                            displayFeature = isRTL ? feature.replace(/Tables/gi, "طاولة") : feature;
-                          } else if (feature.includes("Categories")) {
-                            displayFeature = isRTL ? feature.replace(/Categories/gi, "فئة") : feature;
-                          } else if (feature.includes("Items")) {
-                            displayFeature = isRTL ? feature.replace(/Items/gi, "صنف") : feature;
-                          }
-                          
-                          return (
-                            <li key={idx} className="flex items-center">
-                              <Check className="h-5 w-5 text-green-500 mr-3 flex-shrink-0" strokeWidth={2.5} />
-                              <span className="text-gray-700 dark:text-gray-300">
-                                {displayFeature}
-                              </span>
-                            </li>
-                          );
-                        })}
-                    </ul>
+                        <li className="flex items-center">
+                          <Check
+                            className="h-5 w-5 text-green-500 mr-3 flex-shrink-0"
+                            strokeWidth={2.5}
+                          />
+                          <span className="text-gray-700 dark:text-gray-300">
+                            {isRTL
+                              ? `${plan.maxCategories} فئة`
+                              : `${plan.maxCategories} Categories`}
+                          </span>
+                        </li>
+                        <li className="flex items-center">
+                          <Check
+                            className="h-5 w-5 text-green-500 mr-3 flex-shrink-0"
+                            strokeWidth={2.5}
+                          />
+                          <span className="text-gray-700 dark:text-gray-300">
+                            {isRTL
+                              ? `${plan.maxItems} عنصر لكل فئة`
+                              : `${plan.maxItems} Items per Category`}
+                          </span>
+                        </li>
+                        {plan.canCustomizeTheme && (
+                          <li className="flex items-center">
+                            <Check
+                              className="h-5 w-5 text-green-500 mr-3 flex-shrink-0"
+                              strokeWidth={2.5}
+                            />
+                            <span className="text-gray-700 dark:text-gray-300">
+                              {isRTL ? "تخصيص التصميم" : "Custom Design"}
+                            </span>
+                          </li>
+                        )}
+                        {plan.features &&
+                          plan.features.length > 0 &&
+                          plan.features
+                            .filter((feature) => {
+                              const featureLower = feature.toLowerCase();
 
-                    <div className="main-blue-button-hover text-center mt-auto">
-                      <Link
-                        href="/auth/register"
-                        className="inline-block bg-tm-blue hover:bg-tm-orange text-white font-medium py-3 px-8 rounded-full transition-all duration-300 transform hover:scale-105"
-                      >
-                        {isRTL ? "ابدأ الآن" : "Get Started"}
-                      </Link>
+                              // Always show special features
+                              if (
+                                feature === "KITCHEN_DISPLAY_SYSTEM" ||
+                                feature === "External Orders" ||
+                                feature === "Priority Support"
+                              ) {
+                                return true;
+                              }
+
+                              // Skip features that are already displayed as static items
+                              // Skip if it matches maxTables, maxCategories, or maxItems (already shown above)
+                              if (
+                                feature.includes(`${plan.maxTables} Tables`) ||
+                                feature.includes(
+                                  `${plan.maxCategories} Categories`,
+                                ) ||
+                                feature.includes(
+                                  `${plan.maxItems} Items per Category`,
+                                ) ||
+                                feature.includes(`${plan.maxItems} Items`)
+                              ) {
+                                return false;
+                              }
+
+                              // Skip Custom Theme if canCustomizeTheme is true (already shown above)
+                              if (
+                                plan.canCustomizeTheme &&
+                                (featureLower.includes("custom theme") ||
+                                  featureLower.includes("theme") ||
+                                  feature === "Custom Theme")
+                              ) {
+                                return false;
+                              }
+
+                              return true;
+                            })
+                            .map((feature, idx) => {
+                              // Translate specific features
+                              let displayFeature = feature;
+
+                              if (feature === "KITCHEN_DISPLAY_SYSTEM") {
+                                displayFeature = isRTL
+                                  ? "لوحة المطبخ"
+                                  : "Kitchen Display System";
+                              } else if (feature === "External Orders") {
+                                displayFeature = isRTL
+                                  ? "طلبات خارجية"
+                                  : "External Orders";
+                              } else if (feature === "Priority Support") {
+                                displayFeature = isRTL
+                                  ? "دعم ذو أولوية"
+                                  : "Priority Support";
+                              } else if (feature.includes("Unlimited Tables")) {
+                                displayFeature = isRTL
+                                  ? "طاولات غير محدودة"
+                                  : "Unlimited Tables";
+                              } else if (
+                                feature.includes("Unlimited Categories")
+                              ) {
+                                displayFeature = isRTL
+                                  ? "فئات غير محدودة"
+                                  : "Unlimited Categories";
+                              } else if (feature.includes("Unlimited Items")) {
+                                displayFeature = isRTL
+                                  ? "أصناف غير محدودة"
+                                  : "Unlimited Items";
+                              } else if (feature.includes("Unlimited")) {
+                                displayFeature = isRTL
+                                  ? feature.replace(/Unlimited/gi, "غير محدود")
+                                  : feature;
+                              } else if (feature.includes("1 Month Duration")) {
+                                displayFeature = isRTL
+                                  ? "مدة شهر واحد"
+                                  : "1 Month Duration";
+                              } else if (
+                                feature.match(/\d+\s+Month\s+Duration/)
+                              ) {
+                                const months =
+                                  feature.match(/(\d+)\s+Month/)?.[1];
+                                displayFeature = isRTL
+                                  ? `مدة ${months} ${months === "1" ? "شهر" : "أشهر"}`
+                                  : feature;
+                              } else if (feature.includes("Month Duration")) {
+                                displayFeature = isRTL
+                                  ? "مدة شهرية"
+                                  : "Month Duration";
+                              } else if (feature.match(/\d+\s+Month/)) {
+                                const months =
+                                  feature.match(/(\d+)\s+Month/)?.[1];
+                                displayFeature = isRTL
+                                  ? `${months} ${months === "1" ? "شهر" : "أشهر"}`
+                                  : feature;
+                              } else if (feature.includes("Month")) {
+                                displayFeature = isRTL
+                                  ? feature.replace(/Month/gi, "شهر")
+                                  : feature;
+                              } else if (feature.includes("Duration")) {
+                                displayFeature = isRTL
+                                  ? feature.replace(/Duration/gi, "مدة")
+                                  : feature;
+                              } else if (feature.includes("Tables")) {
+                                displayFeature = isRTL
+                                  ? feature.replace(/Tables/gi, "طاولة")
+                                  : feature;
+                              } else if (feature.includes("Categories")) {
+                                displayFeature = isRTL
+                                  ? feature.replace(/Categories/gi, "فئة")
+                                  : feature;
+                              } else if (feature.includes("Items")) {
+                                displayFeature = isRTL
+                                  ? feature.replace(/Items/gi, "صنف")
+                                  : feature;
+                              }
+
+                              return (
+                                <li key={idx} className="flex items-center">
+                                  <Check
+                                    className="h-5 w-5 text-green-500 mr-3 flex-shrink-0"
+                                    strokeWidth={2.5}
+                                  />
+                                  <span className="text-gray-700 dark:text-gray-300">
+                                    {displayFeature}
+                                  </span>
+                                </li>
+                              );
+                            })}
+                      </ul>
+
+                      <div className="main-blue-button-hover text-center mt-auto">
+                        <Link
+                          href="/auth/register"
+                          className="inline-block bg-tm-blue hover:bg-tm-orange text-white font-medium py-3 px-8 rounded-full transition-all duration-300 transform hover:scale-105"
+                        >
+                          {isRTL ? "ابدأ الآن" : "Get Started"}
+                        </Link>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
             </div>
           )}
         </div>

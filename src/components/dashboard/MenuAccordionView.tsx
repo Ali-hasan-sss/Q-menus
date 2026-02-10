@@ -148,9 +148,9 @@ export function MenuAccordionView({
                 key={category.id}
                 className="overflow-hidden border border-gray-200 dark:border-gray-700"
               >
-                {/* Category header */}
+                {/* Category header - responsive: more room for name on mobile, compact controls */}
                 <div
-                  className={`flex items-center gap-3 p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${
+                  className={`flex items-center gap-2 sm:gap-3 p-3 sm:p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${
                     isExpanded ? "bg-gray-50 dark:bg-gray-800/50" : ""
                   }`}
                   onClick={() => handleCategoryClick(category)}
@@ -166,11 +166,11 @@ export function MenuAccordionView({
                     <img
                       src={category.image}
                       alt={category.name}
-                      className="w-10 h-10 object-cover rounded flex-shrink-0"
+                      className="w-9 h-9 sm:w-10 sm:h-10 object-cover rounded flex-shrink-0"
                     />
                   )}
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-gray-900 dark:text-white truncate">
+                  <div className="flex-1 min-w-0 overflow-hidden">
+                    <h4 className="font-medium text-gray-900 dark:text-white text-sm sm:text-base line-clamp-2 break-words">
                       {getLocalizedName(category.name, category.nameAr, lang)}
                     </h4>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
@@ -179,7 +179,7 @@ export function MenuAccordionView({
                     </p>
                   </div>
                   <div
-                    className="flex items-center gap-2 flex-shrink-0"
+                    className="flex items-center gap-1 sm:gap-2 flex-shrink-0"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <Switch
@@ -192,17 +192,17 @@ export function MenuAccordionView({
                       size="sm"
                       variant="ghost"
                       onClick={() => onEditCategory(category)}
-                      className="p-2"
+                      className="p-2 min-h-10 min-w-10 sm:p-2 touch-manipulation"
                     >
-                      <Edit className="h-4 w-4" />
+                      <Edit className="h-4 w-4 sm:h-4 sm:w-4" />
                     </Button>
                     <Button
                       size="sm"
                       variant="ghost"
                       onClick={() => onDeleteCategory(category.id)}
-                      className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                      className="p-2 min-h-10 min-w-10 sm:p-2 text-red-600 hover:text-red-700 hover:bg-red-50 touch-manipulation"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-4 w-4 sm:h-4 sm:w-4" />
                     </Button>
                   </div>
                 </div>
@@ -211,24 +211,24 @@ export function MenuAccordionView({
                 {isExpanded && (
                   <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
                     <div
-                      className={`flex flex-wrap items-center justify-between gap-2 px-4 py-3 bg-gray-50 dark:bg-gray-800/30 ${
+                      className={`flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-3 bg-gray-50 dark:bg-gray-800/30 ${
                         isRTL ? "flex-row-reverse" : ""
                       }`}
                     >
-                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                      <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                         {isRTL ? "العناصر" : "Items"}
                       </span>
                       <div
-                        className={`flex gap-2 ${isRTL ? "flex-row-reverse" : ""}`}
+                        className={`flex flex-wrap gap-2 ${isRTL ? "flex-row-reverse" : ""}`}
                       >
                         {onApplyDiscountToCategory && categoryItems.length > 0 && (
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={() => onApplyDiscountToCategory(category.id)}
-                            className="text-green-600 hover:text-green-700 text-xs"
+                            className="text-green-600 hover:text-green-700 text-xs min-h-9 px-2.5 sm:min-h-0 touch-manipulation"
                           >
-                            <Percent className="h-3 w-3 mr-1" />
+                            <Percent className="h-3.5 w-3.5 sm:h-3 sm:w-3 mr-1 shrink-0" />
                             {isRTL ? "خصم" : "Discount"}
                           </Button>
                         )}
@@ -236,17 +236,17 @@ export function MenuAccordionView({
                           size="sm"
                           variant="outline"
                           onClick={() => onReorderItems(category.id)}
-                          className="text-xs"
+                          className="text-xs min-h-9 px-2.5 sm:min-h-0 touch-manipulation"
                         >
-                          <GripVertical className="h-3 w-3 mr-1" />
+                          <GripVertical className="h-3.5 w-3.5 sm:h-3 sm:w-3 mr-1 shrink-0" />
                           {isRTL ? "ترتيب" : "Reorder"}
                         </Button>
                         <Button
                           size="sm"
                           onClick={() => onCreateItem(category.id)}
-                          className="text-xs"
+                          className="text-xs min-h-9 px-2.5 sm:min-h-0 touch-manipulation"
                         >
-                          <Plus className="h-3 w-3 mr-1" />
+                          <Plus className="h-3.5 w-3.5 sm:h-3 sm:w-3 mr-1 shrink-0" />
                           {t("item.add")}
                         </Button>
                       </div>
@@ -276,15 +276,15 @@ export function MenuAccordionView({
                         {categoryItems.map((item) => (
                           <li
                             key={item.id}
-                            className={`flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/30 ${
+                            className={`flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/30 ${
                               isRTL ? "flex-row-reverse" : ""
                             }`}
                           >
-                            <div className="flex-1 min-w-0">
-                              <span className="font-medium text-gray-900 dark:text-white truncate">
+                            <div className="flex-1 min-w-0 overflow-hidden">
+                              <span className="font-medium text-gray-900 dark:text-white text-sm sm:text-base truncate block">
                                 {getLocalizedName(item.name, item.nameAr, lang)}
                               </span>
-                              <div className="flex items-center gap-2 mt-0.5">
+                              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                                 <span className="text-sm font-semibold text-primary-600">
                                   {formatCurrencyWithLanguage(
                                     item.price,
@@ -293,14 +293,14 @@ export function MenuAccordionView({
                                   )}
                                 </span>
                                 {item.description && (
-                                  <span className="text-xs text-gray-500 truncate max-w-[200px] block sm:inline">
+                                  <span className="text-xs text-gray-500 truncate max-w-[180px] sm:max-w-[200px] block sm:inline">
                                     {item.description}
                                   </span>
                                 )}
                               </div>
                             </div>
                             <div
-                              className={`flex items-center gap-2 flex-shrink-0 ${
+                              className={`flex items-center gap-1.5 sm:gap-2 flex-shrink-0 ${
                                 isRTL ? "flex-row-reverse" : ""
                               }`}
                             >
@@ -314,17 +314,17 @@ export function MenuAccordionView({
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => onEditItem(item)}
-                                className="p-1.5 h-8 w-8"
+                                className="p-2 min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 sm:p-1.5 sm:h-8 sm:w-8 flex items-center justify-center touch-manipulation"
                               >
-                                <Edit className="h-4 w-4" />
+                                <Edit className="h-5 w-5 sm:h-4 sm:w-4" />
                               </Button>
                               <Button
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => onDeleteItem(item.id)}
-                                className="p-1.5 h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                className="p-2 min-h-11 min-w-11 sm:min-h-0 sm:min-w-0 sm:p-1.5 sm:h-8 sm:w-8 flex items-center justify-center text-red-600 hover:text-red-700 hover:bg-red-50 touch-manipulation"
                               >
-                                <Trash2 className="h-4 w-4" />
+                                <Trash2 className="h-5 w-5 sm:h-4 sm:w-4" />
                               </Button>
                             </div>
                           </li>

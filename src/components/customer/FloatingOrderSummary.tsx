@@ -136,15 +136,23 @@ export function FloatingOrderSummary({
 
   return (
     <>
-      {/* Floating Bar */}
+      {/* Floating Bar - click opens order modal */}
       <div
-        className="fixed bottom-2 left-0 right-0 rounded-b-full rounded-t-[20px] mx-3 px-5 py-3 z-50 shadow-lg"
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setShowDetails(true);
+          }
+        }}
+        className="fixed bottom-2 left-0 right-0 rounded-b-full rounded-t-[20px] mx-3 px-5 py-3 z-50 shadow-lg cursor-pointer"
         style={{
           backgroundColor: menuTheme?.primaryColor || "#f97316",
           color: menuTheme?.textColor || "#ffffff",
           border: `2px solid ${menuTheme?.secondaryColor || "#27ae1e"}`,
         }}
-        onClick={() => setShowDetails(!showDetails)}
+        onClick={() => setShowDetails(true)}
       >
         <div className="max-w-7xl mx-auto flex items-center justify-between min-w-0">
           <div className="flex items-center space-x-2 min-w-0 flex-shrink-0">
@@ -170,37 +178,26 @@ export function FloatingOrderSummary({
                 language
               )}
             </div>
-            <Button
-              onClick={() => setShowDetails(!showDetails)}
-              variant="outline"
-              size="sm"
-              className="px-3 py-1 text-xs whitespace-nowrap flex-shrink-0"
+            <span
+              className="px-3 py-1 text-xs font-medium whitespace-nowrap flex-shrink-0 rounded"
               style={{
                 backgroundColor:
                   menuTheme?.accentColor || "var(--theme-accent)",
                 color: menuTheme?.textColor || "#ffffff",
-                borderColor: menuTheme?.accentColor || "var(--theme-accent)",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor =
-                  menuTheme?.secondaryColor || "var(--theme-secondary)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor =
-                  menuTheme?.accentColor || "var(--theme-accent)";
+                border: `1px solid ${menuTheme?.textColor || "#ffffff"}`,
               }}
             >
-              {isRTL ? "ارسال" : "Order"}
-            </Button>
+              {isRTL ? "إرسال الطلب" : "Send Order"}
+            </span>
           </div>
         </div>
       </div>
 
-      {/* Order Details Modal */}
+      {/* Order Details Modal - scrollable content + sticky footer with Send Order */}
       {showDetails && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-end justify-center">
-          <div className="bg-white w-full max-w-md max-h-[90vh] rounded-t-lg overflow-hidden">
-            <div className="p-4 border-b border-gray-200">
+          <div className="bg-white w-full max-w-md max-h-[90vh] rounded-t-lg overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-gray-200 flex-shrink-0">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-black">
                   {isRTL ? "تفاصيل الطلب" : "Order Details"}
@@ -225,8 +222,8 @@ export function FloatingOrderSummary({
                 </button>
               </div>
             </div>
-            <div className="overflow-y-auto max-h-[calc(90vh-80px)]">
-              <div className="p-4">
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              <div className="p-4 pb-2">
                 <OrderSummary
                   orderItems={orderItems}
                   total={total}
@@ -251,7 +248,46 @@ export function FloatingOrderSummary({
                   currencyExchanges={currencyExchanges}
                   selectedPaymentCurrency={selectedPaymentCurrency}
                   setSelectedPaymentCurrency={setSelectedPaymentCurrency}
+                  hideActionButtons
                 />
+              </div>
+            </div>
+            {/* Sticky footer: always visible at bottom of modal */}
+            <div className="p-4 pt-2 border-t border-gray-200 bg-white flex-shrink-0">
+              <p className="text-xs text-gray-500 text-center mb-3">
+                {isRTL
+                  ? "سيتم إرسال طلبك إلى المطبخ وستتلقى تحديثات في الوقت الفعلي"
+                  : "Your order will be sent to the kitchen and you'll receive updates in real-time"}
+              </p>
+              <div className="flex items-center gap-2 w-full">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  size="lg"
+                  onClick={() => setShowDetails(false)}
+                  disabled={isOrdering}
+                >
+                  {isRTL ? "إلغاء" : "Cancel"}
+                </Button>
+                <Button
+                  style={{
+                    backgroundColor: menuTheme?.primaryColor || "var(--theme-primary)",
+                    color: menuTheme?.textColor || "#ffffff",
+                    borderColor: menuTheme?.primaryColor || "var(--theme-primary)",
+                  }}
+                  className="flex-1"
+                  size="lg"
+                  onClick={onPlaceOrder}
+                  disabled={isOrdering}
+                >
+                  {isOrdering
+                    ? isRTL
+                      ? "جاري إرسال الطلب..."
+                      : "Placing Order..."
+                    : isRTL
+                      ? "إرسال الطلب"
+                      : "Send Order"}
+                </Button>
               </div>
             </div>
           </div>

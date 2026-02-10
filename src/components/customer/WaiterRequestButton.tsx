@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { Bell } from "lucide-react";
 import { useLanguage } from "@/store/hooks/useLanguage";
 import { useCustomerSocket } from "@/contexts/CustomerSocketContext";
 import toast from "react-hot-toast";
@@ -154,15 +155,7 @@ export default function WaiterRequestButton({
         </>
       ) : (
         <>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 512 512"
-            fill="currentColor"
-            className="w-6 h-6"
-          >
-            <path d="M256 0C114.6 0 0 114.6 0 256s114.6 256 256 256 256-114.6 256-256S397.4 0 256 0zm0 96c26.5 0 48 21.5 48 48s-21.5 48-48 48-48-21.5-48-48 21.5-48 48-48zm-16 128h32c26.5 0 48 21.5 48 48v32h32v64H160v-64h32v-32c0-26.5 21.5-48 48-48z" />
-          </svg>
-
+          <Bell className="w-5 h-5 shrink-0" strokeWidth={2} />
           <span>{isRTL ? "طلب النادل" : "Call Waiter"}</span>
         </>
       )}

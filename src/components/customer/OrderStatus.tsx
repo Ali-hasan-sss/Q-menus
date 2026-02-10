@@ -803,33 +803,8 @@ export function OrderStatus({
         </div>
       </div>
 
-      {/* Display Content (visible to user) */}
+      {/* Display Content (visible to user) - Download invoice button hidden from customer */}
       <div className="max-w-md w-full space-y-8">
-        {/* Export Invoice Button */}
-        <div className="flex justify-end">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={exportInvoice}
-            className="flex items-center gap-2"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-              />
-            </svg>
-            {isRTL ? "تحميل الفاتورة" : "Download Invoice"}
-          </Button>
-        </div>
-
         {/* Header */}
         <div className="text-center">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
