@@ -4,6 +4,7 @@ import { useLanguage } from "@/store/hooks/useLanguage";
 import { LanguageToggle } from "@/components/ui/LanguageToggle";
 import { hexToRgba } from "@/lib/helper";
 import { formatCurrencyWithLanguage } from "@/lib/utils";
+import { getImageUrl } from "@/lib/api";
 
 interface Restaurant {
   id: string;
@@ -101,7 +102,7 @@ export function RestaurantHeader({
             {restaurant?.logo && (
               <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-700 flex-shrink-0">
                 <img
-                  src={restaurant.logo}
+                  src={getImageUrl(restaurant.logo)}
                   alt={
                     isRTL
                       ? restaurant?.nameAr || restaurant?.name

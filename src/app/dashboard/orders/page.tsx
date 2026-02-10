@@ -10,7 +10,7 @@ import { useConfirmDialog } from "@/store/hooks/useConfirmDialog";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import Navbar from "@/components/dashboard/Navbar";
-import { api, publicApi, endpoints } from "@/lib/api";
+import { api, publicApi, endpoints, getImageUrl } from "@/lib/api";
 import { formatCurrencyWithLanguage } from "@/lib/utils";
 import { MenuItem } from "@/components/customer/MenuItem";
 import { FloatingOrderSummary } from "@/components/customer/FloatingOrderSummary";
@@ -135,6 +135,8 @@ export default function OrdersPage() {
   const [addItemSearchQuery, setAddItemSearchQuery] = useState("");
   const [deliveryOrders, setDeliveryOrders] = useState<Order[]>([]);
   const [showQuickOrderModal, setShowQuickOrderModal] = useState(false);
+  /** When set, modal creates order for this table; when null, creates quick order (QUICK). */
+  const [quickOrderTableNumber, setQuickOrderTableNumber] = useState<string | null>(null);
   const [quickOrderItems, setQuickOrderItems] = useState<
     Array<{
       menuItemId: string;
@@ -174,6 +176,8 @@ export default function OrdersPage() {
   const [quickOrderShowOrderSummary, setQuickOrderShowOrderSummary] =
     useState(false);
   const menuItemsFetchedRef = useRef(false);
+  /** Tracks category IDs for which items were already fetched (avoids infinite loop when category has no items). */
+  const quickOrderItemsLoadedForCategoryId = useRef<Set<string>>(new Set());
   const [currencyExchanges, setCurrencyExchanges] = useState<any[]>([]);
   const [selectedPaymentCurrency, setSelectedPaymentCurrency] = useState<
     string | null
@@ -449,46 +453,49 @@ export default function OrdersPage() {
     }
   }, [showQuickOrderModal, user?.restaurant?.id, isRTL]);
 
-  // Load category items when category is selected
+  // Clear "items loaded" tracking when quick order modal closes
+  useEffect(() => {
+    if (!showQuickOrderModal) quickOrderItemsLoadedForCategoryId.current.clear();
+  }, [showQuickOrderModal]);
+
+  // Load category items when category is selected (only once per category — avoids infinite loop for empty categories)
   useEffect(() => {
     if (
-      quickOrderSelectedCategory &&
-      user?.restaurant?.id &&
-      (!quickOrderSelectedCategory.items ||
-        quickOrderSelectedCategory.items.length === 0)
-    ) {
-      const loadCategoryItems = async () => {
-        try {
-          setQuickOrderLoadingItems(true);
-          const response = await publicApi.get(
-            endpoints.public.categoryItems(
-              user.restaurant!.id,
-              quickOrderSelectedCategory.id
+      !quickOrderSelectedCategory ||
+      !user?.restaurant?.id ||
+      quickOrderItemsLoadedForCategoryId.current.has(quickOrderSelectedCategory.id)
+    )
+      return;
+    quickOrderItemsLoadedForCategoryId.current.add(quickOrderSelectedCategory.id);
+    const categoryId = quickOrderSelectedCategory.id;
+    const loadCategoryItems = async () => {
+      try {
+        setQuickOrderLoadingItems(true);
+        const response = await publicApi.get(
+          endpoints.public.categoryItems(user.restaurant!.id, categoryId)
+        );
+        if (response.data.success) {
+          const { items } = response.data.data;
+          setQuickOrderSelectedCategory((prev: any) =>
+            prev?.id === categoryId ? { ...prev, items: items ?? [] } : prev
+          );
+          setQuickOrderCategories((prev) =>
+            prev.map((cat) =>
+              cat.id === categoryId ? { ...cat, items: items ?? [] } : cat
             )
           );
-          if (response.data.success) {
-            const { items } = response.data.data;
-            setQuickOrderSelectedCategory((prev: any) => ({
-              ...prev,
-              items: items,
-            }));
-            // Update categories list
-            setQuickOrderCategories((prev) =>
-              prev.map((cat) =>
-                cat.id === quickOrderSelectedCategory.id
-                  ? { ...cat, items: items }
-                  : cat
-              )
-            );
-          }
-        } catch (error) {
-          console.error("Error loading category items:", error);
-        } finally {
-          setQuickOrderLoadingItems(false);
         }
-      };
-      loadCategoryItems();
-    }
+      } catch (error) {
+        console.error("Error loading category items:", error);
+        quickOrderItemsLoadedForCategoryId.current.delete(categoryId);
+        setQuickOrderSelectedCategory((prev: any) =>
+          prev?.id === categoryId ? { ...prev, items: [] } : prev
+        );
+      } finally {
+        setQuickOrderLoadingItems(false);
+      }
+    };
+    loadCategoryItems();
   }, [quickOrderSelectedCategory, user?.restaurant?.id]);
 
   // Quick Order Helper Functions
@@ -668,12 +675,37 @@ export default function OrdersPage() {
     try {
       setIsCreatingQuickOrder(true);
 
+      // When creating an order for a specific table, open session first if table is not occupied (backend requires it)
+      const tableNumberForOrder = quickOrderTableNumber ?? null;
+      if (tableNumberForOrder) {
+        const qrCode = qrCodes[tableNumberForOrder];
+        if (qrCode?.id && !qrCode.isOccupied) {
+          try {
+            await toggleTableOccupied(qrCode.id);
+            setQrCodes((prev) => ({
+              ...prev,
+              [tableNumberForOrder]: {
+                ...prev[tableNumberForOrder],
+                id: qrCode.id,
+                isOccupied: true,
+              },
+            }));
+          } catch (err) {
+            console.error("Error opening table session:", err);
+            showToast(
+              isRTL ? "فشل في فتح جلسة الطاولة" : "Failed to start table session",
+              "error"
+            );
+            return;
+          }
+        }
+      }
+
       // Create order with menu items
-      // Use "QUICK" as special table number for quick orders
       const response = await api.post("/order/create", {
         restaurantId: user.restaurant.id,
         orderType: "DINE_IN",
-        tableNumber: "QUICK", // Special table number for quick orders
+        tableNumber: tableNumberForOrder ?? "QUICK",
         items: quickOrderItems.map((item) => ({
           menuItemId: item.menuItemId,
           quantity: item.quantity,
@@ -688,12 +720,13 @@ export default function OrdersPage() {
 
       if (response.data.success) {
         showToast(
-          isRTL
-            ? "تم إنشاء الطلب السريع بنجاح"
-            : "Quick order created successfully",
+          tableNumberForOrder
+            ? (isRTL ? `تم إنشاء طلب الطاولة ${tableNumberForOrder} بنجاح` : `Order for Table ${tableNumberForOrder} created successfully`)
+            : (isRTL ? "تم إنشاء الطلب السريع بنجاح" : "Quick order created successfully"),
           "success"
         );
         setShowQuickOrderModal(false);
+        setQuickOrderTableNumber(null);
         setQuickOrderItems([]);
         setQuickOrderSelectedCategory(null);
         setQuickOrderCategories([]);
@@ -705,7 +738,6 @@ export default function OrdersPage() {
         setQuickOrderNotes("");
         setQuickOrderShowOrderSummary(false);
         setExpandedExtrasItems(new Set());
-        // Refresh orders
         await fetchOrders(1, false);
       }
     } catch (error: any) {
@@ -713,8 +745,8 @@ export default function OrdersPage() {
       showToast(
         error.response?.data?.message ||
           (isRTL
-            ? "فشل في إنشاء الطلب السريع"
-            : "Failed to create quick order"),
+            ? (quickOrderTableNumber ? "فشل في إنشاء طلب الطاولة" : "فشل في إنشاء الطلب السريع")
+            : (quickOrderTableNumber ? "Failed to create table order" : "Failed to create quick order")),
         "error"
       );
     } finally {
@@ -3255,7 +3287,10 @@ export default function OrdersPage() {
                             {isRTL ? "جلسة نشطة" : "Active Session"}
                           </span>
                           <button
-                            onClick={handleToggleSession}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleSession(e);
+                            }}
                             className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 ${
                               hasActiveSession
                                 ? "bg-green-600"
@@ -3273,6 +3308,20 @@ export default function OrdersPage() {
                           </button>
                         </div>
                       </div>
+                      {!tableOrder && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setQuickOrderTableNumber(tableNumber);
+                            setShowQuickOrderModal(true);
+                          }}
+                          className="absolute bottom-2 left-2 w-8 h-8 rounded-full bg-primary-600 hover:bg-primary-700 text-white flex items-center justify-center text-lg font-medium shadow transition-transform hover:scale-110"
+                          title={isRTL ? "إنشاء طلب" : "Create order"}
+                        >
+                          +
+                        </button>
+                      )}
                       {isNew && (
                         <span className="absolute -top-2 -right-2 bg-blue-500 text-white text-xs px-2 py-1 rounded-full font-medium animate-bounce">
                           {isRTL ? "جديد" : "NEW"}
@@ -4369,7 +4418,7 @@ export default function OrdersPage() {
                                 <div className="w-14 h-14 mx-auto mb-2 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-600">
                                   {category.image ? (
                                     <img
-                                      src={category.image}
+                                      src={getImageUrl(category.image)}
                                       alt={
                                         isRTL
                                           ? category.nameAr || category.name
@@ -4589,11 +4638,14 @@ export default function OrdersPage() {
             <div className="p-6 flex-shrink-0 border-b border-gray-200 dark:border-gray-700">
               <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {isRTL ? "إنشاء طلب سريع" : "Create Quick Order"}
+                  {quickOrderTableNumber
+                    ? (isRTL ? `إنشاء طلب لطاولة ${quickOrderTableNumber}` : `Create order for Table ${quickOrderTableNumber}`)
+                    : (isRTL ? "إنشاء طلب سريع" : "Create Quick Order")}
                 </h2>
                 <button
                   onClick={() => {
                     setShowQuickOrderModal(false);
+                    setQuickOrderTableNumber(null);
                     setQuickOrderItems([]);
                     setQuickOrderSelectedCategory(null);
                     setQuickOrderCategories([]);
@@ -4700,7 +4752,7 @@ export default function OrdersPage() {
                             <div className="w-20 h-20 mx-auto mb-3 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-600">
                               {category.image ? (
                                 <img
-                                  src={category.image}
+                                  src={getImageUrl(category.image)}
                                   alt={
                                     isRTL
                                       ? category.nameAr || category.name
@@ -5196,7 +5248,10 @@ export default function OrdersPage() {
 
       {/* Floating Quick Order Button */}
       <button
-        onClick={() => setShowQuickOrderModal(true)}
+        onClick={() => {
+          setQuickOrderTableNumber(null);
+          setShowQuickOrderModal(true);
+        }}
         className="fixed bottom-20 md:bottom-24 lg:bottom-6 right-6 bg-primary-600 hover:bg-primary-700 text-white rounded-full p-4 shadow-lg z-40 transition-all duration-200 hover:scale-110"
         title={isRTL ? "إنشاء طلب سريع" : "Create Quick Order"}
       >

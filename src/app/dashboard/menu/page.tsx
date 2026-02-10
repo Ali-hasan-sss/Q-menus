@@ -74,7 +74,8 @@ export default function MenuPage() {
     }
   }, [searchParams]);
 
-  // Sync selectedCategory from URL (for browser back + direct links)
+  // Sync selectedCategory from URL (for browser back + direct links).
+  // fetchCategoryItems must be stable (useCallback in useMenu); items omitted from deps to avoid loop.
   useEffect(() => {
     const categoryId = searchParams.get("category");
     if (viewMode !== "grid") return;
@@ -86,13 +87,14 @@ export default function MenuPage() {
     if (category) {
       setSelectedCategory(category);
       const categoryItems = items.filter((item) => item.categoryId === categoryId);
-      if (categoryItems.length === 0) {
+      if (categoryItems.length === 0 && !loadingItems) {
         fetchCategoryItems(categoryId);
       }
     } else {
       setSelectedCategory(null);
     }
-  }, [searchParams, categories, viewMode, fetchCategoryItems, items]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- items intentionally omitted to avoid loop on empty category
+  }, [searchParams, categories, viewMode, fetchCategoryItems]);
 
   // Update URL when selectedCategory changes (grid view only)
   const updateUrlForCategory = (categoryId: string | null, push = false) => {

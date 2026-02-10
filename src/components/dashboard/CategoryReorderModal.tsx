@@ -21,7 +21,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { useLanguage } from "@/store/hooks/useLanguage";
 import { getLocalizedName } from "@/lib/utils";
-import { api } from "@/lib/api";
+import { api, getImageUrl } from "@/lib/api";
 
 interface Category {
   id: string;
@@ -100,7 +100,7 @@ function SortableCategoryItem({
       {category.image && (
         <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0">
           <img
-            src={category.image}
+            src={getImageUrl(category.image)}
             alt={category.name}
             className="w-full h-full object-cover"
           />

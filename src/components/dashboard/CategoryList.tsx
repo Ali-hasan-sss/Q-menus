@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { useLanguage } from "@/store/hooks/useLanguage";
 import { getLocalizedName } from "@/lib/utils";
+import { getImageUrl } from "@/lib/api";
 
 interface Category {
   id: string;
@@ -215,7 +216,7 @@ export function CategoryList({
               {category.image && (
                 <div className="mb-3">
                   <img
-                    src={category.image}
+                    src={getImageUrl(category.image)}
                     alt={category.name}
                     className="w-full h-20 object-cover rounded-lg"
                   />

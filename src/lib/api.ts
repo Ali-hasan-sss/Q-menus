@@ -7,6 +7,41 @@ const API_URL = USE_PROXY
     ? `${process.env.NEXT_PUBLIC_API_URL}/api`
     : "http://localhost:5000/api";
 
+// Base URL for uploads (no /api suffix). Used when not using proxy.
+const getUploadBaseUrl = () => {
+  const envUrl = process.env.NEXT_PUBLIC_API_URL || "";
+  const base =
+    typeof window !== "undefined" &&
+    window.location.hostname === "localhost" &&
+    !envUrl.includes("localhost")
+      ? "http://localhost:5000"
+      : envUrl || "http://localhost:5000";
+  return base.replace(/\/api\/?$/, "");
+};
+
+export const UPLOAD_BASE_URL = getUploadBaseUrl();
+
+/**
+ * Returns URL for display. Store only relative path in DB (e.g. /uploads/2025/02/xxx.webp).
+ * - If stored value is already absolute (http/https), returns as-is.
+ * - If proxy is used: returns relative path so the request goes to same origin and is proxied to backend.
+ * - Otherwise: returns full URL (UPLOAD_BASE_URL + path).
+ */
+export function getImageUrl(
+  storedPath: string | null | undefined
+): string {
+  if (!storedPath) return "";
+  if (
+    storedPath.startsWith("http://") ||
+    storedPath.startsWith("https://")
+  )
+    return storedPath;
+  const relativePath = storedPath.startsWith("/") ? storedPath : `/${storedPath}`;
+  const useProxy = process.env.NEXT_PUBLIC_PROXY_API === "true";
+  if (useProxy) return relativePath;
+  return `${getUploadBaseUrl()}${relativePath}`;
+}
+
 // API client for authenticated requests
 export const api = axios.create({
   baseURL: API_URL,

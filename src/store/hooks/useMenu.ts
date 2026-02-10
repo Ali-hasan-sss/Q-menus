@@ -78,6 +78,10 @@ export function useMenu() {
     () => dispatch(createRestaurantQR()).unwrap(),
     [dispatch]
   );
+  const fetchCategoryItemsStable = useCallback(
+    (categoryId: string) => dispatch(fetchCategoryItems(categoryId)),
+    [dispatch]
+  );
 
   useEffect(() => {
     if (typeof window !== "undefined" && localStorage.getItem("token")) {
@@ -153,7 +157,7 @@ export function useMenu() {
     fetchMenu: () => dispatch(fetchMenu()),
     fetchCategories: () => dispatch(fetchCategories()),
     fetchItems: (categoryId?: string) => dispatch(fetchItems(categoryId)),
-    fetchCategoryItems: (categoryId: string) => dispatch(fetchCategoryItems(categoryId)),
+    fetchCategoryItems: fetchCategoryItemsStable,
     createCategory: (data: CreateCategoryData) => dispatch(createCategory(data)).unwrap(),
     updateCategory: (id: string, data: CreateCategoryData) =>
       dispatch(updateCategory({ id, data })).unwrap(),

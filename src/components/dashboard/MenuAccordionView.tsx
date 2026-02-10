@@ -9,6 +9,7 @@ import {
   formatCurrencyWithLanguage,
   getLocalizedName,
 } from "@/lib/utils";
+import { getImageUrl } from "@/lib/api";
 import {
   ChevronDown,
   ChevronRight,
@@ -164,7 +165,7 @@ export function MenuAccordionView({
                   </div>
                   {category.image && (
                     <img
-                      src={category.image}
+                      src={getImageUrl(category.image)}
                       alt={category.name}
                       className="w-9 h-9 sm:w-10 sm:h-10 object-cover rounded flex-shrink-0"
                     />

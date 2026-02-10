@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useLanguage } from "@/store/hooks/useLanguage";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
-import { publicApi, endpoints } from "@/lib/api";
+import { publicApi, endpoints, getImageUrl } from "@/lib/api";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { UtensilsCrossed, MapPin, Phone, ChevronRight, Search } from "lucide-react";
 
@@ -179,7 +179,7 @@ export default function DiscoverPage() {
                       <div className="flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 shadow-inner flex items-center justify-center">
                         {r.logo ? (
                           <img
-                            src={r.logo}
+                            src={getImageUrl(r.logo)}
                             alt={displayName(r)}
                             className="w-full h-full object-cover"
                           />

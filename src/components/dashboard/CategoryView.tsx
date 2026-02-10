@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { useMenu } from "@/store/hooks/useMenu";
 import { useLanguage } from "@/store/hooks/useLanguage";
 import { getLocalizedName } from "@/lib/utils";
+import { getImageUrl } from "@/lib/api";
 
 interface CategoryViewProps {
   categoryId: string;
@@ -36,7 +37,7 @@ export function CategoryView({
           <div className="flex items-center gap-4">
             {category.image && (
               <img
-                src={category.image}
+                src={getImageUrl(category.image)}
                 alt={category.name}
                 className="w-16 h-16 object-cover rounded-lg"
               />
@@ -124,7 +125,7 @@ export function CategoryView({
                   {item.image && (
                     <div className="mb-3">
                       <img
-                        src={item.image}
+                        src={getImageUrl(item.image)}
                         alt={item.name}
                         className="w-full h-24 object-cover rounded-lg"
                       />

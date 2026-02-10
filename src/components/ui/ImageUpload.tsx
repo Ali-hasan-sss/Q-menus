@@ -1,9 +1,21 @@
 "use client";
 
 import { useState, useRef } from "react";
+import imageCompression from "browser-image-compression";
 import { Button } from "./Button";
 import { GalleryPicker } from "./GalleryPicker";
 import { useLanguage } from "@/store/hooks/useLanguage";
+import { getImageUrl } from "@/lib/api";
+
+// Only still images: JPEG, PNG, WebP. No GIF, no video.
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+const ACCEPT_ATTR = "image/jpeg,image/png,image/webp";
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
 
 interface ImageUploadProps {
   value?: string;
@@ -40,36 +52,62 @@ export function ImageUpload({
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
-    if (!file.type.startsWith("image/")) {
-      setError(isRTL ? "يجب أن يكون الملف صورة" : "File must be an image");
+    const mime = (file.type || "").toLowerCase();
+    if (!ALLOWED_IMAGE_TYPES.includes(mime)) {
+      setError(
+        isRTL
+          ? "يُسمح فقط بصور JPEG أو PNG أو WebP (بدون GIF أو فيديو)"
+          : "Only JPEG, PNG or WebP images are allowed (no GIF or video)"
+      );
       return;
     }
-
-    // Note: File size validation happens on server after compression
 
     setError(null);
     setUploading(true);
 
     try {
-      const formData = new FormData();
-      formData.append("image", file);
+      const originalSize = file.size;
 
-      const response = await fetch("/api/upload", {
+      // Compress before upload — keep quality high, limit dimensions and size
+      const compressionOptions = {
+        maxSizeMB: 1.5,
+        maxWidthOrHeight: 1920,
+        useWebWorker: true,
+        initialQuality: 0.92,
+      };
+
+      const compressedFile = await imageCompression(file, compressionOptions);
+      const compressedSize = compressedFile.size;
+
+      setSizeInfo({
+        original: { bytes: originalSize, formatted: formatBytes(originalSize) },
+        compressed: { bytes: compressedSize, formatted: formatBytes(compressedSize) },
+        uploaded: { bytes: compressedSize, formatted: formatBytes(compressedSize) },
+        compressionSuccess: true,
+      });
+
+      const formData = new FormData();
+      formData.append("image", compressedFile);
+
+      const uploadUrl =
+        process.env.NEXT_PUBLIC_PROXY_API === "true"
+          ? "/api/upload"
+          : process.env.NEXT_PUBLIC_API_URL
+            ? `${process.env.NEXT_PUBLIC_API_URL.replace(/\/api\/?$/, "")}/api/upload`
+            : "http://localhost:5000/api/upload";
+
+      const response = await fetch(uploadUrl, {
         method: "POST",
         body: formData,
+        credentials: "include",
       });
 
       const result = await response.json();
 
       if (result.success) {
-        onChange(result.data.url);
-        // Save size information if available
-        if (result.data.sizes) {
-          setSizeInfo(result.data.sizes);
-        }
+        const pathToStore = result.data.path ?? result.data.url;
+        onChange(pathToStore || null);
       } else {
-        // Show server error message (may include size validation after compression)
         setError(result.message || (isRTL ? "فشل في رفع الصورة" : "Failed to upload image"));
         setSizeInfo(null);
       }
@@ -80,6 +118,7 @@ export function ImageUpload({
           ? "حدث خطأ أثناء رفع الصورة"
           : "An error occurred while uploading the image"
       );
+      setSizeInfo(null);
     } finally {
       setUploading(false);
     }
@@ -87,40 +126,9 @@ export function ImageUpload({
 
   const handleDelete = async () => {
     if (!value) return;
-
-    // Extract public ID from Cloudinary URL
-    const urlParts = value.split("/");
-    const publicId = urlParts
-      .slice(urlParts.findIndex((part) => part === "upload") + 1)
-      .join("/")
-      .split(".")[0];
-
-    try {
-      const response = await fetch("/api/upload", {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ publicId }),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        onChange(null);
-        setSizeInfo(null);
-      } else {
-        console.error("Delete error:", result.message);
-        // Even if delete fails on server, remove from UI
-        onChange(null);
-        setSizeInfo(null);
-      }
-    } catch (err) {
-      console.error("Delete error:", err);
-      // Even if delete fails, remove from UI
-      onChange(null);
-      setSizeInfo(null);
-    }
+    // All images are server-stored (relative path). No backend delete; clear from UI/DB only.
+    onChange(null);
+    setSizeInfo(null);
   };
 
   const handleButtonClick = () => {
@@ -133,7 +141,7 @@ export function ImageUpload({
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept={ACCEPT_ATTR}
         onChange={handleFileSelect}
         className="hidden"
         disabled={disabled || uploading}
@@ -200,8 +208,8 @@ export function ImageUpload({
               <p className="text-xs">
                 {placeholder ||
                   (isRTL
-                    ? "PNG, JPG, GIF - سيتم ضغط الصورة قبل الرفع"
-                    : "PNG, JPG, GIF - image will be compressed before upload")}
+                    ? "JPEG, PNG, WebP فقط — سيتم ضغط الصورة قبل الرفع"
+                    : "JPEG, PNG, WebP only — image will be compressed before upload")}
               </p>
             </div>
           </div>
@@ -210,7 +218,7 @@ export function ImageUpload({
         <div className="space-y-3">
           <div className="relative rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
             <img
-              src={value}
+              src={getImageUrl(value)}
               alt="Uploaded image"
               className="w-full h-48 object-cover"
             />
@@ -343,7 +351,7 @@ export function ImageUpload({
             setSizeInfo(null);
           }}
           onClose={() => setShowGallery(false)}
-          currentImage={value}
+          currentImage={value ? getImageUrl(value) : value}
         />
       )}
     </div>

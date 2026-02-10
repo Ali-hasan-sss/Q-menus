@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
-import { publicApi, endpoints } from "@/lib/api";
+import { publicApi, endpoints, getImageUrl } from "@/lib/api";
 import { useLanguage } from "@/store/hooks/useLanguage";
 import { useCustomerSocket } from "@/contexts/CustomerSocketContext";
 
@@ -1461,7 +1461,7 @@ export default function CustomerMenuPage() {
                           <div className="w-20 h-20 mx-auto mb-3 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-700">
                             {category.image ? (
                               <img
-                                src={category.image}
+                                src={getImageUrl(category.image)}
                                 alt={
                                   isRTL
                                     ? category.nameAr || category.name

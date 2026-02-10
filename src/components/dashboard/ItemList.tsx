@@ -9,6 +9,7 @@ import {
   formatCurrencyWithLanguage,
   getLocalizedName,
 } from "@/lib/utils";
+import { getImageUrl } from "@/lib/api";
 import { ArrowLeft, ArrowRight, Edit, Trash2 } from "lucide-react";
 
 interface MenuItem {
@@ -113,7 +114,7 @@ export function ItemList({
         <div className="flex items-center gap-3 min-w-0 flex-1">
           {selectedCategory?.image && (
             <img
-              src={selectedCategory.image}
+              src={getImageUrl(selectedCategory.image)}
               alt={selectedCategory.name}
               className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded-lg flex-shrink-0"
             />
@@ -245,7 +246,7 @@ export function ItemList({
               {item.image && (
                 <div className="mb-3">
                   <img
-                    src={item.image}
+                    src={getImageUrl(item.image)}
                     alt={item.name}
                     className="w-full h-20 object-cover rounded-lg"
                   />

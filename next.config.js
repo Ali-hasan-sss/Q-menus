@@ -59,12 +59,18 @@ const baseConfig = {
   },
   async rewrites() {
     const backend = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+    const backendOrigin = backend.replace(/\/api\/?$/, "");
     const useProxy = process.env.NEXT_PUBLIC_PROXY_API === "true";
     if (!useProxy) return [];
     return [
       {
         source: "/api/:path*",
         destination: `${backend}/api/:path*`,
+      },
+      // Serve uploaded images via same origin (proxy to backend)
+      {
+        source: "/uploads/:path*",
+        destination: `${backendOrigin}/uploads/:path*`,
       },
     ];
   },

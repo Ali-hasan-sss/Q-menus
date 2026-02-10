@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { formatCurrencyWithLanguage } from "@/lib/utils";
 import { useLanguage } from "@/store/hooks/useLanguage";
+import { getImageUrl } from "@/lib/api";
 import Image from "next/image";
 
 interface CurrencyExchange {
@@ -224,7 +225,7 @@ export function MenuItem({
           <div className="w-full h-48 relative overflow-hidden rounded-t-lg">
             {item.image ? (
               <Image
-                src={item.image}
+                src={getImageUrl(item.image)}
                 alt={isRTL ? item.nameAr || item.name : item.name}
                 fill
                 className="object-cover"
@@ -318,7 +319,7 @@ export function MenuItem({
       <div className="w-full h-32 sm:h-40 relative overflow-hidden">
         {item.image ? (
           <Image
-            src={item.image}
+            src={getImageUrl(item.image)}
             alt={isRTL ? item.nameAr || item.name : item.name}
             fill
             className="object-cover"
@@ -465,7 +466,7 @@ export function MenuItem({
               {item.image && (
                 <div className="w-full h-48 relative overflow-hidden rounded-lg">
                   <Image
-                    src={item.image}
+                    src={getImageUrl(item.image)}
                     alt={isRTL ? item.nameAr || item.name : item.name}
                     fill
                     className="object-cover"
