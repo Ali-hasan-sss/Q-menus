@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@/store/hooks/useAuth";
 import { useLanguage } from "@/store/hooks/useLanguage";
 import { useConfirmDialog } from "@/store/hooks/useConfirmDialog";
@@ -41,7 +40,6 @@ export default function AdminNavbar() {
     deleteNotification,
     requestNotificationPermission,
   } = useAdminNotifications();
-  const router = useRouter();
   const pathname = usePathname();
 
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -112,7 +110,6 @@ export default function AdminNavbar() {
         : "Are you sure you want to logout?",
       onConfirm: () => {
         logout();
-        router.push("/auth/login");
       },
     });
   };

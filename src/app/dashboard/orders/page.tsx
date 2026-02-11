@@ -133,6 +133,15 @@ export default function OrdersPage() {
   const [addItemCategorySearchQuery, setAddItemCategorySearchQuery] =
     useState("");
   const [addItemSearchQuery, setAddItemSearchQuery] = useState("");
+  const [addItemVariablePricePrompt, setAddItemVariablePricePrompt] = useState<{
+    menuItem: any;
+    quantity: number;
+    notes?: string;
+    extras?: any;
+  } | null>(null);
+  const [addItemVariablePriceInput, setAddItemVariablePriceInput] = useState("");
+  const [editingOrderItemPriceId, setEditingOrderItemPriceId] = useState<string | null>(null);
+  const [editingOrderItemPriceValue, setEditingOrderItemPriceValue] = useState("");
   const [deliveryOrders, setDeliveryOrders] = useState<Order[]>([]);
   const [showQuickOrderModal, setShowQuickOrderModal] = useState(false);
   /** When set, modal creates order for this table; when null, creates quick order (QUICK). */
@@ -141,15 +150,25 @@ export default function OrdersPage() {
     Array<{
       menuItemId: string;
       quantity: number;
-      price: string; // Changed to string to match FloatingOrderSummary
-      currency: string; // Added currency
+      price: string; // display / calculated
+      currency: string;
       notes?: string;
       extras?: any;
       name?: string;
       nameAr?: string;
-      originalMenuItem?: any; // Store original menu item data for extras
+      originalMenuItem?: any;
+      /** When set, sent to API as item price for variable-price (menu price 0) lines */
+      orderLinePrice?: number;
     }>
   >([]);
+  /** When adding a variable-price item (menu price 0), prompt for price before adding */
+  const [quickOrderVariablePricePrompt, setQuickOrderVariablePricePrompt] = useState<{
+    menuItem: any;
+    quantity: number;
+    notes?: string;
+    extras?: any;
+  } | null>(null);
+  const [quickOrderVariablePriceInput, setQuickOrderVariablePriceInput] = useState("");
   const [quickOrderCategories, setQuickOrderCategories] = useState<any[]>([]);
   const [quickOrderSelectedCategory, setQuickOrderSelectedCategory] = useState<
     any | null
@@ -503,17 +522,23 @@ export default function OrdersPage() {
     menuItem: any,
     quantity: number = 1,
     notes?: string,
-    extras?: any
+    extras?: any,
+    /** For variable-price items (menu price 0), pass tax-inclusive price for this order line */
+    orderLinePriceOverride?: number
   ) => {
     setQuickOrderItems((prev) => {
       const existingItem = prev.find((item) => item.menuItemId === menuItem.id);
 
-      // Calculate final price with discount
-      let finalPrice =
+      const basePrice =
         typeof menuItem.price === "string"
           ? parseFloat(menuItem.price)
           : menuItem.price;
-      if (menuItem.discount && menuItem.discount > 0) {
+      const isVariablePrice = basePrice === 0;
+      const useOverride = isVariablePrice && orderLinePriceOverride != null && orderLinePriceOverride >= 0;
+
+      // Calculate final price: use override for variable-price items, else from menu + discount
+      let finalPrice = useOverride ? orderLinePriceOverride! : basePrice;
+      if (!useOverride && menuItem.discount && menuItem.discount > 0) {
         finalPrice = finalPrice * (1 - menuItem.discount / 100);
       }
 
@@ -576,6 +601,7 @@ export default function OrdersPage() {
               notes,
               extras,
               originalMenuItem: menuItem,
+              ...(useOverride ? { orderLinePrice: orderLinePriceOverride } : {}),
             },
           ];
         }
@@ -592,6 +618,7 @@ export default function OrdersPage() {
             notes,
             extras,
             originalMenuItem: menuItem,
+            ...(useOverride ? { orderLinePrice: orderLinePriceOverride } : {}),
           },
         ];
       }
@@ -601,6 +628,15 @@ export default function OrdersPage() {
 
     // Show order summary when items are added
     setQuickOrderShowOrderSummary(true);
+  };
+
+  const quickOrderHandleAddItem = (menuItem: any, quantity: number, notes?: string, extras?: any) => {
+    const basePrice = typeof menuItem.price === "string" ? parseFloat(menuItem.price) : menuItem.price;
+    if (basePrice === 0) {
+      setQuickOrderVariablePricePrompt({ menuItem, quantity, notes, extras });
+      return;
+    }
+    quickOrderAddItemToOrder(menuItem, quantity, notes, extras);
   };
 
   const quickOrderRemoveFromOrder = (menuItemId: string) => {
@@ -711,6 +747,7 @@ export default function OrdersPage() {
           quantity: item.quantity,
           notes: item.notes || "",
           extras: item.extras,
+          ...(item.orderLinePrice != null ? { price: item.orderLinePrice } : {}),
         })),
         notes: quickOrderNotes || "", // Add order notes
         customerName: quickOrderCustomerName || undefined,
@@ -1416,46 +1453,38 @@ export default function OrdersPage() {
   };
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
-    try {
-      await api.put(`/order/${orderId}/status`, { status: newStatus });
+    await api.put(`/order/${orderId}/status`, { status: newStatus });
 
-      // Update orders without adding to modifiedOrderIds (restaurant self-update)
-      setOrders(
-        orders.map((order) =>
+    // Update orders without adding to modifiedOrderIds (restaurant self-update)
+    setOrders(
+      orders.map((order) =>
+        order.id === orderId ? { ...order, status: newStatus } : order
+      )
+    );
+
+    if (deliveryOrders.length > 0) {
+      setDeliveryOrders((prevOrders) =>
+        prevOrders.map((order) =>
           order.id === orderId ? { ...order, status: newStatus } : order
         )
       );
-
-      // Update deliveryOrders if applicable
-      if (deliveryOrders.length > 0) {
-        setDeliveryOrders((prevOrders) =>
-          prevOrders.map((order) =>
-            order.id === orderId ? { ...order, status: newStatus } : order
-          )
-        );
-      }
-
-      // Update quickOrders if applicable
-      if (quickOrders.length > 0) {
-        setQuickOrders((prevOrders) =>
-          prevOrders.map((order) =>
-            order.id === orderId ? { ...order, status: newStatus } : order
-          )
-        );
-      }
-
-      // Update selectedOrder if it's the same order
-      if (selectedOrder?.id === orderId) {
-        setSelectedOrder((prev) =>
-          prev ? { ...prev, status: newStatus } : null
-        );
-      }
-
-      // Don't add to modifiedOrderIds since this is a restaurant self-update
-      console.log("🎯 Order status updated by restaurant - no visual effects");
-    } catch (error) {
-      console.error("Error updating order status:", error);
     }
+
+    if (quickOrders.length > 0) {
+      setQuickOrders((prevOrders) =>
+        prevOrders.map((order) =>
+          order.id === orderId ? { ...order, status: newStatus } : order
+        )
+      );
+    }
+
+    if (selectedOrder?.id === orderId) {
+      setSelectedOrder((prev) =>
+        prev ? { ...prev, status: newStatus } : null
+      );
+    }
+
+    console.log("🎯 Order status updated by restaurant - no visual effects");
   };
 
   // Function to get item name (custom or from menu)
@@ -1578,9 +1607,16 @@ export default function OrdersPage() {
     menuItem: any,
     quantity: number,
     notes?: string,
-    extras?: any
+    extras?: any,
+    /** For variable-price items (menu price 0), tax-inclusive price for this line */
+    priceOverride?: number
   ) => {
     if (!selectedOrder) return;
+    const basePrice = typeof menuItem.price === "string" ? parseFloat(menuItem.price) : menuItem.price;
+    if (basePrice === 0 && (priceOverride == null || priceOverride < 0)) {
+      setAddItemVariablePricePrompt({ menuItem, quantity, notes, extras });
+      return;
+    }
     try {
       const response = await api.put(`/order/${selectedOrder.id}/add-items`, {
         items: [
@@ -1589,6 +1625,7 @@ export default function OrdersPage() {
             quantity,
             notes: notes || undefined,
             extras: extras || undefined,
+            ...(basePrice === 0 && priceOverride != null ? { price: priceOverride } : {}),
           },
         ],
       });
@@ -3949,6 +3986,77 @@ export default function OrdersPage() {
                                   converted.currency,
                                   language
                                 );
+                                const isVariablePriceItem = !item.isCustomItem && item.menuItem != null && Number(item.menuItem.price) === 0;
+                                const isEditingThis = editingOrderItemPriceId === item.id;
+                                if (isVariablePriceItem && isEditingThis) {
+                                  return (
+                                    <div className="flex flex-col items-center gap-1">
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={editingOrderItemPriceValue}
+                                        onChange={(e) => setEditingOrderItemPriceValue(e.target.value)}
+                                        className="w-20 px-2 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-center"
+                                      />
+                                      <div className="flex gap-1">
+                                        <button
+                                          type="button"
+                                          onClick={async () => {
+                                            const price = parseFloat(editingOrderItemPriceValue);
+                                            if (isNaN(price) || price < 0) {
+                                              showToast(isRTL ? "أدخل سعراً صحيحاً" : "Enter a valid price", "error");
+                                              return;
+                                            }
+                                            try {
+                                              const res = await api.patch(`/order/${selectedOrder.id}/items/${item.id}/price`, { price });
+                                              if (res.data?.data?.order) {
+                                                setSelectedOrder(res.data.data.order);
+                                                setOrders((prev) => prev.map((o) => (o.id === selectedOrder.id ? res.data.data.order : o)));
+                                              }
+                                              setEditingOrderItemPriceId(null);
+                                              setEditingOrderItemPriceValue("");
+                                              showToast(isRTL ? "تم تحديث السعر" : "Price updated", "success");
+                                            } catch (err: any) {
+                                              showToast(err.response?.data?.message || (isRTL ? "فشل التحديث" : "Update failed"), "error");
+                                            }
+                                          }}
+                                          className="text-xs px-2 py-0.5 bg-primary-600 text-white rounded"
+                                        >
+                                          {isRTL ? "حفظ" : "Save"}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setEditingOrderItemPriceId(null);
+                                            setEditingOrderItemPriceValue("");
+                                          }}
+                                          className="text-xs px-2 py-0.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                                        >
+                                          {isRTL ? "إلغاء" : "Cancel"}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  );
+                                }
+                                const canEditPrice = selectedOrder.status !== "COMPLETED" && selectedOrder.status !== "CANCELLED";
+                                if (isVariablePriceItem && canEditPrice) {
+                                  return (
+                                    <div className="flex flex-col items-center gap-0.5">
+                                      <span>{currentPriceDisplay}</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setEditingOrderItemPriceId(item.id);
+                                          setEditingOrderItemPriceValue(String(Number(item.price)));
+                                        }}
+                                        className="text-xs text-primary-600 dark:text-primary-400 hover:underline"
+                                      >
+                                        {isRTL ? "تعديل السعر" : "Edit price"}
+                                      </button>
+                                    </div>
+                                  );
+                                }
                                 return <span>{currentPriceDisplay}</span>;
                               })()}
                             </td>
@@ -4196,15 +4304,30 @@ export default function OrdersPage() {
                       <>
                         <button
                           onClick={() => {
+                            const order = selectedOrder;
+                            const tableNum = order?.tableNumber;
+                            const orderTyp = order?.orderType;
+                            const qrCodeToClose = tableNum ? qrCodes[tableNum] : null;
                             showConfirm({
                               title: isRTL ? "تعيين كمكتمل (مدفوع)" : "Mark as Completed (Paid)",
                               message: isRTL ? "هل تريد تعيين هذا الطلب كمكتمل (مدفوع)؟" : "Do you want to mark this order as completed (paid)?",
                               confirmText: isRTL ? "نعم، مكتمل" : "Yes, mark completed",
                               cancelText: isRTL ? "إلغاء" : "Cancel",
                               confirmVariant: "primary",
-                              onConfirm: () => {
-                                updateOrderStatus(selectedOrder.id, "COMPLETED");
-                                setSelectedOrder({ ...selectedOrder, status: "COMPLETED" });
+                              onConfirm: async () => {
+                                try {
+                                  await updateOrderStatus(order!.id, "COMPLETED");
+                                  closeOrderModal();
+                                  if (orderTyp === "DINE_IN" && tableNum && tableNum !== "QUICK" && qrCodeToClose?.id && qrCodeToClose.isOccupied) {
+                                    await toggleTableOccupied(qrCodeToClose.id);
+                                    setQrCodes((prev) => ({
+                                      ...prev,
+                                      [tableNum]: { ...prev[tableNum], isOccupied: false },
+                                    }));
+                                  }
+                                } catch {
+                                  showToast(isRTL ? "فشل تحديث حالة الطلب" : "Failed to update order status", "error");
+                                }
                               },
                             });
                           }}
@@ -4217,15 +4340,30 @@ export default function OrdersPage() {
                         </button>
                         <button
                           onClick={() => {
+                            const order = selectedOrder;
+                            const tableNum = order?.tableNumber;
+                            const orderTyp = order?.orderType;
+                            const qrCodeToClose = tableNum ? qrCodes[tableNum] : null;
                             showConfirm({
                               title: isRTL ? "إلغاء الطلب" : "Cancel Order",
                               message: isRTL ? "هل أنت متأكد من إلغاء هذا الطلب؟" : "Are you sure you want to cancel this order?",
                               confirmText: isRTL ? "نعم، إلغاء" : "Yes, cancel",
                               cancelText: isRTL ? "تراجع" : "Go back",
                               confirmVariant: "danger",
-                              onConfirm: () => {
-                                updateOrderStatus(selectedOrder.id, "CANCELLED");
-                                setSelectedOrder({ ...selectedOrder, status: "CANCELLED" });
+                              onConfirm: async () => {
+                                try {
+                                  await updateOrderStatus(order!.id, "CANCELLED");
+                                  closeOrderModal();
+                                  if (orderTyp === "DINE_IN" && tableNum && tableNum !== "QUICK" && qrCodeToClose?.id && qrCodeToClose.isOccupied) {
+                                    await toggleTableOccupied(qrCodeToClose.id);
+                                    setQrCodes((prev) => ({
+                                      ...prev,
+                                      [tableNum]: { ...prev[tableNum], isOccupied: false },
+                                    }));
+                                  }
+                                } catch {
+                                  showToast(isRTL ? "فشل تحديث حالة الطلب" : "Failed to update order status", "error");
+                                }
                               },
                             });
                           }}
@@ -4882,7 +5020,7 @@ export default function OrdersPage() {
                               key={item.id}
                               item={item}
                               currency={restaurantCurrency}
-                              onAddToOrder={quickOrderAddItemToOrder}
+                              onAddToOrder={quickOrderHandleAddItem}
                               onItemClick={() => {}}
                               isRTL={isRTL}
                             />
@@ -4998,6 +5136,132 @@ export default function OrdersPage() {
                 />
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Add-item modal: variable-price item — enter price for this order */}
+      {addItemVariablePricePrompt && selectedOrder && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[70] p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-sm p-6">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
+              {isRTL ? "أدخل السعر لهذا الطلب" : "Enter price for this order"}
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              {isRTL ? "عناصر حسب الوزن (مثل السمك) — السعر في القائمة 0." : "Weight-based item — menu price is 0."}
+            </p>
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                {isRTL ? "السعر (شامل الضريبة)" : "Price (tax-inclusive)"}
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={addItemVariablePriceInput}
+                onChange={(e) => setAddItemVariablePriceInput(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                placeholder="0.00"
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setAddItemVariablePricePrompt(null);
+                  setAddItemVariablePriceInput("");
+                }}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+              >
+                {isRTL ? "إلغاء" : "Cancel"}
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const price = parseFloat(addItemVariablePriceInput);
+                  if (isNaN(price) || price < 0) {
+                    showToast(isRTL ? "أدخل سعراً صحيحاً" : "Enter a valid price", "error");
+                    return;
+                  }
+                  await addItemToOrderFromMenuItem(
+                    addItemVariablePricePrompt.menuItem,
+                    addItemVariablePricePrompt.quantity,
+                    addItemVariablePricePrompt.notes,
+                    addItemVariablePricePrompt.extras,
+                    price
+                  );
+                  setAddItemVariablePricePrompt(null);
+                  setAddItemVariablePriceInput("");
+                }}
+                className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg"
+              >
+                {isRTL ? "إضافة" : "Add"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Variable-price item: enter price for this order (e.g. weight-based) */}
+      {quickOrderVariablePricePrompt && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-sm p-6">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
+              {isRTL ? "أدخل السعر لهذا الطلب" : "Enter price for this order"}
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              {isRTL ? "عناصر حسب الوزن (مثل السمك) — السعر في القائمة 0." : "Weight-based item — menu price is 0."}
+            </p>
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                {isRTL ? "السعر (شامل الضريبة)" : "Price (tax-inclusive)"}
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={quickOrderVariablePriceInput}
+                onChange={(e) => setQuickOrderVariablePriceInput(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                placeholder="0.00"
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setQuickOrderVariablePricePrompt(null);
+                  setQuickOrderVariablePriceInput("");
+                }}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+              >
+                {isRTL ? "إلغاء" : "Cancel"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const price = parseFloat(quickOrderVariablePriceInput);
+                  if (isNaN(price) || price < 0) {
+                    showToast(isRTL ? "أدخل سعراً صحيحاً" : "Enter a valid price", "error");
+                    return;
+                  }
+                  quickOrderAddItemToOrder(
+                    quickOrderVariablePricePrompt.menuItem,
+                    quickOrderVariablePricePrompt.quantity,
+                    quickOrderVariablePricePrompt.notes,
+                    quickOrderVariablePricePrompt.extras,
+                    price
+                  );
+                  setQuickOrderVariablePricePrompt(null);
+                  setQuickOrderVariablePriceInput("");
+                }}
+                className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg"
+              >
+                {isRTL ? "إضافة" : "Add"}
+              </button>
+            </div>
           </div>
         </div>
       )}

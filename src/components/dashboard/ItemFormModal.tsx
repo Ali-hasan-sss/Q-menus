@@ -287,8 +287,16 @@ export function ItemFormModal({
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 whitespace-nowrap overflow-hidden text-ellipsis">
                 {t("item.price")}
               </label>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                {typeof t("item.priceVariableHint") === "string" && t("item.priceVariableHint") !== "item.priceVariableHint"
+                  ? t("item.priceVariableHint")
+                  : isRTL
+                    ? "للعناصر حسب الوزن (مثل السمك) أدخل 0 وأدخل السعر عند الطلب."
+                    : "For weight-based items (e.g. fish) enter 0 and set the price when adding to order."}
+              </p>
               <Input
                 type="number"
+                min="0"
                 step="0.01"
                 value={formData.price}
                 onChange={(e) =>

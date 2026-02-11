@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@/store/hooks/useAuth";
 import { useLanguage } from "@/store/hooks/useLanguage";
 import { useConfirmDialog } from "@/store/hooks/useConfirmDialog";
@@ -40,7 +39,6 @@ export default function AdminMobileHeader() {
     deleteNotification,
     requestNotificationPermission,
   } = useAdminNotifications();
-  const router = useRouter();
   const pathname = usePathname();
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -124,7 +122,6 @@ export default function AdminMobileHeader() {
         : "Are you sure you want to logout?",
       onConfirm: () => {
         logout();
-        router.push("/auth/login");
       },
     });
   };

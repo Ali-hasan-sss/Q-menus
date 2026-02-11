@@ -9,10 +9,13 @@ import { useLanguage } from "@/store/hooks/useLanguage";
 import { publicApi } from "@/lib/api";
 
 interface QRScannerProps {
-  restaurantId: string;
+  /** When provided, only QR codes for this restaurant are accepted. When omitted, any restaurant/table QR is accepted (universal scan). */
+  restaurantId?: string;
+  /** Called when user closes/cancels the scanner (e.g. to hide overlay on home page). */
+  onClose?: () => void;
 }
 
-export default function QRScanner({ restaurantId }: QRScannerProps) {
+export default function QRScanner({ restaurantId, onClose }: QRScannerProps) {
   const router = useRouter();
   const { isRTL } = useLanguage();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -20,12 +23,21 @@ export default function QRScanner({ restaurantId }: QRScannerProps) {
   const streamRef = useRef<MediaStream | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const jsQRRef = useRef<any>(null);
+  const autoStartedRef = useRef(false);
 
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [currentCamera, setCurrentCamera] = useState<"back" | "front">("back");
   const [availableCameras, setAvailableCameras] = useState<MediaDeviceInfo[]>([]);
+
+  // When opened as overlay (onClose provided), start camera immediately instead of showing "Start Scanning"
+  useEffect(() => {
+    if (onClose && !autoStartedRef.current) {
+      autoStartedRef.current = true;
+      startScanning();
+    }
+  }, [onClose]);
 
   // Load jsQR dynamically to avoid SSR issues
   useEffect(() => {
@@ -346,64 +358,66 @@ export default function QRScanner({ restaurantId }: QRScannerProps) {
 
   const handleQRCodeDetected = async (qrData: string) => {
     try {
-      // Parse QR code data to extract table number
       const url = new URL(qrData);
       const pathParts = url.pathname.split("/");
       const tableNumber = url.searchParams.get("tableNumber");
 
-      // Validate that QR code is for this restaurant
-      if (pathParts[1] === "menu" && pathParts[2] === restaurantId) {
-        if (
-          tableNumber &&
-          (tableNumber === "DELIVERY" || /^\d+$/.test(tableNumber))
-        ) {
-          // Check for incomplete order before allowing QR scan
-          // Only check for dine-in orders (not DELIVERY)
-          if (tableNumber !== "DELIVERY") {
-            try {
-              const response = await publicApi.get(
-                `/order/incomplete/${restaurantId}?tableNumber=${tableNumber}`
-              );
-              if (
-                response.data.success &&
-                response.data.data.order &&
-                response.data.data.order.status !== "COMPLETED" &&
-                response.data.data.order.status !== "CANCELLED"
-              ) {
-                // Incomplete order found - redirect to order page instead
-                stopScanning();
-                const orderId = response.data.data.order.id;
-                console.log(
-                  "🚫 Incomplete order found, redirecting to order page:",
-                  orderId
-                );
-                router.push(`/order/${orderId}`);
-                return;
-              }
-            } catch (error) {
-              // No incomplete order found, continue with normal flow
-              console.log("No incomplete order found, proceeding with QR scan");
-            }
-          }
+      // pathParts: ["", "menu", "restaurantId"] for /menu/:restaurantId
+      const isUniversalScan = restaurantId == null;
+      const extractedRestaurantId = pathParts[1] === "menu" ? pathParts[2] : null;
+      const targetRestaurantId = isUniversalScan ? extractedRestaurantId : restaurantId;
 
-          stopScanning();
+      if (pathParts[1] === "menu" && targetRestaurantId) {
+        const validTable =
+          tableNumber == null ||
+          tableNumber === "DELIVERY" ||
+          tableNumber === "QUICK" ||
+          /^\d+$/.test(tableNumber);
 
-          // Clear browser history to prevent back button manipulation
-          window.history.replaceState(null, "", window.location.href);
-
-          router.push(`/menu/${restaurantId}?tableNumber=${tableNumber}`);
-        } else {
+        if (!validTable) {
           setError(
             isRTL
               ? "رمز QR غير صحيح - رقم الطاولة غير صالح"
               : "Invalid QR code - invalid table number"
           );
+          return;
         }
+
+        // Check for incomplete order (dine-in tables only, not DELIVERY/QUICK)
+        if (
+          tableNumber &&
+          tableNumber !== "DELIVERY" &&
+          tableNumber !== "QUICK"
+        ) {
+          try {
+            const response = await publicApi.get(
+              `/order/incomplete/${targetRestaurantId}?tableNumber=${tableNumber}`
+            );
+            if (
+              response.data.success &&
+              response.data.data.order &&
+              response.data.data.order.status !== "COMPLETED" &&
+              response.data.data.order.status !== "CANCELLED"
+            ) {
+              stopScanning();
+              const orderId = response.data.data.order.id;
+              router.push(`/order/${orderId}`);
+              return;
+            }
+          } catch {
+            // No incomplete order, continue
+          }
+        }
+
+        stopScanning();
+        window.history.replaceState(null, "", window.location.href);
+        const query = tableNumber ? `?tableNumber=${tableNumber}` : "";
+        router.push(`/menu/${targetRestaurantId}${query}`);
       } else {
         setError(
           isRTL
-            ? "رمز QR غير صحيح - لا ينتمي لهذا المطعم"
-            : "Invalid QR code - not for this restaurant"
+            ? "رمز QR غير صحيح - ليس رمز مطعم أو طاولة"
+            : "Invalid QR code - not a restaurant or table code"
         );
       }
     } catch (err) {
@@ -411,11 +425,14 @@ export default function QRScanner({ restaurantId }: QRScannerProps) {
     }
   };
 
-  // Manual entry removed for security reasons - QR scan only
+  // When used as overlay (onClose provided), use fixed full-screen so it's visible on top of the page
+  const overlayClass = onClose
+    ? "fixed inset-0 z-[9999] flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4 overflow-auto"
+    : "min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4";
 
   if (hasPermission === false) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
+      <div className={overlayClass}>
         <Card className="max-w-md w-full p-6 text-center">
           <div className="mb-4">
             <svg
@@ -443,10 +460,15 @@ export default function QRScanner({ restaurantId }: QRScannerProps) {
               ? "يجب السماح بالوصول للكاميرا لمسح رمز QR الخاص بالطاولة. الإدخال اليدوي غير متاح لأغراض الأمان."
               : "Camera access is required to scan the table's QR code. Manual entry is disabled for security reasons."}
           </p>
-          <div className="space-y-3">
+          <div className="space-y-3 flex flex-col gap-2">
             <Button onClick={startScanning} className="w-full">
               {isRTL ? "إعادة المحاولة" : "Try Again"}
             </Button>
+            {onClose && (
+              <Button onClick={onClose} variant="outline" className="w-full">
+                {isRTL ? "إغلاق" : "Close"}
+              </Button>
+            )}
           </div>
         </Card>
       </div>
@@ -455,7 +477,7 @@ export default function QRScanner({ restaurantId }: QRScannerProps) {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
+      <div className={overlayClass}>
         <Card className="max-w-md w-full p-6 text-center">
           <div className="mb-4">
             <svg
@@ -485,10 +507,15 @@ export default function QRScanner({ restaurantId }: QRScannerProps) {
               ? "يرجى السماح بالوصول للكاميرا للمتابعة. الإدخال اليدوي غير متاح لأغراض الأمان."
               : "Please allow camera access to continue. Manual entry is disabled for security reasons."}
           </p>
-          <div className="space-y-3">
+          <div className="space-y-3 flex flex-col gap-2">
             <Button onClick={startScanning} className="w-full">
               {isRTL ? "إعادة المحاولة" : "Try Again"}
             </Button>
+            {onClose && (
+              <Button onClick={onClose} variant="outline" className="w-full">
+                {isRTL ? "إغلاق" : "Close"}
+              </Button>
+            )}
           </div>
         </Card>
       </div>
@@ -497,7 +524,7 @@ export default function QRScanner({ restaurantId }: QRScannerProps) {
 
   if (!isScanning) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
+      <div className={overlayClass}>
         <Card className="max-w-md w-full p-6 text-center">
           <div className="mb-4">
             <svg
@@ -525,10 +552,15 @@ export default function QRScanner({ restaurantId }: QRScannerProps) {
               ? "امسح رمز QR الموجود على الطاولة للوصول إلى قائمة الطعام. الإدخال اليدوي غير متاح لأغراض الأمان."
               : "Scan the QR code on your table to access the menu. Manual entry is disabled for security reasons."}
           </p>
-          <div className="space-y-3">
+          <div className="space-y-3 flex flex-col gap-2">
             <Button onClick={startScanning} className="w-full">
               {isRTL ? "بدء المسح" : "Start Scanning"}
             </Button>
+            {onClose && (
+              <Button onClick={onClose} variant="outline" className="w-full">
+                {isRTL ? "إغلاق" : "Close"}
+              </Button>
+            )}
           </div>
         </Card>
       </div>
@@ -608,7 +640,10 @@ export default function QRScanner({ restaurantId }: QRScannerProps) {
             </Button>
           )}
           <Button
-            onClick={stopScanning}
+            onClick={() => {
+              stopScanning();
+              onClose?.();
+            }}
             variant="outline"
             className="bg-white text-black hover:bg-gray-100"
           >

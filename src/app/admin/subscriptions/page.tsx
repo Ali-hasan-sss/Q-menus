@@ -56,6 +56,9 @@ export default function SubscriptionsPage() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("ALL");
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalSubscriptions, setTotalSubscriptions] = useState(0);
@@ -83,6 +86,7 @@ export default function SubscriptionsPage() {
         page: page.toString(),
         limit: subscriptionsPerPage.toString(),
         ...(filter !== "ALL" && { status: filter }),
+        ...(searchQuery.trim() && { search: searchQuery.trim() }),
       });
 
       const response = await api.get(`/admin/subscriptions?${params}`);
@@ -145,22 +149,31 @@ export default function SubscriptionsPage() {
       const nextPage = currentPageRef.current + 1;
       fetchSubscriptions(nextPage, true);
     }
-  }, [hasMoreSubscriptions, isLoadingMore, loading, filter]);
+  }, [hasMoreSubscriptions, isLoadingMore, loading, filter, searchQuery]);
+
+  // Debounce search input -> searchQuery
+  useEffect(() => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      setSearchQuery(searchInput);
+      searchDebounceRef.current = null;
+    }, 400);
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    };
+  }, [searchInput]);
 
   useEffect(() => {
-    fetchSubscriptions(1, false);
     fetchPlans();
   }, []);
 
-  // Reset pagination when filter changes
+  // Fetch subscriptions on mount and when filter or search changes
   useEffect(() => {
-    if (filter !== "ALL") {
-      setCurrentPage(1);
-      currentPageRef.current = 1;
-      setHasMoreSubscriptions(true);
-      fetchSubscriptions(1, false);
-    }
-  }, [filter]);
+    setCurrentPage(1);
+    currentPageRef.current = 1;
+    setHasMoreSubscriptions(true);
+    fetchSubscriptions(1, false);
+  }, [filter, searchQuery]);
 
   // Infinite scroll observer
   useEffect(() => {
@@ -325,6 +338,25 @@ export default function SubscriptionsPage() {
               ? "عرض وإدارة اشتراكات المطاعم"
               : "View and manage restaurant subscriptions"}
           </p>
+        </div>
+
+        {/* Search - by email, owner name, or restaurant name */}
+        <div className="mb-4">
+          <label htmlFor="subscriptions-search" className="sr-only">
+            {isRTL ? "بحث عن اشتراك" : "Search subscriptions"}
+          </label>
+          <input
+            id="subscriptions-search"
+            type="search"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder={
+              isRTL
+                ? "بحث بالإيميل أو اسم صاحب المطعم أو اسم المطعم..."
+                : "Search by email, owner name, or restaurant name..."
+            }
+            className="w-full max-w-md px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          />
         </div>
 
         {/* Filter - Mobile Responsive */}

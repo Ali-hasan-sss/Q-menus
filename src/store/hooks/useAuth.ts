@@ -11,6 +11,7 @@ import {
   setLoading,
   logout as logoutAction,
 } from "../slices/authSlice";
+import { clearMenuData } from "../slices/menuSlice";
 import { api } from "@/lib/api";
 import toast from "react-hot-toast";
 import type { User } from "../slices/authSlice";
@@ -188,11 +189,24 @@ export function useAuth() {
     [dispatch, router]
   );
 
-  const logout = useCallback(() => {
-    dispatch(logoutAction());
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("token");
+  const logout = useCallback(async () => {
+    if (typeof window === "undefined") {
+      dispatch(logoutAction());
+      router.push("/auth/login");
+      return;
     }
+    try {
+      await api.post("/auth/logout");
+    } catch (error) {
+      console.error("Logout API error:", error);
+    }
+    dispatch(clearMenuData());
+    dispatch(logoutAction());
+    localStorage.removeItem("token");
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith("tableCount_")) localStorage.removeItem(key);
+    });
+    sessionStorage.clear();
     router.push("/auth/login");
   }, [dispatch, router]);
 

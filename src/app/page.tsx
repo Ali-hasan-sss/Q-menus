@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useLanguage } from "@/store/hooks/useLanguage";
@@ -10,7 +11,6 @@ import Footer from "@/components/layout/Footer";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { api, publicApi } from "@/lib/api";
-import { number } from "zod";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import {
   CheckCircle2,
@@ -26,7 +26,17 @@ import {
   Target,
   Eye,
   Check,
+  ScanLine,
 } from "lucide-react";
+
+const QRScanner = dynamic(() => import("@/components/customer/QRScanner"), {
+  ssr: false,
+  loading: () => (
+    <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/80">
+      <LoadingSpinner />
+    </div>
+  ),
+});
 
 interface Plan {
   id: string;
@@ -77,6 +87,7 @@ export default function HomePage() {
     null,
   );
   const [contactLoading, setContactLoading] = useState(true);
+  const [showQRScanner, setShowQRScanner] = useState(false);
   const servicesRef = useRef<HTMLDivElement>(null);
 
   // Redirect authenticated users to dashboard
@@ -1237,6 +1248,24 @@ export default function HomePage() {
       </div>
 
       <Footer />
+
+      {/* Floating QR scan button - scan any restaurant or table code */}
+      {!authLoading && !isAuthenticated && (
+        <>
+          <button
+            type="button"
+            onClick={() => setShowQRScanner(true)}
+            className="fixed right-5 bottom-5 z-[9990] flex items-center justify-center w-14 h-14 rounded-full shadow-lg transition-all duration-200 hover:scale-110 hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-tm-blue/40 bg-gradient-to-br from-tm-blue to-tm-orange text-white"
+            title={isRTL ? "مسح كود مطعم أو طاولة" : "Scan restaurant or table code"}
+            aria-label={isRTL ? "مسح كود QR" : "Scan QR code"}
+          >
+            <ScanLine className="w-7 h-7" strokeWidth={2} />
+          </button>
+          {showQRScanner && (
+            <QRScanner onClose={() => setShowQRScanner(false)} />
+          )}
+        </>
+      )}
     </div>
   );
 }

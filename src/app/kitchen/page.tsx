@@ -15,7 +15,7 @@ import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import {
   DndContext,
   DragOverlay,
-  closestCorners,
+  pointerWithin,
   KeyboardSensor,
   PointerSensor,
   useSensor,
@@ -256,9 +256,9 @@ function StatusColumn({
         </div>
       </div>
 
-      {/* Column Items */}
+      {/* Column Items - min-height ensures droppable area is always large enough */}
       <div
-        className="flex-1 overflow-y-auto p-4 thin-scrollbar"
+        className="flex-1 min-h-[200px] overflow-y-auto p-4 thin-scrollbar"
         style={{
           scrollbarWidth: "thin",
           scrollbarColor: "rgba(156, 163, 175, 0.5) transparent",
@@ -269,7 +269,7 @@ function StatusColumn({
           strategy={verticalListSortingStrategy}
         >
           {column.items.length === 0 ? (
-            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400 min-h-[120px] flex items-center justify-center">
               {isRTL ? "لا توجد عناصر" : "No items"}
             </div>
           ) : (
@@ -321,9 +321,9 @@ export default function KitchenDisplayPage() {
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 5, // Reduced for better touch sensitivity
-        delay: 50, // Small delay for touch devices
-        tolerance: 3, // More precise touch detection
+        distance: 6,
+        delay: 60,
+        tolerance: 4,
       },
     }),
     useSensor(KeyboardSensor)
@@ -1171,7 +1171,7 @@ export default function KitchenDisplayPage() {
           <div className="flex-1 flex flex-col min-h-0">
             <DndContext
               sensors={sensors}
-              collisionDetection={closestCorners}
+              collisionDetection={pointerWithin}
               onDragStart={(event) => {
                 handleDragStart(event);
                 // Prevent body scroll during drag on touch devices
