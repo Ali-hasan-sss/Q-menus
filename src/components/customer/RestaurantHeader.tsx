@@ -84,6 +84,11 @@ export function RestaurantHeader({
   // Use default theme if no custom theme exists
   const activeTheme = menuTheme || defaultTheme;
 
+  const activeCurrencyExchanges =
+    currencyExchanges?.filter(
+      (ce) => ce.isActive && ce.currency !== restaurantCurrency,
+    ) || [];
+
   return (
     <header
       className="fixed top-0 right-0 w-full shadow-md backdrop-blur-xl"
@@ -114,7 +119,7 @@ export function RestaurantHeader({
             )}
 
             <div className="min-w-0 flex-1">
-              <h1 className="text-xl sm:text-3xl font-extrabold text-white truncate">
+              <h1 className="text-lg sm:text-2xl font-extrabold text-white whitespace-normal break-words">
                 {isRTL
                   ? restaurant?.nameAr || restaurant?.name
                   : restaurant?.name}
@@ -123,8 +128,10 @@ export function RestaurantHeader({
           </div>
 
           <div className="flex items-center gap-4 sm:gap-5 flex-shrink-0">
-            {/* Currency Selector - Always show if onCurrencyChange is provided */}
-            {onCurrencyChange && restaurantCurrency && (
+            {/* Currency Selector - show فقط عند توفر أكثر من عملة */}
+            {onCurrencyChange &&
+              restaurantCurrency &&
+              activeCurrencyExchanges.length > 0 && (
               <select
                 value={selectedCurrency || restaurantCurrency}
                 onChange={(e) =>
@@ -151,11 +158,7 @@ export function RestaurantHeader({
                   {getCurrencyDisplayName(restaurantCurrency)}{" "}
                   {isRTL ? "(أساسي)" : "(Base)"}
                 </option>
-                {currencyExchanges &&
-                  currencyExchanges.length > 0 &&
-                  currencyExchanges
-                    .filter((ce) => ce.isActive)
-                    .map((ce) => (
+                {activeCurrencyExchanges.map((ce) => (
                       <option
                         key={ce.id}
                         value={ce.currency}

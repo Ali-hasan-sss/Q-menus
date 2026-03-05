@@ -186,6 +186,7 @@ export default function CustomerMenuPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [categorySearchQuery, setCategorySearchQuery] = useState("");
+  const searchResultsContainerRef = useRef<HTMLDivElement | null>(null);
 
   // LocalStorage key for this restaurant's order
   const orderStorageKey = `order_${restaurantId}_${tableNumber || "delivery"}`;
@@ -773,6 +774,13 @@ export default function CustomerMenuPage() {
 
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery]);
+
+  // Scroll to top of results container when showing search results (e.g. user كان في أسفل القائمة)
+  useEffect(() => {
+    if (showSearchResults && searchResultsContainerRef.current) {
+      searchResultsContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [showSearchResults]);
 
   const addItemToOrder = (
     menuItem: MenuItem,
@@ -1408,6 +1416,7 @@ export default function CustomerMenuPage() {
                 {/* Scrollable content: search results + categories (with hidden scrollbar).
                     نضيف padding سفلي إضافي عندما يكون شريط الطلب السفلي ظاهراً حتى لا يغطي آخر العناصر. */}
                 <div
+                  ref={searchResultsContainerRef}
                   className={`max-h-[calc(100vh-150px)] sm:max-h-[calc(100vh-180px)] overflow-y-auto menu-scroll-hidden ${
                     showOrderSummary && orderItems.length > 0 ? "pb-32" : "pb-4"
                   }`}
