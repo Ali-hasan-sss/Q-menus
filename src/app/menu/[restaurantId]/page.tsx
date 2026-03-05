@@ -1753,10 +1753,10 @@ export default function CustomerMenuPage() {
             )}
           </div>
 
-          {/* Fixed bottom actions: Waiter button (no floating back button) */}
+          {/* Fixed bottom actions: Waiter button (just above order bar when visible) */}
           <div
             className={`fixed inset-x-0 z-[60] pointer-events-none ${
-              orderItems.length > 0 ? "bottom-36" : "bottom-16"
+              orderItems.length > 0 ? "bottom-28" : "bottom-16"
             }`}
           >
             <div className="absolute left-4 pointer-events-auto">

@@ -155,40 +155,40 @@ export function FloatingOrderSummary({
         onClick={() => setShowDetails(true)}
       >
         <div className="max-w-7xl mx-auto flex items-center justify-between min-w-0">
-          <div className="flex items-center space-x-2 min-w-0 flex-shrink-0">
-            <div
-              className="text-sm font-medium whitespace-nowrap"
-              style={{
-                color: menuTheme?.textColor || "#ffffff",
-              }}
-            >
-              {totalItems} {isRTL ? "عنصر" : "items"}
-            </div>
+          {/* Amount on the left (hidden text when total = 0, لكن مع الحفاظ على المساحة) */}
+          <div
+            className="min-w-[80px] text-sm sm:text-base font-semibold text-left"
+            style={{
+              color: menuTheme?.textColor || "#ffffff",
+            }}
+          >
+            {displayTotal.amount !== 0
+              ? formatCurrencyWithLanguage(
+                  displayTotal.amount,
+                  displayTotal.currency,
+                  language,
+                )
+              : "\u00A0"}
           </div>
-          <div className="flex items-center space-x-2 min-w-0">
-            <div
-              className="text-base font-semibold whitespace-nowrap"
-              style={{
-                color: menuTheme?.textColor || "#ffffff",
-              }}
-            >
-              {formatCurrencyWithLanguage(
-                displayTotal.amount,
-                displayTotal.currency,
-                language
-              )}
-            </div>
-            <span
-              className="px-3 py-1 text-xs font-medium whitespace-nowrap flex-shrink-0 rounded"
-              style={{
-                backgroundColor:
-                  menuTheme?.accentColor || "var(--theme-accent)",
-                color: menuTheme?.textColor || "#ffffff",
-                border: `1px solid ${menuTheme?.textColor || "#ffffff"}`,
-              }}
-            >
-              {isRTL ? "إرسال الطلب" : "Send Order"}
-            </span>
+
+          {/* Center: plain \"Send Order\" text (no button background) */}
+          <div
+            className="flex-1 text-center text-sm sm:text-base font-semibold"
+            style={{
+              color: menuTheme?.textColor || "#ffffff",
+            }}
+          >
+            {isRTL ? "إرسال الطلب" : "Send Order"}
+          </div>
+
+          {/* Items count on the right */}
+          <div
+            className="min-w-[60px] text-sm font-medium text-right whitespace-nowrap"
+            style={{
+              color: menuTheme?.textColor || "#ffffff",
+            }}
+          >
+            {totalItems} {isRTL ? "عنصر" : "items"}
           </div>
         </div>
       </div>
