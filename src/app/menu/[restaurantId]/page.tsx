@@ -1235,7 +1235,7 @@ export default function CustomerMenuPage() {
       `}</style>
 
       <div
-        className="min-h-screen relative menu-scroll-hidden"
+        className="h-screen overflow-hidden relative menu-scroll-hidden"
         style={{
           backgroundColor: hexToRgba(
             menuTheme?.backgroundColor || DEFAULT_THEME.backgroundColor,
@@ -1328,7 +1328,7 @@ export default function CustomerMenuPage() {
               <div className="animate-fadeIn">
                 {/* Search Bar (sticky below header, شفافة) */}
                 <div
-                  className="sticky top-[70px] sm:top-[100px] z-[40] max-w-2xl mx-auto pt-2 pb-4"
+                  className="sticky top-20 sm:top-24 z-[40] max-w-2xl mx-auto pt-2 pb-4"
                 >
                   <div className="relative">
                     <input
@@ -1561,7 +1561,7 @@ export default function CustomerMenuPage() {
             {selectedCategory && (
               <div className="animate-fadeIn">
                 {/* Sticky header with category title + search */}
-                <div className="sticky top-[70px] sm:top-[100px] z-[40] pb-4">
+                <div className="sticky top-20 sm:top-24 z-[40] pb-4">
                   {/* Category Title */}
                   <div className="text-center mb-4">
                     <h2
