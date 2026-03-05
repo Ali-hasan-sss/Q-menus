@@ -1281,7 +1281,10 @@ export default function CustomerMenuPage() {
             menuTheme?.textColor || DEFAULT_THEME.textColor,
             colorOpacity.text,
           ),
-          fontFamily: menuTheme?.fontFamily || DEFAULT_THEME.fontFamily,
+          // استخدم خط كايرو في الواجهة العربية، وإلا استخدم خط الثيم الافتراضي
+          fontFamily: isRTL
+            ? "var(--font-cairo), Arial, sans-serif"
+            : menuTheme?.fontFamily || DEFAULT_THEME.fontFamily,
         }}
         onLoad={() => {
           console.log("Main page div loaded with colorOpacity:", colorOpacity);
