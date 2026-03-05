@@ -366,10 +366,11 @@ export function MenuItem({
                 basePrice,
                 null
               );
+              const isZeroPrice = basePrice === 0;
               return (
                 <>
                   <span
-                    className="text-sm sm:text-base font-semibold"
+                    className="text-sm sm:text-base font-semibold min-h-[1.25rem]"
                     style={{
                       color: hexToRgba(
                         theme?.textColor || "#1f2937",
@@ -377,23 +378,26 @@ export function MenuItem({
                       ),
                     }}
                   >
-                    {formatCurrencyWithLanguage(
-                      displayPrice.amount,
-                      displayPrice.currency,
-                      language
-                    )}
-                  </span>
-                  {typeof item.discount === "number" && item.discount > 0 && (
-                    <span className="text-xs text-gray-500 line-through">
-                      {formatCurrencyWithLanguage(
-                        calculatePriceInCurrency(basePrice, selectedCurrency)
-                          .amount,
-                        calculatePriceInCurrency(basePrice, selectedCurrency)
-                          .currency,
+                    {!isZeroPrice &&
+                      formatCurrencyWithLanguage(
+                        displayPrice.amount,
+                        displayPrice.currency,
                         language
                       )}
-                    </span>
-                  )}
+                  </span>
+                  {typeof item.discount === "number" &&
+                    item.discount > 0 &&
+                    !isZeroPrice && (
+                      <span className="text-xs text-gray-500 line-through">
+                        {formatCurrencyWithLanguage(
+                          calculatePriceInCurrency(basePrice, selectedCurrency)
+                            .amount,
+                          calculatePriceInCurrency(basePrice, selectedCurrency)
+                            .currency,
+                          language
+                        )}
+                      </span>
+                    )}
                 </>
               );
             })()}
@@ -507,22 +511,25 @@ export function MenuItem({
                     basePrice,
                     selectedCurrency
                   );
+                  const isZeroPrice = basePrice === 0;
                   return (
                     <>
                       <span
-                        className="text-lg font-semibold"
+                        className="text-lg font-semibold min-h-[1.5rem]"
                         style={{
                           color: theme?.primaryColor || "var(--theme-primary)",
                         }}
                       >
-                        {formatCurrencyWithLanguage(
-                          displayPrice.amount,
-                          displayPrice.currency,
-                          language
-                        )}
+                        {!isZeroPrice &&
+                          formatCurrencyWithLanguage(
+                            displayPrice.amount,
+                            displayPrice.currency,
+                            language
+                          )}
                       </span>
                       {typeof item.discount === "number" &&
-                        item.discount > 0 && (
+                        item.discount > 0 &&
+                        !isZeroPrice && (
                           <span className="text-sm text-gray-500 line-through">
                             {formatCurrencyWithLanguage(
                               originalDisplayPrice.amount,

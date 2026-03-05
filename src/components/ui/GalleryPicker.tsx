@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useLanguage } from "@/store/hooks/useLanguage";
-import { api } from "@/lib/api";
+import { api, getImageUrl } from "@/lib/api";
 import { Button } from "./Button";
 import { Input } from "./Input";
 
@@ -47,10 +47,6 @@ export function GalleryPicker({
     currentImage || null
   );
 
-  useEffect(() => {
-    fetchImages();
-  }, [searchTerm, selectedCategory]);
-
   const fetchImages = async () => {
     try {
       setLoading(true);
@@ -69,6 +65,15 @@ export function GalleryPicker({
       setLoading(false);
     }
   };
+
+  // Debounce fetching images while typing in the search field / changing category
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      fetchImages();
+    }, 400);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm, selectedCategory]);
 
   const handleSelect = async () => {
     if (selectedImage) {
@@ -171,7 +176,7 @@ export function GalleryPicker({
                 >
                   <div className="aspect-square relative">
                     <img
-                      src={image.imageUrl}
+                      src={getImageUrl(image.imageUrl)}
                       alt={image.name}
                       className="w-full h-full object-cover"
                     />

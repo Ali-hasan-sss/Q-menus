@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { ImageUpload } from "@/components/ui/ImageUpload";
-import { api } from "@/lib/api";
+import { api, getImageUrl } from "@/lib/api";
 
 interface GalleryImage {
   id: string;
@@ -362,7 +362,7 @@ export default function AdminGalleryPage() {
                 >
                   <div className="relative aspect-square">
                     <img
-                      src={image.imageUrl}
+                      src={getImageUrl(image.imageUrl)}
                       alt={image.name}
                       className="w-full h-full object-cover"
                     />

@@ -86,21 +86,21 @@ export function RestaurantHeader({
 
   return (
     <header
-      className="shadow-sm backdrop-blur-xl fixed w-full top-0 right-0"
+      className="fixed top-0 right-0 w-full shadow-md backdrop-blur-xl"
       style={{
         backgroundColor: hexToRgba(
           activeTheme.primaryColor || defaultTheme.primaryColor,
-          colorOpacity?.primary || defaultTheme.primaryColorOpacity
+          colorOpacity?.primary || defaultTheme.primaryColorOpacity,
         ),
-        zIndex: 10,
+        zIndex: 20,
       }}
     >
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8">
-        <div className="flex justify-between items-center h-14 sm:h-16">
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-20 sm:h-24 gap-4 sm:gap-8">
+          <div className="flex items-center gap-5 sm:gap-6 min-w-0 flex-1">
             {/* Restaurant Logo or Name */}
             {restaurant?.logo && (
-              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-700 flex-shrink-0">
+              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-700 flex-shrink-0 ring-2 ring-white/70 shadow-md">
                 <img
                   src={getImageUrl(restaurant.logo)}
                   alt={
@@ -114,7 +114,7 @@ export function RestaurantHeader({
             )}
 
             <div className="min-w-0 flex-1">
-              <h1 className="text-base sm:text-xl font-semibold text-white truncate">
+              <h1 className="text-xl sm:text-3xl font-extrabold text-white truncate">
                 {isRTL
                   ? restaurant?.nameAr || restaurant?.name
                   : restaurant?.name}
@@ -122,7 +122,7 @@ export function RestaurantHeader({
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+          <div className="flex items-center gap-4 sm:gap-5 flex-shrink-0">
             {/* Currency Selector - Always show if onCurrencyChange is provided */}
             {onCurrencyChange && restaurantCurrency && (
               <select
@@ -131,20 +131,20 @@ export function RestaurantHeader({
                   onCurrencyChange(
                     e.target.value === restaurantCurrency
                       ? null
-                      : e.target.value
+                      : e.target.value,
                   )
                 }
-                className="px-1.5 sm:px-2 py-1 text-xs sm:text-sm rounded-md bg-white/20 backdrop-blur-sm border border-white/30 text-white focus:outline-none focus:ring-2 focus:ring-white/50 hover:bg-white/30 transition-colors"
+                className="px-2 sm:px-3 py-1.5 text-xs sm:text-sm rounded-md bg-white/15 backdrop-blur-sm border border-white/40 text-white focus:outline-none focus:ring-2 focus:ring-white/60 hover:bg-white/30 transition-colors"
                 style={{
                   color: "white",
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor =
-                    "rgba(255, 255, 255, 0.3)";
+                    "rgba(255, 255, 255, 0.28)";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor =
-                    "rgba(255, 255, 255, 0.2)";
+                    "rgba(255, 255, 255, 0.15)";
                 }}
               >
                 <option value={restaurantCurrency} style={{ color: "#000" }}>

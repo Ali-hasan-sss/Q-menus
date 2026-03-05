@@ -1221,24 +1221,54 @@ export default function CustomerMenuPage() {
         .transition-smooth {
           transition: all 0.3s ease-in-out;
         }
+
+        /* Hide all scrollbars (track, thumb, buttons) inside customer menu page */
+        .menu-scroll-hidden {
+          -ms-overflow-style: none; /* IE and Edge */
+          scrollbar-width: none; /* Firefox */
+        }
+        .menu-scroll-hidden::-webkit-scrollbar {
+          display: none; /* Chrome, Safari, Opera */
+          width: 0;
+          height: 0;
+        }
       `}</style>
 
       <div
-        className="min-h-screen relative"
+        className="min-h-screen relative menu-scroll-hidden"
         style={{
           backgroundColor: hexToRgba(
             menuTheme?.backgroundColor || DEFAULT_THEME.backgroundColor,
             colorOpacity.background,
           ),
+          // إذا لم توجد خلفية في الثيم الحالي نستخدم اللون فقط،
+          // ولا نستعمل الصورة الافتراضية إلا في حالة عدم وجود menuTheme أصلاً
           backgroundImage: menuTheme?.backgroundImage
             ? `url(${menuTheme.backgroundImage})`
-            : `url(${DEFAULT_THEME.backgroundImage})`,
+            : !menuTheme && DEFAULT_THEME.backgroundImage
+              ? `url(${DEFAULT_THEME.backgroundImage})`
+              : undefined,
+          // اجعل صورة الخلفية ثابتة وتملأ الشاشة عند وجود صورة
+          backgroundAttachment:
+            menuTheme?.backgroundImage ||
+            (!menuTheme && DEFAULT_THEME.backgroundImage)
+              ? "fixed"
+              : undefined,
           backgroundPosition:
-            menuTheme?.backgroundPosition || DEFAULT_THEME.backgroundPosition,
+            menuTheme?.backgroundImage ||
+            (!menuTheme && DEFAULT_THEME.backgroundImage)
+              ? "center"
+              : menuTheme?.backgroundPosition || DEFAULT_THEME.backgroundPosition,
           backgroundSize:
-            menuTheme?.backgroundSize || DEFAULT_THEME.backgroundSize,
+            menuTheme?.backgroundImage ||
+            (!menuTheme && DEFAULT_THEME.backgroundImage)
+              ? "cover"
+              : menuTheme?.backgroundSize || DEFAULT_THEME.backgroundSize,
           backgroundRepeat:
-            menuTheme?.backgroundRepeat || DEFAULT_THEME.backgroundRepeat,
+            menuTheme?.backgroundImage ||
+            (!menuTheme && DEFAULT_THEME.backgroundImage)
+              ? "no-repeat"
+              : menuTheme?.backgroundRepeat || DEFAULT_THEME.backgroundRepeat,
           color: hexToRgba(
             menuTheme?.textColor || DEFAULT_THEME.textColor,
             colorOpacity.text,
@@ -1296,8 +1326,10 @@ export default function CustomerMenuPage() {
             {/* Categories View */}
             {!selectedCategory && (
               <div className="animate-fadeIn">
-                {/* Search Bar */}
-                <div className="mb-6 max-w-2xl mx-auto">
+                {/* Search Bar (sticky below header, شفافة) */}
+                <div
+                  className="sticky top-[70px] sm:top-[100px] z-[40] max-w-2xl mx-auto pt-2 pb-4"
+                >
                   <div className="relative">
                     <input
                       type="text"
@@ -1373,11 +1405,61 @@ export default function CustomerMenuPage() {
                   </div>
                 </div>
 
-                {/* Search Results */}
-                {showSearchResults && searchResults.length > 0 && (
-                  <div className="mb-8">
+                {/* Scrollable content: search results + categories (with hidden scrollbar).
+                    نضيف padding سفلي إضافي عندما يكون شريط الطلب السفلي ظاهراً حتى لا يغطي آخر العناصر. */}
+                <div
+                  className={`max-h-[calc(100vh-150px)] sm:max-h-[calc(100vh-180px)] overflow-y-auto menu-scroll-hidden ${
+                    showOrderSummary && orderItems.length > 0 ? "pb-32" : "pb-4"
+                  }`}
+                >
+                  {/* Search Results */}
+                  {showSearchResults && searchResults.length > 0 && (
+                    <div className="mb-8">
+                      <h3
+                        className="text-lg font-semibold mb-4"
+                        style={{
+                          color: hexToRgba(
+                            menuTheme?.textColor || "#1f2937",
+                            colorOpacity.text,
+                          ),
+                        }}
+                      >
+                        {isRTL
+                          ? `نتائج البحث (${searchResults.length})`
+                          : `Search Results (${searchResults.length})`}
+                      </h3>
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+                        {searchResults.map((item) => (
+                          <MenuItem
+                            key={item.id}
+                            item={item}
+                            currency={restaurantCurrency}
+                            selectedCurrency={selectedPaymentCurrency}
+                            currencyExchanges={currencyExchanges}
+                            onAddToOrder={addItemToOrder}
+                            onItemClick={handleItemClick}
+                            isRTL={isRTL}
+                            theme={menuTheme || undefined}
+                            colorOpacity={colorOpacity}
+                          />
+                        ))}
+                      </div>
+                      <div
+                        className="border-t-2 pt-6 mb-6"
+                        style={{
+                          borderColor: hexToRgba(
+                            menuTheme?.secondaryColor || "#e5e7eb",
+                            0.3,
+                          ),
+                        }}
+                      ></div>
+                    </div>
+                  )}
+
+                  {/* Categories Title */}
+                  {showSearchResults && searchResults.length > 0 && (
                     <h3
-                      className="text-lg font-semibold mb-4"
+                      className="text-lg font-semibold mb-4 text-center"
                       style={{
                         color: hexToRgba(
                           menuTheme?.textColor || "#1f2937",
@@ -1385,54 +1467,11 @@ export default function CustomerMenuPage() {
                         ),
                       }}
                     >
-                      {isRTL
-                        ? `نتائج البحث (${searchResults.length})`
-                        : `Search Results (${searchResults.length})`}
+                      {isRTL ? "أو اختر من الفئات" : "Or choose from categories"}
                     </h3>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
-                      {searchResults.map((item) => (
-                        <MenuItem
-                          key={item.id}
-                          item={item}
-                          currency={restaurantCurrency}
-                          selectedCurrency={selectedPaymentCurrency}
-                          currencyExchanges={currencyExchanges}
-                          onAddToOrder={addItemToOrder}
-                          onItemClick={handleItemClick}
-                          isRTL={isRTL}
-                          theme={menuTheme || undefined}
-                          colorOpacity={colorOpacity}
-                        />
-                      ))}
-                    </div>
-                    <div
-                      className="border-t-2 pt-6 mb-6"
-                      style={{
-                        borderColor: hexToRgba(
-                          menuTheme?.secondaryColor || "#e5e7eb",
-                          0.3,
-                        ),
-                      }}
-                    ></div>
-                  </div>
-                )}
+                  )}
 
-                {/* Categories Title */}
-                {showSearchResults && searchResults.length > 0 && (
-                  <h3
-                    className="text-lg font-semibold mb-4 text-center"
-                    style={{
-                      color: hexToRgba(
-                        menuTheme?.textColor || "#1f2937",
-                        colorOpacity.text,
-                      ),
-                    }}
-                  >
-                    {isRTL ? "أو اختر من الفئات" : "Or choose from categories"}
-                  </h3>
-                )}
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pb-4">
                   {menus.map((menu) =>
                     menu.categories.map((category) => (
                       <div
@@ -1513,6 +1552,7 @@ export default function CustomerMenuPage() {
                       </div>
                     )),
                   )}
+                  </div>
                 </div>
               </div>
             )}
@@ -1520,10 +1560,10 @@ export default function CustomerMenuPage() {
             {/* Items View */}
             {selectedCategory && (
               <div className="animate-fadeIn">
-                {/* Category Header with Back Button */}
-                <div className="mb-8">
+                {/* Sticky header with category title + search */}
+                <div className="sticky top-[70px] sm:top-[100px] z-[40] pb-4">
                   {/* Category Title */}
-                  <div className="text-center">
+                  <div className="text-center mb-4">
                     <h2
                       className="text-2xl font-bold mb-2"
                       style={{
@@ -1553,61 +1593,66 @@ export default function CustomerMenuPage() {
                       </p>
                     )}
                   </div>
-                </div>
 
-                {/* Category Search Bar */}
-                {selectedCategory.items &&
-                  selectedCategory.items.length > 0 && (
-                    <div className="mb-6 max-w-2xl mx-auto">
-                      <div className="relative">
-                        <input
-                          type="text"
-                          value={categorySearchQuery}
-                          onChange={(e) =>
-                            setCategorySearchQuery(e.target.value)
-                          }
-                          placeholder={
-                            isRTL
-                              ? "ابحث عن العناصر في هذه الفئة..."
-                              : "Search items in this category..."
-                          }
-                          className="w-full !text-black px-4 py-3 ltr:pr-12 rtl:pl-12 rounded-lg border focus:outline-none focus:ring-2 transition-all"
-                          style={{
-                            backgroundColor: hexToRgba(
-                              menuTheme?.backgroundColor || "#ffffff",
-                              0.9,
-                            ),
-                            borderColor: hexToRgba(
-                              menuTheme?.secondaryColor || "#e5e7eb",
-                              colorOpacity.secondary,
-                            ),
-                            color: menuTheme?.textColor || "#1f2937",
-                          }}
-                        />
-                        <div className="absolute !text-black inset-y-0 ltr:right-0 rtl:left-0 flex items-center ltr:pr-3 rtl:pl-3 pointer-events-none">
-                          <svg
-                            className="w-5 h-5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                  {/* Category Search Bar */}
+                  {selectedCategory.items &&
+                    selectedCategory.items.length > 0 && (
+                      <div className="max-w-2xl mx-auto">
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={categorySearchQuery}
+                            onChange={(e) =>
+                              setCategorySearchQuery(e.target.value)
+                            }
+                            placeholder={
+                              isRTL
+                                ? "ابحث عن العناصر في هذه الفئة..."
+                                : "Search items in this category..."
+                            }
+                            className="w-full !text-black px-4 py-3 ltr:pr-12 rtl:pl-12 rounded-lg border focus:outline-none focus:ring-2 transition-all"
                             style={{
-                              color: "#6b7280",
+                              backgroundColor: hexToRgba(
+                                menuTheme?.backgroundColor || "#ffffff",
+                                0.9,
+                              ),
+                              borderColor: hexToRgba(
+                                menuTheme?.secondaryColor || "#e5e7eb",
+                                colorOpacity.secondary,
+                              ),
+                              color: menuTheme?.textColor || "#1f2937",
                             }}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                            />
-                          </svg>
+                          />
+                          <div className="absolute !text-black inset-y-0 ltr:right-0 rtl:left-0 flex items-center ltr:pr-3 rtl:pl-3 pointer-events-none">
+                            <svg
+                              className="w-5 h-5"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                              style={{
+                                color: "#6b7280",
+                              }}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                              />
+                            </svg>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                </div>
 
-                {/* Items Grid */}
-                {(() => {
+                {/* Items Grid - scrollable like mobile ScrollView, with bottom padding if order bar is visible */}
+                <div
+                  className={`max-h-[calc(100vh-180px)] sm:max-h-[calc(100vh-210px)] overflow-y-auto menu-scroll-hidden ${
+                    showOrderSummary && orderItems.length > 0 ? "pb-32" : "pb-4"
+                  }`}
+                >
+                  {(() => {
                   console.log("🎯 Items Grid Debug:", {
                     loadingItems,
                     selectedCategoryItems: selectedCategory.items,
@@ -1615,11 +1660,11 @@ export default function CustomerMenuPage() {
                   });
                   return null;
                 })()}
-                {loadingItems ? (
-                  <MenuLoadingSkeleton menuTheme={menuTheme} />
-                ) : selectedCategory.items &&
-                  selectedCategory.items.length > 0 ? (
-                  (() => {
+                  {loadingItems ? (
+                    <MenuLoadingSkeleton menuTheme={menuTheme} />
+                  ) : selectedCategory.items &&
+                    selectedCategory.items.length > 0 ? (
+                    (() => {
                     // Filter items based on category search query
                     const filteredItems = selectedCategory.items.filter(
                       (item) => {
@@ -1682,20 +1727,21 @@ export default function CustomerMenuPage() {
                       </div>
                     );
                   })()
-                ) : (
-                  <div className="text-center py-12">
-                    <p className="text-gray-600 dark:text-gray-400">
-                      {isRTL
-                        ? "لا توجد عناصر في هذه الفئة"
-                        : "No items available in this category"}
-                    </p>
-                  </div>
-                )}
+                  ) : (
+                    <div className="text-center py-12">
+                      <p className="text-gray-600 dark:text-gray-400">
+                        {isRTL
+                          ? "لا توجد عناصر في هذه الفئة"
+                          : "No items available in this category"}
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
 
-          {/* Fixed bottom actions: Waiter at far left, Back to categories at far right (above order bar when present) */}
+          {/* Fixed bottom actions: Waiter button (no floating back button) */}
           <div
             className={`fixed inset-x-0 z-[60] pointer-events-none ${
               orderItems.length > 0 ? "bottom-36" : "bottom-16"
@@ -1710,59 +1756,6 @@ export default function CustomerMenuPage() {
                   menuTheme={menuTheme}
                   className="shadow-lg"
                 />
-              )}
-            </div>
-            <div className="absolute right-4 pointer-events-auto">
-              {selectedCategory && (
-                <button
-                  onClick={handleBackToCategories}
-                  className="shadow-lg hover:shadow-xl rounded-full w-14 h-14 flex items-center justify-center transition-all duration-200"
-                  style={{
-                    backgroundColor:
-                      menuTheme?.accentColor || "var(--theme-accent)",
-                    color: menuTheme?.textColor || "#ffffff",
-                    border: `2px solid ${menuTheme?.secondaryColor || "#2797dd"}`,
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor =
-                      menuTheme?.secondaryColor || "var(--theme-secondary)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor =
-                      menuTheme?.accentColor || "var(--theme-accent)";
-                  }}
-                  aria-label={isRTL ? "الرجوع للفئات" : "Back to categories"}
-                >
-                  {isRTL ? (
-                    <svg
-                      className="w-6 h-6"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 5l7 7-7 7"
-                      />
-                    </svg>
-                  ) : (
-                    <svg
-                      className="w-6 h-6"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M15 19l-7-7 7-7"
-                      />
-                    </svg>
-                  )}
-                </button>
               )}
             </div>
           </div>

@@ -268,7 +268,11 @@ export function ThemeEditor({ onThemeChange }: ThemeEditorProps) {
         backgroundColor: previewTheme.backgroundColor,
         textColor: previewTheme.textColor,
         accentColor: previewTheme.accentColor,
-        backgroundImage: previewTheme.backgroundImage,
+        // If backgroundImage تمت إزالتها من المعاينة نرسل null بدلاً من ترك القيمة القديمة
+        backgroundImage:
+          previewTheme.backgroundImage === undefined
+            ? null
+            : previewTheme.backgroundImage,
         backgroundOverlay: previewTheme.backgroundOverlay,
         backgroundPosition: previewTheme.backgroundPosition,
         backgroundSize: previewTheme.backgroundSize,
@@ -325,6 +329,7 @@ export function ThemeEditor({ onThemeChange }: ThemeEditorProps) {
 
   const handleCustomBackgroundRemove = () => {
     setCustomBackgroundImage(null);
+    // استخدم undefined في الـ preview، وسيتم تحويلها إلى null عند الإرسال للـ API
     updatePreviewTheme({ backgroundImage: undefined });
   };
 
