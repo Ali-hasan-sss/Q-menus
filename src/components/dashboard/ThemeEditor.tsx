@@ -754,16 +754,19 @@ export function ThemeEditor({ onThemeChange }: ThemeEditorProps) {
                       {mockMenuData.categories.map((category) => (
                         <div
                           key={category.id}
-                          className={`shadow-sm border cursor-pointer hover:shadow-md transition-shadow rounded-lg p-4`}
+                          className={`cursor-pointer transition-shadow relative hover:shadow-xl rounded-lg p-4`}
                           style={{
                             backgroundColor: hexToRgba(
                               activePreviewTheme.primaryColor,
                               colorOpacity.primary
                             ),
-                            borderColor: hexToRgba(
+                            boxShadow: `0 10px 25px -5px ${hexToRgba(
                               activePreviewTheme.secondaryColor,
                               colorOpacity.secondary
-                            ),
+                            )}, 0 8px 10px -6px ${hexToRgba(
+                              activePreviewTheme.secondaryColor,
+                              colorOpacity.secondary * 0.8
+                            )}`,
                           }}
                         >
                           <div className="text-center">
@@ -833,16 +836,19 @@ export function ThemeEditor({ onThemeChange }: ThemeEditorProps) {
                         {mockMenuData.categories[0].items.map((item) => (
                           <div
                             key={item.id}
-                            className={`shadow-sm border overflow-hidden hover:shadow-md transition-shadow rounded-lg`}
+                            className={`overflow-hidden hover:shadow-xl transition-shadow rounded-lg`}
                             style={{
                               backgroundColor: hexToRgba(
                                 activePreviewTheme.primaryColor,
                                 colorOpacity.primary
                               ),
-                              borderColor: hexToRgba(
+                              boxShadow: `0 10px 25px -5px ${hexToRgba(
                                 activePreviewTheme.secondaryColor,
                                 colorOpacity.secondary
-                              ),
+                              )}, 0 8px 10px -6px ${hexToRgba(
+                                activePreviewTheme.secondaryColor,
+                                colorOpacity.secondary * 0.8
+                              )}`,
                             }}
                           >
                             {/* Image */}

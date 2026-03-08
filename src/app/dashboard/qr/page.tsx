@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/store/hooks/useAuth";
 import { useLanguage } from "@/store/hooks/useLanguage";
 import { useMenu } from "@/store/hooks/useMenu";
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useToast } from "@/store/hooks/useToast";
 import jsPDF from "jspdf";
+import { getImageUrl } from "@/lib/api";
 
 function QRPageContent() {
   const { user } = useAuth();
@@ -42,9 +43,408 @@ function QRPageContent() {
   const [selectedQRForPrint, setSelectedQRForPrint] = useState<any>(null);
   const [printType, setPrintType] = useState<"standard" | "label">("standard");
 
+  // Custom design for table QR codes
+  const [showCustomDesign, setShowCustomDesign] = useState(false);
+  const [designBackground, setDesignBackground] = useState<string | null>(null);
+  const [designWidth, setDesignWidth] = useState(80); // mm
+  const [designHeight, setDesignHeight] = useState(40); // mm
+  const [qrPosX, setQrPosX] = useState(5); // mm from left
+  const [qrPosY, setQrPosY] = useState(5); // mm from top
+  const [qrSize, setQrSize] = useState(30); // mm
+  const [tableNumPosX, setTableNumPosX] = useState(40); // mm - center X (default middle)
+  const [tableNumPosY, setTableNumPosY] = useState(8); // mm - center Y (default near top)
+  const [tableNumSize, setTableNumSize] = useState(12); // mm diameter
+  const [tableNumBgColor, setTableNumBgColor] = useState("#ffffff");
+  const [tableNumTextColor, setTableNumTextColor] = useState("#000000");
+  const [tableNumFontScale, setTableNumFontScale] = useState(0.75); // 0.5-1.0, font size relative to circle
+  const [paperSize, setPaperSize] = useState<"a4" | "a3" | "letter" | "a5">("a4");
+  const [paperMargin, setPaperMargin] = useState(5); // mm
+
+  // Drag/resize refs for interactive preview
+  const previewRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{
+    type: "design" | "qrMove" | "qrResize" | "tableNumMove" | "tableNumResize";
+    startX: number;
+    startY: number;
+    startW: number;
+    startH: number;
+    startPosX: number;
+    startPosY: number;
+    startQrSize: number;
+    startTableNumPosX: number;
+    startTableNumPosY: number;
+    startTableNumSize: number;
+  } | null>(null);
+
+  const PX_PER_MM = 4;
+  const MIN_DESIGN_MM = 20;
+  const MAX_DESIGN_MM = 200;
+
+  const [previewScale, setPreviewScale] = useState(1);
+  const MIN_ZOOM = 0.25;
+  const MAX_ZOOM = 2;
+  const ZOOM_STEP = 0.25;
+
+  const getMaxFitScale = useCallback(() => {
+    const designW = designWidth * PX_PER_MM;
+    const designH = designHeight * PX_PER_MM;
+    const maxW = typeof window !== "undefined" ? window.innerWidth * 0.5 : 400;
+    const maxH = typeof window !== "undefined" ? window.innerHeight * 0.5 : 400;
+    return Math.min(
+      1,
+      maxW / Math.max(designW, 1),
+      maxH / Math.max(designH, 1)
+    );
+  }, [designWidth, designHeight]);
+
+  const handleZoomIn = useCallback(() => {
+    setPreviewScale((s) => Math.min(MAX_ZOOM, s + ZOOM_STEP));
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setPreviewScale((s) => Math.max(MIN_ZOOM, s - ZOOM_STEP));
+  }, []);
+
+  const handleZoomFit = useCallback(() => {
+    setPreviewScale(getMaxFitScale());
+  }, [getMaxFitScale]);
+
+  useEffect(() => {
+    setPreviewScale((s) => Math.min(s, getMaxFitScale()));
+  }, [designWidth, designHeight, getMaxFitScale]);
+
   useEffect(() => {
     fetchQRCodes();
   }, [fetchQRCodes]);
+
+  // Clamp QR and table number position/size when design is resized
+  useEffect(() => {
+    const maxSize = Math.min(designWidth, designHeight) - 2;
+    const maxX = Math.max(0, designWidth - qrSize - 2);
+    const maxY = Math.max(0, designHeight - qrSize - 2);
+    if (qrSize > maxSize) setQrSize(Math.max(5, maxSize));
+    if (qrPosX > maxX) setQrPosX(maxX);
+    if (qrPosY > maxY) setQrPosY(maxY);
+    const r = tableNumSize / 2;
+    if (tableNumPosX - r < 0) setTableNumPosX(r);
+    if (tableNumPosX + r > designWidth) setTableNumPosX(designWidth - r);
+    if (tableNumPosY - r < 0) setTableNumPosY(r);
+    if (tableNumPosY + r > designHeight) setTableNumPosY(designHeight - r);
+    if (tableNumSize > Math.min(designWidth, designHeight) - 2)
+      setTableNumSize(Math.max(6, Math.min(designWidth, designHeight) - 2));
+  }, [designWidth, designHeight]);
+
+  // Convert image URL to base64 for jsPDF (handles CORS via proxy/same-origin)
+  const imageUrlToBase64 = useCallback(
+    async (url: string): Promise<string> => {
+      try {
+        const fullUrl = url.startsWith("http") ? url : getImageUrl(url);
+        const res = await fetch(fullUrl, { mode: "cors" });
+        const blob = await res.blob();
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      } catch (e) {
+        console.warn("Could not fetch image as base64:", e);
+        return "";
+      }
+    },
+    []
+  );
+
+  // Export custom design PDF
+  const exportCustomDesignPDF = useCallback(async () => {
+    if (qrCodes.length === 0) {
+      showToast(
+        isRTL ? "لا توجد أكواد للتصدير" : "No QR codes to export",
+        "error"
+      );
+      return;
+    }
+    if (!designBackground) {
+      showToast(
+        isRTL ? "يرجى رفع صورة خلفية للتصميم" : "Please upload a background image",
+        "error"
+      );
+      return;
+    }
+    try {
+      showToast(
+        isRTL ? "جاري إنشاء ملف PDF..." : "Generating PDF...",
+        "info"
+      );
+      const bgBase64 = designBackground.startsWith("data:")
+        ? designBackground
+        : await imageUrlToBase64(designBackground);
+
+      const PAPER_SIZES: Record<string, [number, number]> = {
+        a4: [210, 297],
+        a3: [297, 420],
+        a5: [148, 210],
+        letter: [216, 279],
+      };
+      const [paperWidth, paperHeight] = PAPER_SIZES[paperSize] || PAPER_SIZES.a4;
+      const margin = paperMargin;
+      const gap = 3;
+      const cols = Math.floor((paperWidth - 2 * margin + gap) / (designWidth + gap)) || 1;
+      const rows = Math.floor((paperHeight - 2 * margin + gap) / (designHeight + gap)) || 1;
+      const perPage = cols * rows;
+
+      const pdf = new jsPDF({
+        unit: "mm",
+        format: [paperWidth, paperHeight],
+      });
+
+      let pageAdded = false;
+      for (let i = 0; i < qrCodes.length; i++) {
+        const qr = qrCodes[i];
+        if (!qr.qrCodeImage) continue;
+        const idx = i % perPage;
+        if (i > 0 && idx === 0) {
+          pdf.addPage([paperWidth, paperHeight]);
+        }
+        pageAdded = true;
+
+        const col = idx % cols;
+        const row = Math.floor(idx / cols);
+        const baseX = margin + col * (designWidth + gap);
+        const baseY = margin + row * (designHeight + gap);
+
+        // Draw background
+        if (bgBase64) {
+          const fmt = bgBase64.includes("image/png")
+            ? "PNG"
+            : bgBase64.includes("image/webp")
+              ? "WEBP"
+              : "JPEG";
+          pdf.addImage(
+            bgBase64,
+            fmt,
+            baseX,
+            baseY,
+            designWidth,
+            designHeight
+          );
+        } else {
+          pdf.setDrawColor(200);
+          pdf.setFillColor(255, 255, 255);
+          pdf.rect(baseX, baseY, designWidth, designHeight, "FD");
+        }
+
+        // Draw table number circle
+        const cx = baseX + tableNumPosX;
+        const cy = baseY + tableNumPosY;
+        const radius = tableNumSize / 2;
+        const hexToRgb = (hex: string) => {
+          const r = parseInt(hex.slice(1, 3), 16);
+          const g = parseInt(hex.slice(3, 5), 16);
+          const b = parseInt(hex.slice(5, 7), 16);
+          return [r, g, b];
+        };
+        const [br, bg, bb] = hexToRgb(tableNumBgColor);
+        const [tr, tg, tb] = hexToRgb(tableNumTextColor);
+        pdf.setFillColor(br, bg, bb);
+        pdf.setDrawColor(100, 100, 100);
+        pdf.circle(cx, cy, radius, "FD");
+        pdf.setTextColor(tr, tg, tb);
+        const fontSize = Math.max(4, Math.min(24, tableNumSize * tableNumFontScale));
+        pdf.setFontSize(fontSize);
+        pdf.setFont("helvetica", "bold");
+        // Vertical center: baseline = cy + half cap-height (cap ~0.72 of fontSize, 1pt≈0.35mm)
+        const textY = cy + (fontSize * 0.35 * 0.72) / 2;
+        pdf.text(String(qr.tableNumber), cx, textY, { align: "center" });
+
+        // Draw QR code
+        const qrX = baseX + qrPosX;
+        const qrY = baseY + qrPosY;
+        pdf.addImage(
+          qr.qrCodeImage,
+          "PNG",
+          qrX,
+          qrY,
+          qrSize,
+          qrSize
+        );
+      }
+
+      pdf.save(
+        isRTL ? "أكواد_QR_التصميم_المخصص.pdf" : "table_qr_codes_custom.pdf"
+      );
+      showToast(
+        isRTL ? "تم تحميل ملف PDF بنجاح" : "PDF downloaded successfully",
+        "success"
+      );
+      setShowCustomDesign(false);
+    } catch (err) {
+      console.error("Error generating custom PDF:", err);
+      showToast(
+        isRTL ? "حدث خطأ أثناء إنشاء PDF" : "Error generating PDF",
+        "error"
+      );
+    }
+  }, [
+    qrCodes,
+    designBackground,
+    designWidth,
+    designHeight,
+    qrPosX,
+    qrPosY,
+    qrSize,
+    tableNumPosX,
+    tableNumPosY,
+    tableNumSize,
+    tableNumFontScale,
+    tableNumBgColor,
+    tableNumTextColor,
+    paperSize,
+    paperMargin,
+    imageUrlToBase64,
+    isRTL,
+    showToast,
+  ]);
+
+  // Mouse handlers for drag/resize
+  const handleDesignCornerMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    dragRef.current = {
+      type: "design",
+      startX: e.clientX,
+      startY: e.clientY,
+      startW: designWidth,
+      startH: designHeight,
+      startPosX: 0,
+      startPosY: 0,
+      startQrSize: 0,
+      startTableNumPosX: 0,
+      startTableNumPosY: 0,
+      startTableNumSize: 0,
+    };
+  }, [designWidth, designHeight]);
+
+  const handleQrMouseDown = useCallback((e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest(".qr-resize-handle")) return;
+    e.preventDefault();
+    dragRef.current = {
+      type: "qrMove",
+      startX: e.clientX,
+      startY: e.clientY,
+      startW: designWidth,
+      startH: designHeight,
+      startPosX: qrPosX,
+      startPosY: qrPosY,
+      startQrSize: qrSize,
+      startTableNumPosX: 0,
+      startTableNumPosY: 0,
+      startTableNumSize: 0,
+    };
+  }, [designWidth, designHeight, qrPosX, qrPosY, qrSize]);
+
+  const handleQrResizeMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragRef.current = {
+      type: "qrResize",
+      startX: e.clientX,
+      startY: e.clientY,
+      startW: designWidth,
+      startH: designHeight,
+      startPosX: qrPosX,
+      startPosY: qrPosY,
+      startQrSize: qrSize,
+      startTableNumPosX: 0,
+      startTableNumPosY: 0,
+      startTableNumSize: 0,
+    };
+  }, [designWidth, designHeight, qrPosX, qrPosY, qrSize]);
+
+  const handleTableNumMouseDown = useCallback((e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest(".table-num-resize-handle")) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragRef.current = {
+      type: "tableNumMove",
+      startX: e.clientX,
+      startY: e.clientY,
+      startW: designWidth,
+      startH: designHeight,
+      startPosX: 0,
+      startPosY: 0,
+      startQrSize: 0,
+      startTableNumPosX: tableNumPosX,
+      startTableNumPosY: tableNumPosY,
+      startTableNumSize: tableNumSize,
+    };
+  }, [designWidth, designHeight, tableNumPosX, tableNumPosY, tableNumSize]);
+
+  const handleTableNumResizeMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragRef.current = {
+      type: "tableNumResize",
+      startX: e.clientX,
+      startY: e.clientY,
+      startW: designWidth,
+      startH: designHeight,
+      startPosX: 0,
+      startPosY: 0,
+      startQrSize: 0,
+      startTableNumPosX: tableNumPosX,
+      startTableNumPosY: tableNumPosY,
+      startTableNumSize: tableNumSize,
+    };
+  }, [designWidth, designHeight, tableNumPosX, tableNumPosY, tableNumSize]);
+
+  const effectivePxPerMm = Math.max(0.1, PX_PER_MM * previewScale);
+
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      if (!dragRef.current) return;
+      const d = dragRef.current;
+      const dx = (e.clientX - d.startX) / effectivePxPerMm;
+      const dy = (e.clientY - d.startY) / effectivePxPerMm;
+      if (d.type === "design") {
+        const newW = Math.max(MIN_DESIGN_MM, Math.min(MAX_DESIGN_MM, d.startW + dx));
+        const newH = Math.max(MIN_DESIGN_MM, Math.min(MAX_DESIGN_MM, d.startH + dy));
+        setDesignWidth(Math.round(newW));
+        setDesignHeight(Math.round(newH));
+      } else if (d.type === "qrMove") {
+        const maxX = Math.max(0, d.startW - d.startQrSize - 2);
+        const maxY = Math.max(0, d.startH - d.startQrSize - 2);
+        setQrPosX(Math.round(Math.max(0, Math.min(maxX, d.startPosX + dx))));
+        setQrPosY(Math.round(Math.max(0, Math.min(maxY, d.startPosY + dy))));
+      } else if (d.type === "qrResize") {
+        const minSize = 5;
+        const maxSize = Math.min(d.startW - d.startPosX, d.startH - d.startPosY) - 2;
+        const delta = Math.min(dx, dy);
+        const newSize = Math.max(minSize, Math.min(maxSize, d.startQrSize + delta));
+        setQrSize(Math.round(newSize));
+      } else if (d.type === "tableNumMove") {
+        const r = d.startTableNumSize / 2;
+        const maxX = d.startW - r - 2;
+        const maxY = d.startH - r - 2;
+        setTableNumPosX(Math.round(Math.max(r, Math.min(maxX, d.startTableNumPosX + dx))));
+        setTableNumPosY(Math.round(Math.max(r, Math.min(maxY, d.startTableNumPosY + dy))));
+      } else if (d.type === "tableNumResize") {
+        const minSize = 6;
+        const maxSize = Math.min(d.startW, d.startH) - 4;
+        const delta = Math.min(dx, dy);
+        const newSize = Math.max(minSize, Math.min(maxSize, d.startTableNumSize + delta));
+        setTableNumSize(Math.round(newSize));
+      }
+    };
+    const onMouseUp = () => {
+      dragRef.current = null;
+    };
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, [effectivePxPerMm]);
 
   // Print functions
   const printStandard = (codes: any[]) => {
@@ -601,6 +1001,15 @@ function QRPageContent() {
                       className="bg-blue-50 text-blue-700 hover:bg-blue-100"
                     >
                       {isRTL ? "طباعة الكل" : "Print All"}
+                    </Button>
+
+                    <Button
+                      onClick={() => setShowCustomDesign(true)}
+                      variant="outline"
+                      size="sm"
+                      className="bg-purple-50 text-purple-700 hover:bg-purple-100"
+                    >
+                      {isRTL ? "تصميم مخصص للطباعة" : "Custom Print Design"}
                     </Button>
 
                     <Button
@@ -1395,6 +1804,390 @@ function QRPageContent() {
                   >
                     {isRTL ? "إلغاء" : "Cancel"}
                   </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Custom Design Modal */}
+          {showCustomDesign && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[95vh] overflow-y-auto my-8">
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                      {isRTL ? "تصميم مخصص للطباعة" : "Custom Print Design"}
+                    </h3>
+                    <button
+                      onClick={() => setShowCustomDesign(false)}
+                      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                    >
+                      <svg
+                        className="w-6 h-6"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+                    {isRTL
+                      ? "ارفع صورة خلفية، اسحب زوايا التصميم والكود ودائرة رقم الطاولة لضبط الموضع والحجم، ثم صدّر PDF."
+                      : "Upload a background image, drag corners to resize design, QR, and table number circle, then export PDF."}
+                  </p>
+
+                  <div className="space-y-6">
+                    {/* Background image - local only, no server upload */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        {isRTL ? "صورة الخلفية" : "Background Image"}
+                      </label>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                        {isRTL
+                          ? "محلي فقط - لا يتم رفع الصورة للسيرفر (للت export فقط)"
+                          : "Local only - image is not uploaded to server (for export only)"}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = () => {
+                              setDesignBackground(reader.result as string);
+                            };
+                            reader.readAsDataURL(file);
+                            e.target.value = "";
+                          }}
+                          className="hidden"
+                          id="design-bg-local"
+                        />
+                        <label
+                          htmlFor="design-bg-local"
+                          className="flex-1 px-4 py-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:border-primary-500 dark:hover:border-primary-500 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors text-center text-sm text-gray-600 dark:text-gray-400"
+                        >
+                          {designBackground
+                            ? isRTL ? "تغيير الصورة" : "Change image"
+                            : isRTL ? "اختر صورة التصميم (محلي)" : "Choose design image (local)"}
+                        </label>
+                        {designBackground && (
+                          <button
+                            type="button"
+                            onClick={() => setDesignBackground(null)}
+                            className="px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
+                          >
+                            {isRTL ? "إزالة" : "Remove"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Table number circle colors and font */}
+                    <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          {isRTL ? "لون خلفية الدائرة" : "Circle background"}
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={tableNumBgColor}
+                            onChange={(e) => setTableNumBgColor(e.target.value)}
+                            className="w-10 h-10 rounded cursor-pointer border border-gray-300"
+                          />
+                          <span className="text-sm text-gray-500">{tableNumBgColor}</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          {isRTL ? "لون النص" : "Text color"}
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={tableNumTextColor}
+                            onChange={(e) => setTableNumTextColor(e.target.value)}
+                            className="w-10 h-10 rounded cursor-pointer border border-gray-300"
+                          />
+                          <span className="text-sm text-gray-500">{tableNumTextColor}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Font size control */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        {isRTL ? "حجم خط رقم الطاولة" : "Table number font size"}
+                      </label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="range"
+                          min="0.5"
+                          max="1"
+                          step="0.05"
+                          value={tableNumFontScale}
+                          onChange={(e) => setTableNumFontScale(parseFloat(e.target.value))}
+                          className="flex-1 h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer"
+                        />
+                        <span className="text-sm text-gray-600 dark:text-gray-400 min-w-[3rem]">
+                          {Math.round(tableNumFontScale * 100)}%
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {isRTL ? "حجم الخط نسبةً لقطر الدائرة" : "Font size relative to circle diameter"}
+                      </p>
+                    </div>
+                    </div>
+
+                    {/* Interactive Preview with drag & resize */}
+                    {qrCodes[0] && (
+                      <div>
+                        <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                            {isRTL ? "اسحب الزوايا لضبط الأبعاد" : "Drag corners to adjust dimensions"}
+                          </h4>
+                          <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+                              <button
+                                type="button"
+                                onClick={handleZoomOut}
+                                disabled={previewScale <= MIN_ZOOM}
+                                className="w-8 h-8 rounded flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                                title={isRTL ? "تصغير" : "Zoom out"}
+                              >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                                </svg>
+                              </button>
+                              <span className="text-xs font-mono w-12 text-center">{Math.round(previewScale * 100)}%</span>
+                              <button
+                                type="button"
+                                onClick={handleZoomIn}
+                                disabled={previewScale >= MAX_ZOOM}
+                                className="w-8 h-8 rounded flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed"
+                                title={isRTL ? "تكبير" : "Zoom in"}
+                              >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                </svg>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleZoomFit}
+                                className="px-2 py-1 text-xs rounded hover:bg-gray-200 dark:hover:bg-gray-600"
+                                title={isRTL ? "ملاءمة" : "Fit"}
+                              >
+                                {isRTL ? "ملاءمة" : "Fit"}
+                              </button>
+                            </div>
+                            <div className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400">
+                              {isRTL ? "التصميم:" : "Design:"}{" "}
+                              <input
+                                type="number"
+                                min={2}
+                                max={20}
+                                step={0.1}
+                                defaultValue={designWidth / 10}
+                                key={`design-w-${designWidth}`}
+                                onBlur={(e) => {
+                                  const v = parseFloat(e.target.value);
+                                  if (!isNaN(v) && v >= 2 && v <= 20) setDesignWidth(Math.round(v * 10));
+                                }}
+                                onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+                                className="w-14 px-1.5 py-0.5 text-center font-mono font-semibold bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 hover:border-primary-400"
+                              />
+                              <span>×</span>
+                              <input
+                                type="number"
+                                min={2}
+                                max={42}
+                                step={0.1}
+                                defaultValue={designHeight / 10}
+                                key={`design-h-${designHeight}`}
+                                onBlur={(e) => {
+                                  const v = parseFloat(e.target.value);
+                                  if (!isNaN(v) && v >= 2 && v <= 42) setDesignHeight(Math.round(v * 10));
+                                }}
+                                onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+                                className="w-14 px-1.5 py-0.5 text-center font-mono font-semibold bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded focus:ring-2 focus:ring-primary-500 focus:border-primary-500 hover:border-primary-400"
+                              />
+                              <span>سم</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div
+                          ref={previewRef}
+                          className="border-2 border-gray-300 dark:border-gray-500 rounded-lg bg-gray-100 dark:bg-gray-700 p-2 select-none overflow-auto"
+                          style={{
+                            cursor: "default",
+                            maxWidth: "50vw",
+                            maxHeight: "50vh",
+                          }}
+                        >
+                          <div
+                            className="overflow-visible inline-block"
+                            style={{
+                              width: designWidth * PX_PER_MM * previewScale,
+                              height: designHeight * PX_PER_MM * previewScale,
+                              minWidth: 80,
+                              minHeight: 80,
+                            }}
+                          >
+                            <div
+                              className="relative bg-white dark:bg-gray-800 shadow-md overflow-visible origin-top-left"
+                              style={{
+                                width: designWidth * PX_PER_MM,
+                                height: designHeight * PX_PER_MM,
+                                minWidth: 80,
+                                minHeight: 80,
+                                transform: `scale(${previewScale})`,
+                              }}
+                            >
+                            {/* Design background - contain to show full image, pointer-events: none */}
+                            <div
+                              className="absolute inset-0 bg-no-repeat bg-contain bg-center pointer-events-none"
+                              style={{
+                                backgroundImage: designBackground
+                                  ? `url(${designBackground.startsWith("data:") ? designBackground : getImageUrl(designBackground)})`
+                                  : undefined,
+                                backgroundColor: designBackground
+                                  ? "transparent"
+                                  : "#f3f4f6",
+                              }}
+                            />
+                            {/* Table number circle - draggable and resizable */}
+                            <div
+                              onMouseDown={handleTableNumMouseDown}
+                              className="absolute rounded-full border-2 border-gray-400 shadow-md cursor-move flex items-center justify-center font-bold select-none z-10"
+                              style={{
+                                left: (tableNumPosX - tableNumSize / 2) * PX_PER_MM,
+                                top: (tableNumPosY - tableNumSize / 2) * PX_PER_MM,
+                                width: tableNumSize * PX_PER_MM,
+                                height: tableNumSize * PX_PER_MM,
+                                fontSize: Math.max(8, tableNumSize * PX_PER_MM * tableNumFontScale),
+                                backgroundColor: tableNumBgColor,
+                                color: tableNumTextColor,
+                              }}
+                            >
+                              {qrCodes[0].tableNumber}
+                              {/* Resize handle */}
+                              <div
+                                className="table-num-resize-handle absolute -bottom-1 -right-1 w-4 h-4 bg-orange-500 rounded-full border-2 border-white shadow cursor-se-resize hover:bg-orange-600 z-20"
+                                onMouseDown={handleTableNumResizeMouseDown}
+                              />
+                            </div>
+                            {/* QR code - draggable */}
+                            <div
+                              onMouseDown={handleQrMouseDown}
+                              className="absolute bg-white p-0.5 shadow-md cursor-move border border-gray-300 z-10"
+                              style={{
+                                left: qrPosX * PX_PER_MM,
+                                top: qrPosY * PX_PER_MM,
+                                width: qrSize * PX_PER_MM,
+                                height: qrSize * PX_PER_MM,
+                              }}
+                            >
+                              <img
+                                src={qrCodes[0].qrCodeImage}
+                                alt="QR Preview"
+                                className="w-full h-full object-contain pointer-events-none"
+                              />
+                              {/* Resize handle */}
+                              <div
+                                className="qr-resize-handle absolute -bottom-1 -right-1 w-4 h-4 bg-primary-500 rounded-full border-2 border-white shadow cursor-se-resize hover:bg-primary-600"
+                                onMouseDown={handleQrResizeMouseDown}
+                              />
+                            </div>
+                            {/* Design resize handle - bottom-right corner */}
+                            <div
+                              className="absolute -bottom-1 -right-1 w-5 h-5 bg-blue-500 rounded-sm border-2 border-white shadow cursor-se-resize hover:bg-blue-600 flex items-center justify-center"
+                              onMouseDown={handleDesignCornerMouseDown}
+                            >
+                              <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 15l5 5m0-5l-5 5" />
+                              </svg>
+                            </div>
+                          </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Paper size for export */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        {isRTL ? "مقاس الورق للطباعة" : "Paper size for printing"}
+                      </label>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                            {isRTL ? "المقاس" : "Size"}
+                          </label>
+                          <select
+                            value={paperSize}
+                            onChange={(e) => setPaperSize(e.target.value as "a4" | "a3" | "letter" | "a5")}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                          >
+                            <option value="a4">A4 (210×297 مم)</option>
+                            <option value="a3">A3 (297×420 مم)</option>
+                            <option value="a5">A5 (148×210 مم)</option>
+                            <option value="letter">{isRTL ? "Letter" : "Letter (216×279 mm)"}</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                            {isRTL ? "الهوامش (مم)" : "Margin (mm)"}
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            max={20}
+                            value={paperMargin}
+                            onChange={(e) => setPaperMargin(Math.max(0, Math.min(20, Number(e.target.value) || 5)))}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                          />
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                        {(() => {
+                          const [pw, ph] = paperSize === "a4" ? [210, 297] : paperSize === "a3" ? [297, 420] : paperSize === "a5" ? [148, 210] : [216, 279];
+                          const c = Math.floor((pw - 2 * paperMargin + 3) / (designWidth + 3)) || 1;
+                          const r = Math.floor((ph - 2 * paperMargin + 3) / (designHeight + 3)) || 1;
+                          const perPage = c * r;
+                          return isRTL
+                            ? `~${perPage} تصميم/صفحة - توفير الورق`
+                            : `~${perPage} designs/page - saves paper`;
+                        })()}
+                      </p>
+                    </div>
+
+                    <div className="flex gap-3 pt-4">
+                      <Button
+                        onClick={exportCustomDesignPDF}
+                        className="flex-1"
+                        disabled={!designBackground || qrCodes.length === 0}
+                      >
+                        {isRTL ? "تصدير PDF" : "Export PDF"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowCustomDesign(false)}
+                      >
+                        {isRTL ? "إلغاء" : "Cancel"}
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

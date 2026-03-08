@@ -1488,16 +1488,19 @@ export default function CustomerMenuPage() {
                     menu.categories.map((category) => (
                       <div
                         key={category.id}
-                        className={`shadow-sm border cursor-pointer hover:shadow-md transition-shadow relative ${menuTheme?.borderRadius || "rounded-lg"} ${menuTheme?.cardPadding || "p-4"} ${loadingCategory === category.id ? "opacity-75" : ""}`}
+                        className={`cursor-pointer transition-shadow relative hover:shadow-xl ${menuTheme?.borderRadius || "rounded-lg"} ${menuTheme?.cardPadding || "p-4"} ${loadingCategory === category.id ? "opacity-75" : ""}`}
                         style={{
                           backgroundColor: hexToRgba(
                             menuTheme?.primaryColor || "#ffffff",
                             colorOpacity.primary,
                           ),
-                          borderColor: hexToRgba(
+                          boxShadow: `0 10px 25px -5px ${hexToRgba(
                             menuTheme?.secondaryColor || "#e5e7eb",
                             colorOpacity.secondary,
-                          ),
+                          )}, 0 8px 10px -6px ${hexToRgba(
+                            menuTheme?.secondaryColor || "#e5e7eb",
+                            colorOpacity.secondary * 0.8,
+                          )}`,
                         }}
                         onClick={() => handleCategoryClick(category)}
                       >

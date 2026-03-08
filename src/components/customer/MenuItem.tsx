@@ -219,7 +219,18 @@ export function MenuItem({
 
   if (!item.isAvailable) {
     return (
-      <Card className="opacity-50 !p-0  relative">
+      <Card
+        className="opacity-50 !p-0 !border-0 relative"
+        style={{
+          boxShadow: `0 10px 25px -5px ${hexToRgba(
+            theme?.secondaryColor || "#e5e7eb",
+            opacity.secondary,
+          )}, 0 8px 10px -6px ${hexToRgba(
+            theme?.secondaryColor || "#e5e7eb",
+            opacity.secondary * 0.8,
+          )}`,
+        }}
+      >
         <div className="relative">
           {/* Image */}
           <div className="w-full h-48 relative overflow-hidden rounded-t-lg">
@@ -265,16 +276,19 @@ export function MenuItem({
 
   return (
     <Card
-      className={`relative !p-0 overflow-hidden hover:shadow-lg transition-shadow duration-200 cursor-pointer ${theme?.borderRadius || "rounded-lg"}`}
+      className={`relative !p-0 !border-0 overflow-hidden hover:shadow-xl transition-shadow duration-200 cursor-pointer ${theme?.borderRadius || "rounded-lg"}`}
       style={{
         backgroundColor: hexToRgba(
           theme?.primaryColor || "#f97316",
           opacity.primary
         ),
-        borderColor: hexToRgba(
+        boxShadow: `0 10px 25px -5px ${hexToRgba(
           theme?.secondaryColor || "#e5e7eb",
-          opacity.secondary
-        ),
+          opacity.secondary,
+        )}, 0 8px 10px -6px ${hexToRgba(
+          theme?.secondaryColor || "#e5e7eb",
+          opacity.secondary * 0.8,
+        )}`,
       }}
       onClick={handleItemClick}
     >
@@ -692,12 +706,28 @@ export function MenuItem({
                   borderColor: theme?.primaryColor || "var(--theme-primary)",
                 }}
               >
-                {isRTL ? "إضافة" : "Add"} {quantity} -{" "}
-                {formatCurrencyWithLanguage(
-                  calculateItemTotal(item, quantity, selectedExtras),
-                  currency || item.currency || "USD",
-                  language
-                )}
+                {(() => {
+                  const total = calculateItemTotal(
+                    item,
+                    quantity,
+                    selectedExtras
+                  );
+                  return (
+                    <>
+                      {isRTL ? "إضافة" : "Add"} {quantity}
+                      {total > 0 && (
+                        <>
+                          {" - "}
+                          {formatCurrencyWithLanguage(
+                            total,
+                            currency || item.currency || "USD",
+                            language
+                          )}
+                        </>
+                      )}
+                    </>
+                  );
+                })()}
               </Button>
             </div>
           </div>
