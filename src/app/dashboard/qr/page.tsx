@@ -336,8 +336,9 @@ function QRPageContent() {
       startTableNumPosX: 0,
       startTableNumPosY: 0,
       startTableNumSize: 0,
+      startTableNumFontScale: tableNumFontScale,
     };
-  }, [designWidth, designHeight]);
+  }, [designWidth, designHeight, tableNumFontScale]);
 
   const handleQrMouseDown = useCallback((e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest(".qr-resize-handle")) return;
@@ -354,8 +355,9 @@ function QRPageContent() {
       startTableNumPosX: 0,
       startTableNumPosY: 0,
       startTableNumSize: 0,
+      startTableNumFontScale: tableNumFontScale,
     };
-  }, [designWidth, designHeight, qrPosX, qrPosY, qrSize]);
+  }, [designWidth, designHeight, qrPosX, qrPosY, qrSize, tableNumFontScale]);
 
   const handleQrResizeMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -432,10 +434,10 @@ function QRPageContent() {
         startPosX: 0,
         startPosY: 0,
         startQrSize: 0,
-        startTableNumPosX: tableNumPosX,
-        startTableNumPosY: tableNumPosY,
-        startTableNumSize: tableNumSize,
-        startTableNumFontScale,
+      startTableNumPosX: tableNumPosX,
+      startTableNumPosY: tableNumPosY,
+      startTableNumSize: tableNumSize,
+      startTableNumFontScale: tableNumFontScale,
       };
     },
     [designWidth, designHeight, tableNumPosX, tableNumPosY, tableNumSize, tableNumFontScale],
