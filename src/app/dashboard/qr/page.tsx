@@ -55,6 +55,7 @@ function QRPageContent() {
   const [tableNumPosY, setTableNumPosY] = useState(8); // mm - center Y (default near top)
   const [tableNumSize, setTableNumSize] = useState(12); // mm diameter
   const [tableNumBgColor, setTableNumBgColor] = useState("#ffffff");
+  const [tableNumBgTransparent, setTableNumBgTransparent] = useState(false);
   const [tableNumTextColor, setTableNumTextColor] = useState("#000000");
   const [tableNumFontScale, setTableNumFontScale] = useState(0.75); // 0.5-1.0, font size relative to circle
   const [paperSize, setPaperSize] = useState<"a4" | "a3" | "letter" | "a5">("a4");
@@ -63,7 +64,13 @@ function QRPageContent() {
   // Drag/resize refs for interactive preview
   const previewRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{
-    type: "design" | "qrMove" | "qrResize" | "tableNumMove" | "tableNumResize";
+    type:
+      | "design"
+      | "qrMove"
+      | "qrResize"
+      | "tableNumMove"
+      | "tableNumResize"
+      | "tableNumFontResize";
     startX: number;
     startY: number;
     startW: number;
@@ -74,6 +81,7 @@ function QRPageContent() {
     startTableNumPosX: number;
     startTableNumPosY: number;
     startTableNumSize: number;
+    startTableNumFontScale: number;
   } | null>(null);
 
   const PX_PER_MM = 4;
@@ -244,17 +252,23 @@ function QRPageContent() {
           const b = parseInt(hex.slice(5, 7), 16);
           return [r, g, b];
         };
-        const [br, bg, bb] = hexToRgb(tableNumBgColor);
+        const [br, bg, bb] = hexToRgb(tableNumBgColor || "#ffffff");
         const [tr, tg, tb] = hexToRgb(tableNumTextColor);
-        pdf.setFillColor(br, bg, bb);
-        pdf.setDrawColor(100, 100, 100);
-        pdf.circle(cx, cy, radius, "FD");
+        // No border for the circle – fill only when not transparent
+        if (!tableNumBgTransparent) {
+          pdf.setFillColor(br, bg, bb);
+          pdf.circle(cx, cy, radius, "F");
+        }
         pdf.setTextColor(tr, tg, tb);
-        const fontSize = Math.max(4, Math.min(24, tableNumSize * tableNumFontScale));
+        // Approximate preview size: cap-height(mm) ≈ 0.7 * fontSize(pt) * 0.3528
+        // We want cap-height ≈ tableNumSize * tableNumFontScale * 0.75
+        // => fontSize ≈ tableNumSize * tableNumFontScale * (0.75 / (0.7 * 0.3528)) ≈ * 3.0
+        const fontSize = Math.max(4, Math.min(40, tableNumSize * tableNumFontScale * 3));
         pdf.setFontSize(fontSize);
         pdf.setFont("helvetica", "bold");
-        // Vertical center: baseline = cy + half cap-height (cap ~0.72 of fontSize, 1pt≈0.35mm)
-        const textY = cy + (fontSize * 0.35 * 0.72) / 2;
+        // Vertical center: baseline = cy + half cap-height
+        const capHeightMm = fontSize * 0.3528 * 0.7;
+        const textY = cy + capHeightMm / 2;
         pdf.text(String(qr.tableNumber), cx, textY, { align: "center" });
 
         // Draw QR code
@@ -298,6 +312,7 @@ function QRPageContent() {
     tableNumSize,
     tableNumFontScale,
     tableNumBgColor,
+    tableNumBgTransparent,
     tableNumTextColor,
     paperSize,
     paperMargin,
@@ -357,11 +372,16 @@ function QRPageContent() {
       startTableNumPosX: 0,
       startTableNumPosY: 0,
       startTableNumSize: 0,
+      startTableNumFontScale: tableNumFontScale,
     };
-  }, [designWidth, designHeight, qrPosX, qrPosY, qrSize]);
+  }, [designWidth, designHeight, qrPosX, qrPosY, qrSize, tableNumFontScale]);
 
   const handleTableNumMouseDown = useCallback((e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest(".table-num-resize-handle")) return;
+    if (
+      (e.target as HTMLElement).closest(".table-num-resize-handle") ||
+      (e.target as HTMLElement).closest(".table-num-font-resize-handle")
+    )
+      return;
     e.preventDefault();
     e.stopPropagation();
     dragRef.current = {
@@ -376,8 +396,9 @@ function QRPageContent() {
       startTableNumPosX: tableNumPosX,
       startTableNumPosY: tableNumPosY,
       startTableNumSize: tableNumSize,
+      startTableNumFontScale: tableNumFontScale,
     };
-  }, [designWidth, designHeight, tableNumPosX, tableNumPosY, tableNumSize]);
+  }, [designWidth, designHeight, tableNumPosX, tableNumPosY, tableNumSize, tableNumFontScale]);
 
   const handleTableNumResizeMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -394,8 +415,31 @@ function QRPageContent() {
       startTableNumPosX: tableNumPosX,
       startTableNumPosY: tableNumPosY,
       startTableNumSize: tableNumSize,
+      startTableNumFontScale: tableNumFontScale,
     };
-  }, [designWidth, designHeight, tableNumPosX, tableNumPosY, tableNumSize]);
+  }, [designWidth, designHeight, tableNumPosX, tableNumPosY, tableNumSize, tableNumFontScale]);
+
+  const handleTableNumFontResizeMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dragRef.current = {
+        type: "tableNumFontResize",
+        startX: e.clientX,
+        startY: e.clientY,
+        startW: designWidth,
+        startH: designHeight,
+        startPosX: 0,
+        startPosY: 0,
+        startQrSize: 0,
+        startTableNumPosX: tableNumPosX,
+        startTableNumPosY: tableNumPosY,
+        startTableNumSize: tableNumSize,
+        startTableNumFontScale,
+      };
+    },
+    [designWidth, designHeight, tableNumPosX, tableNumPosY, tableNumSize, tableNumFontScale],
+  );
 
   const effectivePxPerMm = Math.max(0.1, PX_PER_MM * previewScale);
 
@@ -433,6 +477,11 @@ function QRPageContent() {
         const delta = Math.min(dx, dy);
         const newSize = Math.max(minSize, Math.min(maxSize, d.startTableNumSize + delta));
         setTableNumSize(Math.round(newSize));
+      } else if (d.type === "tableNumFontResize") {
+        // Vertical drag to increase/decrease font scale
+        const deltaScale = -dy / 50; // drag up to increase, down to decrease
+        const newScale = Math.max(0.4, Math.min(1.2, d.startTableNumFontScale + deltaScale));
+        setTableNumFontScale(parseFloat(newScale.toFixed(2)));
       }
     };
     const onMouseUp = () => {
@@ -1904,9 +1953,25 @@ function QRPageContent() {
                             type="color"
                             value={tableNumBgColor}
                             onChange={(e) => setTableNumBgColor(e.target.value)}
-                            className="w-10 h-10 rounded cursor-pointer border border-gray-300"
+                            disabled={tableNumBgTransparent}
+                            className="w-10 h-10 rounded cursor-pointer border border-gray-300 disabled:opacity-40 disabled:cursor-not-allowed"
                           />
                           <span className="text-sm text-gray-500">{tableNumBgColor}</span>
+                        </div>
+                        <div className="mt-2 flex items-center gap-2">
+                          <input
+                            id="tableNumBgTransparent"
+                            type="checkbox"
+                            checked={tableNumBgTransparent}
+                            onChange={(e) => setTableNumBgTransparent(e.target.checked)}
+                            className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                          />
+                          <label
+                            htmlFor="tableNumBgTransparent"
+                            className="text-xs text-gray-600 dark:text-gray-400"
+                          >
+                            {isRTL ? "خلفية شفافة" : "Transparent background"}
+                          </label>
                         </div>
                       </div>
                       <div>
@@ -2069,22 +2134,27 @@ function QRPageContent() {
                             {/* Table number circle - draggable and resizable */}
                             <div
                               onMouseDown={handleTableNumMouseDown}
-                              className="absolute rounded-full border-2 border-gray-400 shadow-md cursor-move flex items-center justify-center font-bold select-none z-10"
+                              className="absolute rounded-full shadow-md cursor-move flex items-center justify-center font-bold select-none z-10"
                               style={{
                                 left: (tableNumPosX - tableNumSize / 2) * PX_PER_MM,
                                 top: (tableNumPosY - tableNumSize / 2) * PX_PER_MM,
                                 width: tableNumSize * PX_PER_MM,
                                 height: tableNumSize * PX_PER_MM,
                                 fontSize: Math.max(8, tableNumSize * PX_PER_MM * tableNumFontScale),
-                                backgroundColor: tableNumBgColor,
+                                backgroundColor: tableNumBgTransparent ? "transparent" : tableNumBgColor,
                                 color: tableNumTextColor,
                               }}
                             >
                               {qrCodes[0].tableNumber}
-                              {/* Resize handle */}
+                              {/* Resize circle handle */}
                               <div
                                 className="table-num-resize-handle absolute -bottom-1 -right-1 w-4 h-4 bg-orange-500 rounded-full border-2 border-white shadow cursor-se-resize hover:bg-orange-600 z-20"
                                 onMouseDown={handleTableNumResizeMouseDown}
+                              />
+                              {/* Resize font handle */}
+                              <div
+                                className="table-num-font-resize-handle absolute -top-1 -right-1 w-3 h-3 bg-purple-500 rounded-full border-2 border-white shadow cursor-ns-resize hover:bg-purple-600 z-20"
+                                onMouseDown={handleTableNumFontResizeMouseDown}
                               />
                             </div>
                             {/* QR code - draggable */}
