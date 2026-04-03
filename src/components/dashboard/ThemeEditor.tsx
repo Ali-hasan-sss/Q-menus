@@ -1,29 +1,112 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useLanguage } from "@/store/hooks/useLanguage";
+import { api } from "@/lib/api";
+import { useToast } from "@/store/hooks/useToast";
+import { ImageUpload } from "@/components/ui/ImageUpload";
+import { DEFAULT_THEME, mergeWithDefaultTheme } from "@/lib/defaultTheme";
+import { hexToRgba } from "@/lib/helper";
+import { RestaurantHeader } from "@/components/customer/RestaurantHeader";
+import { CustomerSocialLinks } from "@/components/customer/CustomerSocialLinks";
 
-// Add custom styles for range slider
+// Range sliders: larger thumb for touch; dir=ltr on wrapper keeps min/max consistent
 const sliderStyles = `
-  .slider::-webkit-slider-thumb {
+  .theme-editor-slider::-webkit-slider-thumb {
     appearance: none;
-    height: 16px;
-    width: 16px;
+    height: 22px;
+    width: 22px;
     border-radius: 50%;
     background: #f6b23c;
     cursor: pointer;
     border: 2px solid #ffffff;
     box-shadow: 0 2px 4px rgba(0,0,0,0.2);
   }
-  .slider::-moz-range-thumb {
-    height: 16px;
-    width: 16px;
+  .theme-editor-slider::-moz-range-thumb {
+    height: 22px;
+    width: 22px;
     border-radius: 50%;
     background: #f6b23c;
     cursor: pointer;
     border: 2px solid #ffffff;
     box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  }
+  .theme-editor-slider {
+    min-height: 44px;
   }
 `;
+
+function normalizeThemeHex(raw: string): string | null {
+  let h = raw.trim();
+  if (!h.startsWith("#")) h = `#${h.replace(/#/g, "")}`;
+  const body = h.slice(1).replace(/[^0-9A-Fa-f]/g, "");
+  if (body.length === 3) {
+    const r = body[0]!;
+    const g = body[1]!;
+    const b = body[2]!;
+    return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
+  }
+  if (body.length >= 6) {
+    return `#${body.slice(0, 6).toLowerCase()}`;
+  }
+  return null;
+}
+
+function ThemeColorField({
+  label,
+  value,
+  onColorChange,
+}: {
+  label: string;
+  value: string;
+  onColorChange: (hex: string) => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const display = draft ?? value;
+
+  const commitDraft = () => {
+    if (draft == null) return;
+    const normalized = normalizeThemeHex(draft);
+    if (normalized && /^#[0-9a-f]{6}$/.test(normalized)) {
+      onColorChange(normalized);
+    }
+    setDraft(null);
+  };
+
+  return (
+    <div className="flex items-center gap-2.5 sm:gap-3 min-h-[52px] w-full">
+      <label className="text-xs text-gray-600 dark:text-gray-400 shrink-0 w-[4.25rem] sm:w-24 leading-tight">
+        {label}
+      </label>
+      <input
+        type="color"
+        value={/^#[0-9A-Fa-f]{6}$/.test(value) ? value : "#000000"}
+        onChange={(e) => {
+          setDraft(null);
+          onColorChange(e.target.value.toLowerCase());
+        }}
+        className="h-12 w-12 min-h-[48px] min-w-[48px] sm:h-14 sm:w-14 shrink-0 cursor-pointer rounded-xl border-2 border-gray-300 p-0 shadow-sm dark:border-gray-600 overflow-hidden [color-scheme:light] dark:[color-scheme:dark]"
+      />
+      <input
+        type="text"
+        inputMode="text"
+        autoCapitalize="characters"
+        spellCheck={false}
+        value={display}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commitDraft}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            (e.target as HTMLInputElement).blur();
+          }
+        }}
+        placeholder="#RRGGBB"
+        className="flex-1 min-w-0 text-sm font-mono uppercase px-3 py-2.5 rounded-xl border border-gray-300 bg-white text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+        aria-label={label}
+      />
+    </div>
+  );
+}
 
 // Inject styles
 if (typeof document !== "undefined") {
@@ -33,12 +116,16 @@ if (typeof document !== "undefined") {
   document.head.appendChild(styleSheet);
 }
 
-import { useLanguage } from "@/store/hooks/useLanguage";
-import { api } from "@/lib/api";
-import { useToast } from "@/store/hooks/useToast";
-import { ImageUpload } from "@/components/ui/ImageUpload";
-import { DEFAULT_THEME, mergeWithDefaultTheme } from "@/lib/defaultTheme";
-import { hexToRgba } from "@/lib/helper";
+/** Minimal shape for theme preview (matches GET /restaurant fields we need). */
+interface ThemePreviewRestaurant {
+  id: string;
+  name: string;
+  nameAr?: string;
+  logo?: string;
+  phone?: string | null;
+  customerWhatsApp?: string | null;
+  socialLinks?: Record<string, string> | null;
+}
 
 interface MenuTheme {
   id: string;
@@ -122,6 +209,9 @@ export function ThemeEditor({ onThemeChange }: ThemeEditorProps) {
     string | null
   >(null);
 
+  const [previewRestaurant, setPreviewRestaurant] =
+    useState<ThemePreviewRestaurant | null>(null);
+
   // Save color opacity to localStorage whenever it changes
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -174,6 +264,32 @@ export function ThemeEditor({ onThemeChange }: ThemeEditorProps) {
 
   useEffect(() => {
     loadTheme();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await api.get("/restaurant");
+        if (cancelled || !response.data.success) return;
+        const r = response.data.data?.restaurant;
+        if (!r) return;
+        setPreviewRestaurant({
+          id: r.id,
+          name: r.name,
+          nameAr: r.nameAr,
+          logo: r.logo,
+          phone: r.phone,
+          customerWhatsApp: r.customerWhatsApp,
+          socialLinks: r.socialLinks ?? null,
+        });
+      } catch {
+        /* keep fallback mock below */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const loadTheme = async () => {
@@ -229,6 +345,14 @@ export function ThemeEditor({ onThemeChange }: ThemeEditorProps) {
 
   // Use default theme if no custom theme exists
   const activePreviewTheme = previewTheme || DEFAULT_THEME;
+
+  const fallbackPreviewRestaurant: ThemePreviewRestaurant = {
+    id: "theme-preview",
+    name: "Authentic Taste",
+    nameAr: "مطعم الذوق الأصيل",
+  };
+  const previewRestaurantForHeader =
+    previewRestaurant ?? fallbackPreviewRestaurant;
 
   // Function to update CSS custom properties with restaurant theme
   const updateThemeVariables = (theme: MenuTheme) => {
@@ -399,207 +523,173 @@ export function ThemeEditor({ onThemeChange }: ThemeEditorProps) {
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
               {isRTL ? "ألوان التصميم" : "Theme Colors"}
             </h3>
-            <div className="space-y-4">
-              {/* Color Controls Grid */}
-              <div className="grid grid-cols-2 gap-3">
-                {/* Primary Color */}
-                <div className="flex flex-col items-center space-y-2">
-                  <label className="text-xs text-gray-600 dark:text-gray-400">
-                    {isRTL ? "أساسي" : "Primary"}
-                  </label>
-                  <input
-                    type="color"
-                    value={previewTheme.primaryColor}
-                    onChange={(e) =>
-                      updatePreviewTheme({ primaryColor: e.target.value })
-                    }
-                    className="w-12 h-12 border-2 border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer shadow-sm"
-                  />
-                </div>
-
-                {/* Secondary Color */}
-                <div className="flex flex-col items-center space-y-2">
-                  <label className="text-xs text-gray-600 dark:text-gray-400">
-                    {isRTL ? "ثانوي" : "Secondary"}
-                  </label>
-                  <input
-                    type="color"
-                    value={previewTheme.secondaryColor}
-                    onChange={(e) =>
-                      updatePreviewTheme({ secondaryColor: e.target.value })
-                    }
-                    className="w-12 h-12 border-2 border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer shadow-sm"
-                  />
-                </div>
-
-                {/* Background Color */}
-                <div className="flex flex-col items-center space-y-2">
-                  <label className="text-xs text-gray-600 dark:text-gray-400">
-                    {isRTL ? "خلفية" : "Background"}
-                  </label>
-                  <input
-                    type="color"
-                    value={previewTheme.backgroundColor}
-                    onChange={(e) =>
-                      updatePreviewTheme({ backgroundColor: e.target.value })
-                    }
-                    className="w-12 h-12 border-2 border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer shadow-sm"
-                  />
-                </div>
-
-                {/* Text Color */}
-                <div className="flex flex-col items-center space-y-2">
-                  <label className="text-xs text-gray-600 dark:text-gray-400">
-                    {isRTL ? "نص" : "Text"}
-                  </label>
-                  <input
-                    type="color"
-                    value={previewTheme.textColor}
-                    onChange={(e) =>
-                      updatePreviewTheme({ textColor: e.target.value })
-                    }
-                    className="w-12 h-12 border-2 border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer shadow-sm"
-                  />
-                </div>
-
-                {/* Accent Color */}
-                <div className="flex flex-col items-center space-y-2">
-                  <label className="text-xs text-gray-600 dark:text-gray-400">
-                    {isRTL ? "تمييز" : "Accent"}
-                  </label>
-                  <input
-                    type="color"
-                    value={previewTheme.accentColor}
-                    onChange={(e) =>
-                      updatePreviewTheme({ accentColor: e.target.value })
-                    }
-                    className="w-12 h-12 border-2 border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer shadow-sm"
-                  />
-                </div>
+            <div className="space-y-4" dir={isRTL ? "rtl" : "ltr"}>
+              {/* Full-width rows on mobile: label + picker + hex (RTL-aware via dir) */}
+              <div className="space-y-3">
+                <ThemeColorField
+                  label={isRTL ? "أساسي" : "Primary"}
+                  value={previewTheme.primaryColor}
+                  onColorChange={(hex) =>
+                    updatePreviewTheme({ primaryColor: hex })
+                  }
+                />
+                <ThemeColorField
+                  label={isRTL ? "ثانوي" : "Secondary"}
+                  value={previewTheme.secondaryColor}
+                  onColorChange={(hex) =>
+                    updatePreviewTheme({ secondaryColor: hex })
+                  }
+                />
+                <ThemeColorField
+                  label={isRTL ? "خلفية" : "Background"}
+                  value={previewTheme.backgroundColor}
+                  onColorChange={(hex) =>
+                    updatePreviewTheme({ backgroundColor: hex })
+                  }
+                />
+                <ThemeColorField
+                  label={isRTL ? "نص" : "Text"}
+                  value={previewTheme.textColor}
+                  onColorChange={(hex) =>
+                    updatePreviewTheme({ textColor: hex })
+                  }
+                />
+                <ThemeColorField
+                  label={isRTL ? "تمييز" : "Accent"}
+                  value={previewTheme.accentColor}
+                  onColorChange={(hex) =>
+                    updatePreviewTheme({ accentColor: hex })
+                  }
+                />
               </div>
 
-              {/* Opacity Controls - Single Column */}
+              {/* Opacity: gap (not space-x) for RTL; slider in ltr wrapper for predictable min/max */}
               <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
                 <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-3">
                   {isRTL ? "شفافية الألوان" : "Color Opacity"}
                 </h4>
                 <div className="space-y-3">
-                  {/* Primary Opacity */}
-                  <div className="flex items-center space-x-3">
-                    <span className="text-xs text-gray-600 dark:text-gray-400 w-16">
-                      {isRTL ? "أساسي:" : "Primary:"}
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-gray-600 dark:text-gray-400 shrink-0 w-14 sm:w-16 tabular-nums">
+                      {isRTL ? "أساسي" : "Primary"}
                     </span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.1"
-                      value={colorOpacity.primary}
-                      onChange={(e) =>
-                        setColorOpacity((prev: any) => ({
-                          ...prev,
-                          primary: parseFloat(e.target.value),
-                        }))
-                      }
-                      className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                    />
-                    <span className="text-xs text-gray-500 w-8">
+                    <div dir="ltr" className="flex-1 min-w-0 flex items-center">
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={colorOpacity.primary}
+                        onChange={(e) =>
+                          setColorOpacity((prev) => ({
+                            ...prev,
+                            primary: parseFloat(e.target.value),
+                          }))
+                        }
+                        className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer theme-editor-slider"
+                      />
+                    </div>
+                    <span className="text-xs text-gray-500 shrink-0 w-9 text-end tabular-nums">
                       {Math.round(colorOpacity.primary * 100)}%
                     </span>
                   </div>
 
-                  {/* Secondary Opacity */}
-                  <div className="flex items-center space-x-3">
-                    <span className="text-xs text-gray-600 dark:text-gray-400 w-16">
-                      {isRTL ? "ثانوي:" : "Secondary:"}
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-gray-600 dark:text-gray-400 shrink-0 w-14 sm:w-16 tabular-nums">
+                      {isRTL ? "ثانوي" : "Secondary"}
                     </span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.1"
-                      value={colorOpacity.secondary}
-                      onChange={(e) =>
-                        setColorOpacity((prev: any) => ({
-                          ...prev,
-                          secondary: parseFloat(e.target.value),
-                        }))
-                      }
-                      className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                    />
-                    <span className="text-xs text-gray-500 w-8">
+                    <div dir="ltr" className="flex-1 min-w-0 flex items-center">
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={colorOpacity.secondary}
+                        onChange={(e) =>
+                          setColorOpacity((prev) => ({
+                            ...prev,
+                            secondary: parseFloat(e.target.value),
+                          }))
+                        }
+                        className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer theme-editor-slider"
+                      />
+                    </div>
+                    <span className="text-xs text-gray-500 shrink-0 w-9 text-end tabular-nums">
                       {Math.round(colorOpacity.secondary * 100)}%
                     </span>
                   </div>
 
-                  {/* Background Opacity */}
-                  <div className="flex items-center space-x-3">
-                    <span className="text-xs text-gray-600 dark:text-gray-400 w-16">
-                      {isRTL ? "خلفية:" : "Background:"}
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-gray-600 dark:text-gray-400 shrink-0 w-14 sm:w-16 tabular-nums">
+                      {isRTL ? "خلفية" : "Background"}
                     </span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.1"
-                      value={colorOpacity.background}
-                      onChange={(e) =>
-                        setColorOpacity((prev: any) => ({
-                          ...prev,
-                          background: parseFloat(e.target.value),
-                        }))
-                      }
-                      className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                    />
-                    <span className="text-xs text-gray-500 w-8">
+                    <div dir="ltr" className="flex-1 min-w-0 flex items-center">
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={colorOpacity.background}
+                        onChange={(e) =>
+                          setColorOpacity((prev) => ({
+                            ...prev,
+                            background: parseFloat(e.target.value),
+                          }))
+                        }
+                        className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer theme-editor-slider"
+                      />
+                    </div>
+                    <span className="text-xs text-gray-500 shrink-0 w-9 text-end tabular-nums">
                       {Math.round(colorOpacity.background * 100)}%
                     </span>
                   </div>
 
-                  {/* Text Opacity */}
-                  <div className="flex items-center space-x-3">
-                    <span className="text-xs text-gray-600 dark:text-gray-400 w-16">
-                      {isRTL ? "نص:" : "Text:"}
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-gray-600 dark:text-gray-400 shrink-0 w-14 sm:w-16 tabular-nums">
+                      {isRTL ? "نص" : "Text"}
                     </span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.1"
-                      value={colorOpacity.text}
-                      onChange={(e) =>
-                        setColorOpacity((prev: any) => ({
-                          ...prev,
-                          text: parseFloat(e.target.value),
-                        }))
-                      }
-                      className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                    />
-                    <span className="text-xs text-gray-500 w-8">
+                    <div dir="ltr" className="flex-1 min-w-0 flex items-center">
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={colorOpacity.text}
+                        onChange={(e) =>
+                          setColorOpacity((prev) => ({
+                            ...prev,
+                            text: parseFloat(e.target.value),
+                          }))
+                        }
+                        className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer theme-editor-slider"
+                      />
+                    </div>
+                    <span className="text-xs text-gray-500 shrink-0 w-9 text-end tabular-nums">
                       {Math.round(colorOpacity.text * 100)}%
                     </span>
                   </div>
 
-                  {/* Accent Opacity */}
-                  <div className="flex items-center space-x-3">
-                    <span className="text-xs text-gray-600 dark:text-gray-400 w-16">
-                      {isRTL ? "تمييز:" : "Accent:"}
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-gray-600 dark:text-gray-400 shrink-0 w-14 sm:w-16 tabular-nums">
+                      {isRTL ? "تمييز" : "Accent"}
                     </span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.1"
-                      value={colorOpacity.accent}
-                      onChange={(e) =>
-                        setColorOpacity((prev: any) => ({
-                          ...prev,
-                          accent: parseFloat(e.target.value),
-                        }))
-                      }
-                      className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                    />
-                    <span className="text-xs text-gray-500 w-8">
+                    <div dir="ltr" className="flex-1 min-w-0 flex items-center">
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={colorOpacity.accent}
+                        onChange={(e) =>
+                          setColorOpacity((prev) => ({
+                            ...prev,
+                            accent: parseFloat(e.target.value),
+                          }))
+                        }
+                        className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer theme-editor-slider"
+                      />
+                    </div>
+                    <span className="text-xs text-gray-500 shrink-0 w-9 text-end tabular-nums">
                       {Math.round(colorOpacity.accent * 100)}%
                     </span>
                   </div>
@@ -617,6 +707,7 @@ export function ThemeEditor({ onThemeChange }: ThemeEditorProps) {
               <div
                 className="w-full h-full rounded-2xl overflow-hidden relative"
                 style={{
+                  transform: "translateZ(0)",
                   backgroundColor: hexToRgba(
                     activePreviewTheme.backgroundColor,
                     colorOpacity.background
@@ -645,58 +736,24 @@ export function ThemeEditor({ onThemeChange }: ThemeEditorProps) {
                   />
                 )}
 
-                {/* Content */}
-                <div className="relative z-10 h-full">
-                  {/* Mobile Header */}
-                  <header
-                    className="shadow-sm border-b"
-                    style={{
-                      backgroundColor: hexToRgba(
-                        activePreviewTheme.primaryColor,
-                        colorOpacity.primary
-                      ),
-                      borderColor: hexToRgba(
-                        activePreviewTheme.secondaryColor,
-                        colorOpacity.secondary
-                      ),
-                    }}
-                  >
-                    <div className="px-4 py-3">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <h1
-                            className="text-lg font-semibold"
-                            style={{
-                              color: hexToRgba(
-                                activePreviewTheme.textColor,
-                                colorOpacity.text
-                              ),
-                            }}
-                          >
-                            {isRTL ? "مطعم الذوق الأصيل" : "Authentic Taste"}
-                          </h1>
-                          <p
-                            className="text-xs opacity-75"
-                            style={{
-                              color: hexToRgba(
-                                activePreviewTheme.secondaryColor,
-                                colorOpacity.secondary
-                              ),
-                            }}
-                          >
-                            {isRTL ? "أطباق شهية" : "Delicious dishes"}
-                          </p>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <div className="w-6 h-6 bg-gray-300 rounded"></div>
-                          <div className="w-6 h-6 bg-gray-300 rounded"></div>
-                        </div>
-                      </div>
-                    </div>
-                  </header>
+                {/* Content — translateZ(0) on parent makes fixed header/social match customer menu */}
+                <div className="relative z-10 h-full flex flex-col min-h-0">
+                  <RestaurantHeader
+                    restaurant={previewRestaurantForHeader}
+                    menuTheme={activePreviewTheme}
+                    colorOpacity={colorOpacity}
+                  />
+                  <CustomerSocialLinks
+                    links={previewRestaurantForHeader.socialLinks}
+                    phone={previewRestaurantForHeader.phone}
+                    customerWhatsApp={
+                      previewRestaurantForHeader.customerWhatsApp
+                    }
+                    isRTL={isRTL}
+                  />
 
-                  {/* Categories View */}
-                  <div className="p-4">
+                  {/* Categories View (scroll like customer menu) */}
+                  <div className="flex-1 overflow-y-auto min-h-0 pt-[70px] sm:pt-[100px] pb-24 px-4">
                     {/* Search Bar Preview */}
                     <div className="mb-4">
                       <div className="relative">
@@ -1152,22 +1209,27 @@ export function ThemeEditor({ onThemeChange }: ThemeEditorProps) {
                 </div>
 
                 {/* Background Overlay Opacity */}
-                <div className="flex items-center space-x-3">
-                  <span className="text-xs text-gray-600 dark:text-gray-400 w-16">
-                    {isRTL ? "تعتيم:" : "Overlay:"}
+                <div
+                  className="flex items-center gap-3"
+                  dir={isRTL ? "rtl" : "ltr"}
+                >
+                  <span className="text-xs text-gray-600 dark:text-gray-400 shrink-0 w-14 sm:w-16">
+                    {isRTL ? "تعتيم" : "Overlay"}
                   </span>
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.1"
-                    value={backgroundOverlayOpacity}
-                    onChange={(e) =>
-                      setBackgroundOverlayOpacity(parseFloat(e.target.value))
-                    }
-                    className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                  />
-                  <span className="text-xs text-gray-500 w-8">
+                  <div dir="ltr" className="flex-1 min-w-0 flex items-center">
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={backgroundOverlayOpacity}
+                      onChange={(e) =>
+                        setBackgroundOverlayOpacity(parseFloat(e.target.value))
+                      }
+                      className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer theme-editor-slider"
+                    />
+                  </div>
+                  <span className="text-xs text-gray-500 shrink-0 w-9 text-end tabular-nums">
                     {Math.round(backgroundOverlayOpacity * 100)}%
                   </span>
                 </div>

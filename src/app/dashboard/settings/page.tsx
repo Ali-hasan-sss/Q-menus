@@ -31,6 +31,25 @@ interface RestaurantProfile {
   logo?: string;
   currency?: string;
   kitchenWhatsApp?: string;
+  customerWhatsApp?: string;
+  socialLinks?: Record<string, string> | null;
+}
+
+function socialLinksToFormFields(socialLinks: unknown) {
+  const o =
+    socialLinks &&
+    typeof socialLinks === "object" &&
+    !Array.isArray(socialLinks)
+      ? (socialLinks as Record<string, string>)
+      : {};
+  return {
+    socialFacebook: o.facebook || "",
+    socialInstagram: o.instagram || "",
+    socialTwitter: o.twitter || "",
+    socialTiktok: o.tiktok || "",
+    socialYoutube: o.youtube || "",
+    socialSnapchat: o.snapchat || "",
+  };
 }
 
 export default function SettingsPage() {
@@ -105,13 +124,22 @@ export default function SettingsPage() {
     phoneCountry: "SY", // SY for Syria, LB for Lebanon
     kitchenWhatsApp: "",
     kitchenWhatsAppCountry: "SY", // SY for Syria, LB for Lebanon
+    customerWhatsApp: "",
+    customerWhatsAppCountry: "SY",
     logo: "",
     currency: "USD",
+    socialFacebook: "",
+    socialInstagram: "",
+    socialTwitter: "",
+    socialTiktok: "",
+    socialYoutube: "",
+    socialSnapchat: "",
   });
   
   const [formErrors, setFormErrors] = useState<{
     phone?: string;
     kitchenWhatsApp?: string;
+    customerWhatsApp?: string;
   }>({});
 
   const [passwordForm, setPasswordForm] = useState({
@@ -242,6 +270,23 @@ export default function SettingsPage() {
           kitchenWhatsAppCountry = "LB";
           kitchenWhatsAppNumber = kitchenWhatsAppNumber.replace("961", "").trim();
         }
+
+        let customerWhatsAppCountry = "SY";
+        let customerWhatsAppNumber =
+          restaurantData.customerWhatsApp || "";
+        if (customerWhatsAppNumber.startsWith("+963")) {
+          customerWhatsAppCountry = "SY";
+          customerWhatsAppNumber = customerWhatsAppNumber.replace("+963", "").trim();
+        } else if (customerWhatsAppNumber.startsWith("+961")) {
+          customerWhatsAppCountry = "LB";
+          customerWhatsAppNumber = customerWhatsAppNumber.replace("+961", "").trim();
+        } else if (customerWhatsAppNumber.startsWith("963")) {
+          customerWhatsAppCountry = "SY";
+          customerWhatsAppNumber = customerWhatsAppNumber.replace("963", "").trim();
+        } else if (customerWhatsAppNumber.startsWith("961")) {
+          customerWhatsAppCountry = "LB";
+          customerWhatsAppNumber = customerWhatsAppNumber.replace("961", "").trim();
+        }
         
         setRestaurantForm({
           name: restaurantData.name || "",
@@ -253,8 +298,11 @@ export default function SettingsPage() {
           phoneCountry: phoneCountry,
           kitchenWhatsApp: kitchenWhatsAppNumber,
           kitchenWhatsAppCountry: kitchenWhatsAppCountry,
+          customerWhatsApp: customerWhatsAppNumber,
+          customerWhatsAppCountry: customerWhatsAppCountry,
           logo: restaurantData.logo || "",
           currency: restaurantData.currency || "USD",
+          ...socialLinksToFormFields(restaurantData.socialLinks),
         });
       }
     } catch (error) {
@@ -332,6 +380,7 @@ export default function SettingsPage() {
     const errors: {
       phone?: string;
       kitchenWhatsApp?: string;
+      customerWhatsApp?: string;
     } = {};
     
     // Validate phone if provided
@@ -347,6 +396,16 @@ export default function SettingsPage() {
       const whatsappError = validateKitchenWhatsApp(restaurantForm.kitchenWhatsApp, restaurantForm.kitchenWhatsAppCountry);
       if (whatsappError) {
         errors.kitchenWhatsApp = whatsappError;
+      }
+    }
+
+    if (restaurantForm.customerWhatsApp) {
+      const cwError = validateKitchenWhatsApp(
+        restaurantForm.customerWhatsApp,
+        restaurantForm.customerWhatsAppCountry
+      );
+      if (cwError) {
+        errors.customerWhatsApp = cwError;
       }
     }
     
@@ -381,6 +440,23 @@ export default function SettingsPage() {
         const countryCode = restaurantForm.kitchenWhatsAppCountry === "SY" ? "+963" : "+961";
         formData.kitchenWhatsApp = `${countryCode}${restaurantForm.kitchenWhatsApp.replace(/\D/g, "")}`;
       }
+
+      if (restaurantForm.customerWhatsApp) {
+        const countryCode =
+          restaurantForm.customerWhatsAppCountry === "SY" ? "+963" : "+961";
+        formData.customerWhatsApp = `${countryCode}${restaurantForm.customerWhatsApp.replace(/\D/g, "")}`;
+      } else {
+        formData.customerWhatsApp = "";
+      }
+
+      formData.socialLinks = {
+        facebook: restaurantForm.socialFacebook.trim(),
+        instagram: restaurantForm.socialInstagram.trim(),
+        twitter: restaurantForm.socialTwitter.trim(),
+        tiktok: restaurantForm.socialTiktok.trim(),
+        youtube: restaurantForm.socialYoutube.trim(),
+        snapchat: restaurantForm.socialSnapchat.trim(),
+      };
 
       const response = await api.put("/restaurant", formData);
       if (response.data.success) {
@@ -425,6 +501,22 @@ export default function SettingsPage() {
           kitchenWhatsAppCountry = "LB";
           kitchenWhatsAppNumber = kitchenWhatsAppNumber.replace("961", "").trim();
         }
+
+        let customerWhatsAppCountry = "SY";
+        let customerWhatsAppNumber = updatedData.customerWhatsApp || "";
+        if (customerWhatsAppNumber.startsWith("+963")) {
+          customerWhatsAppCountry = "SY";
+          customerWhatsAppNumber = customerWhatsAppNumber.replace("+963", "").trim();
+        } else if (customerWhatsAppNumber.startsWith("+961")) {
+          customerWhatsAppCountry = "LB";
+          customerWhatsAppNumber = customerWhatsAppNumber.replace("+961", "").trim();
+        } else if (customerWhatsAppNumber.startsWith("963")) {
+          customerWhatsAppCountry = "SY";
+          customerWhatsAppNumber = customerWhatsAppNumber.replace("963", "").trim();
+        } else if (customerWhatsAppNumber.startsWith("961")) {
+          customerWhatsAppCountry = "LB";
+          customerWhatsAppNumber = customerWhatsAppNumber.replace("961", "").trim();
+        }
         
         // Update restaurantForm with the updated data to keep it in sync
         setRestaurantForm((prev) => ({
@@ -434,6 +526,9 @@ export default function SettingsPage() {
           phoneCountry: phoneCountry,
           kitchenWhatsApp: kitchenWhatsAppNumber,
           kitchenWhatsAppCountry: kitchenWhatsAppCountry,
+          customerWhatsApp: customerWhatsAppNumber,
+          customerWhatsAppCountry: customerWhatsAppCountry,
+          ...socialLinksToFormFields(updatedData.socialLinks),
         }));
       }
     } catch (error: any) {
@@ -1244,6 +1339,115 @@ export default function SettingsPage() {
                       ? "يجب أن يتكون من 9 أرقام ويبدأ بالرقم 9"
                       : "Must be 9 digits starting with 9"}
                   </p>
+                </div>
+
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-6 space-y-4">
+                  <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                    {isRTL ? "وسائل التواصل مع الزبائن (القائمة العامة)" : "Customer contact & social (public menu)"}
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {isRTL
+                      ? "تظهر كأيقونات فوق شريط الطلب. روابط السوشال: عناوين كاملة تبدأ بـ https:// — أيقونة الاتصال تستخدم رقم الهاتف أعلاه."
+                      : "Shown as icons above the order bar. Social: full https:// URLs. Call icon uses the phone number above."}
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {(
+                      [
+                        ["socialFacebook", "Facebook", "facebook.com/…"] as const,
+                        ["socialInstagram", "Instagram", "instagram.com/…"] as const,
+                        ["socialTwitter", "X (Twitter)", "x.com/…"] as const,
+                        ["socialTiktok", "TikTok", "tiktok.com/@…"] as const,
+                        ["socialYoutube", "YouTube", "youtube.com/…"] as const,
+                        ["socialSnapchat", "Snapchat", "snapchat.com/add/…"] as const,
+                      ] as const
+                    ).map(([key, label, ph]) => (
+                      <div key={key}>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          {label}
+                        </label>
+                        <Input
+                          type="url"
+                          value={(restaurantForm as Record<string, string>)[key]}
+                          onChange={(e) =>
+                            setRestaurantForm((prev) => ({
+                              ...prev,
+                              [key]: e.target.value,
+                            }))
+                          }
+                          placeholder={`https://${ph}`}
+                          className="text-sm"
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="pt-2 border-t border-gray-200 dark:border-gray-600">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      {isRTL ? "واتساب الزبائن" : "Customer WhatsApp"}
+                    </label>
+                    <div className="flex flex-row max-w-md">
+                      <div className="flex-1">
+                        <Input
+                          type="tel"
+                          value={restaurantForm.customerWhatsApp}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/\D/g, "").slice(0, 9);
+                            setRestaurantForm((prev) => ({
+                              ...prev,
+                              customerWhatsApp: value,
+                            }));
+                            if (formErrors.customerWhatsApp) {
+                              setFormErrors((prev) => ({
+                                ...prev,
+                                customerWhatsApp: undefined,
+                              }));
+                            }
+                          }}
+                          placeholder={isRTL ? "9XXXXXXXX" : "9XXXXXXXX"}
+                          className={`rounded-r-md border-l-0 ${
+                            formErrors.customerWhatsApp
+                              ? "border-red-500 focus:ring-red-500"
+                              : ""
+                          }`}
+                          maxLength={9}
+                        />
+                      </div>
+                      <select
+                        className={`px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent focus:outline-none rounded-l-md border-r-0 ${
+                          formErrors.customerWhatsApp ? "border-red-500" : ""
+                        }`}
+                        value={restaurantForm.customerWhatsAppCountry}
+                        onChange={(e) => {
+                          setRestaurantForm((prev) => ({
+                            ...prev,
+                            customerWhatsAppCountry: e.target.value,
+                            customerWhatsApp: "",
+                          }));
+                          setFormErrors((prev) => ({
+                            ...prev,
+                            customerWhatsApp: undefined,
+                          }));
+                        }}
+                      >
+                        <option value="SY">
+                          {isRTL ? "🇸🇾 +963" : "🇸🇾 +963"}
+                        </option>
+                        <option value="LB">
+                          {isRTL ? "🇱🇧 +961" : "🇱🇧 +961"}
+                        </option>
+                      </select>
+                    </div>
+                    {formErrors.customerWhatsApp && (
+                      <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                        {formErrors.customerWhatsApp}
+                      </p>
+                    )}
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      {isRTL
+                        ? "9 أرقام تبدأ بـ 9 — أيقونة واتساب في القائمة تفتح المحادثة مع المطعم."
+                        : "9 digits starting with 9 — WhatsApp icon on the menu opens chat."}
+                    </p>
+                  </div>
                 </div>
 
                 <div className="flex justify-end">

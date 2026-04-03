@@ -8,6 +8,7 @@ import { useCustomerSocket } from "@/contexts/CustomerSocketContext";
 
 import { MenuItem } from "@/components/customer/MenuItem";
 import { RestaurantHeader } from "@/components/customer/RestaurantHeader";
+import { CustomerSocialLinks } from "@/components/customer/CustomerSocialLinks";
 import dynamic from "next/dynamic";
 
 import { FloatingOrderSummary } from "@/components/customer/FloatingOrderSummary";
@@ -74,6 +75,9 @@ interface Restaurant {
   logo?: string;
   currency?: string;
   theme?: any;
+  phone?: string | null;
+  customerWhatsApp?: string | null;
+  socialLinks?: Record<string, string> | null;
 }
 
 interface MenuTheme {
@@ -1316,6 +1320,13 @@ export default function CustomerMenuPage() {
             currencyExchanges={currencyExchanges}
             selectedCurrency={selectedPaymentCurrency}
             onCurrencyChange={handleCurrencyChange}
+          />
+
+          <CustomerSocialLinks
+            links={restaurant?.socialLinks}
+            phone={restaurant?.phone}
+            customerWhatsApp={restaurant?.customerWhatsApp}
+            isRTL={isRTL}
           />
 
           <div className="max-w-7xl pt-[70px] sm:pt-[100px] mx-auto px-4 sm:px-6 lg:px-8 pb-24">
