@@ -12,6 +12,80 @@ import { useToast } from "@/store/hooks/useToast";
 import jsPDF from "jspdf";
 import { getImageUrl } from "@/lib/api";
 
+function hexToRgbTuple(hex: string): [number, number, number] {
+  const h = (hex || "#000000").replace(/^#/, "");
+  if (h.length === 6) {
+    return [
+      parseInt(h.slice(0, 2), 16),
+      parseInt(h.slice(2, 4), 16),
+      parseInt(h.slice(4, 6), 16),
+    ];
+  }
+  return [0, 0, 0];
+}
+
+/** Map typical B/W QR PNG pixels to custom foreground / background colors (preview + PDF). */
+function recolorQrToDataUrl(
+  imageSrc: string,
+  fgHex: string,
+  bgHex: string
+): Promise<string> {
+  const url =
+    imageSrc.startsWith("data:") || imageSrc.startsWith("blob:")
+      ? imageSrc
+      : getImageUrl(imageSrc);
+  const [fr, fGreen, fb] = hexToRgbTuple(fgHex);
+  const [br, bgGreen, bb] = hexToRgbTuple(bgHex);
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      try {
+        const w = img.naturalWidth;
+        const h = img.naturalHeight;
+        if (!w || !h) {
+          resolve(imageSrc);
+          return;
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve(imageSrc);
+          return;
+        }
+        ctx.drawImage(img, 0, 0);
+        const imageData = ctx.getImageData(0, 0, w, h);
+        const d = imageData.data;
+        for (let i = 0; i < d.length; i += 4) {
+          const a = d[i + 3];
+          if (a < 12) continue;
+          const lum = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
+          if (lum < 128) {
+            d[i] = fr;
+            d[i + 1] = fGreen;
+            d[i + 2] = fb;
+            d[i + 3] = 255;
+          } else {
+            d[i] = br;
+            d[i + 1] = bgGreen;
+            d[i + 2] = bb;
+            d[i + 3] = 255;
+          }
+        }
+        ctx.putImageData(imageData, 0, 0);
+        resolve(canvas.toDataURL("image/png"));
+      } catch {
+        resolve(imageSrc);
+      }
+    };
+    img.onerror = () => resolve(imageSrc);
+    img.src = url;
+  });
+}
+
 function QRPageContent() {
   const { user } = useAuth();
   const { t, isRTL } = useLanguage();
@@ -46,6 +120,7 @@ function QRPageContent() {
   // Custom design for table QR codes
   const [showCustomDesign, setShowCustomDesign] = useState(false);
   const [designBackground, setDesignBackground] = useState<string | null>(null);
+  const [designCanvasBgColor, setDesignCanvasBgColor] = useState("#ffffff");
   const [designWidth, setDesignWidth] = useState(80); // mm
   const [designHeight, setDesignHeight] = useState(40); // mm
   const [qrPosX, setQrPosX] = useState(5); // mm from left
@@ -58,6 +133,11 @@ function QRPageContent() {
   const [tableNumBgTransparent, setTableNumBgTransparent] = useState(false);
   const [tableNumTextColor, setTableNumTextColor] = useState("#000000");
   const [tableNumFontScale, setTableNumFontScale] = useState(0.75); // 0.5-1.0, font size relative to circle
+  const [customQrBgColor, setCustomQrBgColor] = useState("#ffffff");
+  const [customQrFgColor, setCustomQrFgColor] = useState("#000000");
+  const [previewRecoloredQr, setPreviewRecoloredQr] = useState<string | null>(
+    null
+  );
   const [paperSize, setPaperSize] = useState<"a4" | "a3" | "letter" | "a5">("a4");
   const [paperMargin, setPaperMargin] = useState(5); // mm
 
@@ -125,6 +205,27 @@ function QRPageContent() {
     fetchQRCodes();
   }, [fetchQRCodes]);
 
+  // Recolor first table QR for custom-design preview (matches PDF export)
+  useEffect(() => {
+    const src = qrCodes[0]?.qrCodeImage;
+    if (!showCustomDesign || !src) {
+      setPreviewRecoloredQr(null);
+      return;
+    }
+    let cancelled = false;
+    recolorQrToDataUrl(src, customQrFgColor, customQrBgColor).then((dataUrl) => {
+      if (!cancelled) setPreviewRecoloredQr(dataUrl);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    showCustomDesign,
+    qrCodes[0]?.qrCodeImage,
+    customQrFgColor,
+    customQrBgColor,
+  ]);
+
   // Clamp QR and table number position/size when design is resized
   useEffect(() => {
     const maxSize = Math.min(designWidth, designHeight) - 2;
@@ -172,21 +273,17 @@ function QRPageContent() {
       );
       return;
     }
-    if (!designBackground) {
-      showToast(
-        isRTL ? "يرجى رفع صورة خلفية للتصميم" : "Please upload a background image",
-        "error"
-      );
-      return;
-    }
     try {
       showToast(
         isRTL ? "جاري إنشاء ملف PDF..." : "Generating PDF...",
         "info"
       );
-      const bgBase64 = designBackground.startsWith("data:")
-        ? designBackground
-        : await imageUrlToBase64(designBackground);
+      let bgBase64 = "";
+      if (designBackground) {
+        bgBase64 = designBackground.startsWith("data:")
+          ? designBackground
+          : await imageUrlToBase64(designBackground);
+      }
 
       const PAPER_SIZES: Record<string, [number, number]> = {
         a4: [210, 297],
@@ -221,7 +318,10 @@ function QRPageContent() {
         const baseX = margin + col * (designWidth + gap);
         const baseY = margin + row * (designHeight + gap);
 
-        // Draw background
+        // Design canvas: solid color for whole area, then optional image on top
+        const [canvasR, canvasG, canvasB] = hexToRgbTuple(designCanvasBgColor);
+        pdf.setFillColor(canvasR, canvasG, canvasB);
+        pdf.rect(baseX, baseY, designWidth, designHeight, "F");
         if (bgBase64) {
           const fmt = bgBase64.includes("image/png")
             ? "PNG"
@@ -236,10 +336,6 @@ function QRPageContent() {
             designWidth,
             designHeight
           );
-        } else {
-          pdf.setDrawColor(200);
-          pdf.setFillColor(255, 255, 255);
-          pdf.rect(baseX, baseY, designWidth, designHeight, "FD");
         }
 
         // Draw table number circle
@@ -271,17 +367,15 @@ function QRPageContent() {
         const textY = cy + capHeightMm / 2;
         pdf.text(String(qr.tableNumber), cx, textY, { align: "center" });
 
-        // Draw QR code
+        // Draw QR code (recolored to match custom preview)
         const qrX = baseX + qrPosX;
         const qrY = baseY + qrPosY;
-        pdf.addImage(
+        const qrPng = await recolorQrToDataUrl(
           qr.qrCodeImage,
-          "PNG",
-          qrX,
-          qrY,
-          qrSize,
-          qrSize
+          customQrFgColor,
+          customQrBgColor
         );
+        pdf.addImage(qrPng, "PNG", qrX, qrY, qrSize, qrSize);
       }
 
       pdf.save(
@@ -302,6 +396,7 @@ function QRPageContent() {
   }, [
     qrCodes,
     designBackground,
+    designCanvasBgColor,
     designWidth,
     designHeight,
     qrPosX,
@@ -314,6 +409,8 @@ function QRPageContent() {
     tableNumBgColor,
     tableNumBgTransparent,
     tableNumTextColor,
+    customQrBgColor,
+    customQrFgColor,
     paperSize,
     paperMargin,
     imageUrlToBase64,
@@ -1943,6 +2040,27 @@ function QRPageContent() {
                       </div>
                     </div>
 
+                    {/* Whole-design canvas background (under background image if any) */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        {isRTL ? "لون خلفية التصميم (المساحة كاملة)" : "Design canvas background"}
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={designCanvasBgColor}
+                          onChange={(e) => setDesignCanvasBgColor(e.target.value)}
+                          className="w-10 h-10 rounded cursor-pointer border border-gray-300"
+                        />
+                        <span className="text-sm text-gray-500">{designCanvasBgColor}</span>
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {isRTL
+                          ? "يظهر خلف الصورة (أو كخلفية كاملة إن لم ترفع صورة)."
+                          : "Shows behind the image, or as the full background if no image is uploaded."}
+                      </p>
+                    </div>
+
                     {/* Table number circle colors and font */}
                     <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
@@ -2014,6 +2132,80 @@ function QRPageContent() {
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         {isRTL ? "حجم الخط نسبةً لقطر الدائرة" : "Font size relative to circle diameter"}
                       </p>
+                    </div>
+
+                    {/* QR code colors (custom design export + preview) */}
+                    <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-200 dark:border-gray-600">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          {isRTL ? "لون خلفية الكود" : "QR background"}
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={customQrBgColor}
+                            onChange={(e) => setCustomQrBgColor(e.target.value)}
+                            className="w-10 h-10 rounded cursor-pointer border border-gray-300"
+                          />
+                          <span className="text-sm text-gray-500">{customQrBgColor}</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          {isRTL ? "لون الكود (الرموز)" : "QR modules (foreground)"}
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={customQrFgColor}
+                            onChange={(e) => setCustomQrFgColor(e.target.value)}
+                            className="w-10 h-10 rounded cursor-pointer border border-gray-300"
+                          />
+                          <span className="text-sm text-gray-500">{customQrFgColor}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* QR square side — numeric entry in cm (internal size stays mm) */}
+                    <div className="pt-2 border-t border-gray-200 dark:border-gray-600">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        {isRTL ? "طول ضلع الكود (سم)" : "QR code side length (cm)"}
+                      </label>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <input
+                          type="number"
+                          min={0.5}
+                          max={Math.max(
+                            0.5,
+                            (Math.min(designWidth, designHeight) - 2) / 10
+                          )}
+                          step={0.1}
+                          defaultValue={Number((qrSize / 10).toFixed(1))}
+                          key={`qr-cm-${qrSize}`}
+                          onBlur={(e) => {
+                            const el = e.target as HTMLInputElement;
+                            const v = parseFloat(el.value);
+                            const maxCm = Math.max(
+                              0.5,
+                              (Math.min(designWidth, designHeight) - 2) / 10
+                            );
+                            if (!isNaN(v) && v >= 0.5 && v <= maxCm) {
+                              setQrSize(Math.round(v * 10));
+                            } else {
+                              el.value = String(Number((qrSize / 10).toFixed(1)));
+                            }
+                          }}
+                          onKeyDown={(e) =>
+                            e.key === "Enter" && (e.target as HTMLInputElement).blur()
+                          }
+                          className="w-28 px-2 py-1.5 text-sm font-mono border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                        />
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {isRTL
+                            ? "مربع؛ الحد الأقصى يعتمد على أبعاد التصميم (يمكنك أيضاً السحب من زاوية الكود)."
+                            : "Square; max depends on design size. You can also drag the QR corner handle."}
+                        </span>
+                      </div>
                     </div>
                     </div>
 
@@ -2112,13 +2304,14 @@ function QRPageContent() {
                             }}
                           >
                             <div
-                              className="relative bg-white dark:bg-gray-800 shadow-md overflow-visible origin-top-left"
+                              className="relative shadow-md overflow-visible origin-top-left"
                               style={{
                                 width: designWidth * PX_PER_MM,
                                 height: designHeight * PX_PER_MM,
                                 minWidth: 80,
                                 minHeight: 80,
                                 transform: `scale(${previewScale})`,
+                                backgroundColor: designCanvasBgColor,
                               }}
                             >
                             {/* Design background - contain to show full image, pointer-events: none */}
@@ -2128,9 +2321,7 @@ function QRPageContent() {
                                 backgroundImage: designBackground
                                   ? `url(${designBackground.startsWith("data:") ? designBackground : getImageUrl(designBackground)})`
                                   : undefined,
-                                backgroundColor: designBackground
-                                  ? "transparent"
-                                  : "#f3f4f6",
+                                backgroundColor: "transparent",
                               }}
                             />
                             {/* Table number circle - draggable and resizable */}
@@ -2162,16 +2353,20 @@ function QRPageContent() {
                             {/* QR code - draggable */}
                             <div
                               onMouseDown={handleQrMouseDown}
-                              className="absolute bg-white p-0.5 shadow-md cursor-move border border-gray-300 z-10"
+                              className="absolute p-0.5 shadow-md cursor-move border border-gray-300 z-10"
                               style={{
                                 left: qrPosX * PX_PER_MM,
                                 top: qrPosY * PX_PER_MM,
                                 width: qrSize * PX_PER_MM,
                                 height: qrSize * PX_PER_MM,
+                                backgroundColor: customQrBgColor,
                               }}
                             >
                               <img
-                                src={qrCodes[0].qrCodeImage}
+                                src={
+                                  previewRecoloredQr ??
+                                  qrCodes[0].qrCodeImage
+                                }
                                 alt="QR Preview"
                                 className="w-full h-full object-contain pointer-events-none"
                               />
@@ -2248,7 +2443,7 @@ function QRPageContent() {
                       <Button
                         onClick={exportCustomDesignPDF}
                         className="flex-1"
-                        disabled={!designBackground || qrCodes.length === 0}
+                        disabled={qrCodes.length === 0}
                       >
                         {isRTL ? "تصدير PDF" : "Export PDF"}
                       </Button>

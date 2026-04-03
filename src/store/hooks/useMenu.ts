@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useMemo } from "react";
 import { useAppSelector, useAppDispatch } from "../hooks";
 import {
   fetchMenu,
@@ -31,6 +31,7 @@ import {
   clearMenuData,
 } from "../slices/menuSlice";
 import { api } from "@/lib/api";
+import { sortQRCodesByTableNumber } from "@/lib/sortQRCodes";
 
 export interface CreateCategoryData {
   name: string;
@@ -59,7 +60,11 @@ export function useMenu() {
   const menu = useAppSelector((s) => s.menu.menu);
   const categories = useAppSelector((s) => s.menu.categories);
   const items = useAppSelector((s) => s.menu.items);
-  const qrCodes = useAppSelector((s) => s.menu.qrCodes);
+  const qrCodesRaw = useAppSelector((s) => s.menu.qrCodes);
+  const qrCodes = useMemo(
+    () => sortQRCodesByTableNumber(qrCodesRaw),
+    [qrCodesRaw]
+  );
   const restaurantQR = useAppSelector((s) => s.menu.restaurantQR);
   const restaurantCurrency = useAppSelector((s) => s.menu.restaurantCurrency);
   const loading = useAppSelector((s) => s.menu.loading);
