@@ -1088,6 +1088,7 @@ export default function SettingsPage() {
                   <ImageUpload
                     value={restaurantForm.logo}
                     onChange={handleLogoUpload}
+                    previewVariant="avatar"
                   />
                 </div>
 

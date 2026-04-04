@@ -144,7 +144,7 @@ export default function WaiterRequestButton({
       style={{
         backgroundColor: menuTheme?.primaryColor || "#f58114",
         color: menuTheme?.textColor || "#ffffff",
-        border: `2px solid ${menuTheme?.secondaryColor || "#27ae1e"}`,
+        border: `2px solid ${menuTheme?.secondaryColor || "#9d622a"}`,
       }}
       title={isRTL ? "طلب النادل" : "Call Waiter"}
     >

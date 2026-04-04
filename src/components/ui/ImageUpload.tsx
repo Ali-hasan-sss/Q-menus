@@ -24,6 +24,8 @@ interface ImageUploadProps {
   disabled?: boolean;
   className?: string;
   showGalleryOption?: boolean; // Option to show gallery picker
+  /** Circular avatar-style preview (e.g. restaurant logo in settings) */
+  previewVariant?: "default" | "avatar";
 }
 
 export function ImageUpload({
@@ -33,7 +35,9 @@ export function ImageUpload({
   disabled = false,
   className = "",
   showGalleryOption = true,
+  previewVariant = "default",
 }: ImageUploadProps) {
+  const isAvatar = previewVariant === "avatar";
   const { isRTL } = useLanguage();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -149,10 +153,16 @@ export function ImageUpload({
 
       {/* Upload button or image preview */}
       {!value ? (
-        <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center hover:border-gray-400 dark:hover:border-gray-500 transition-colors">
+        <div
+          className={`border-2 border-dashed border-gray-300 dark:border-gray-600 text-center hover:border-gray-400 dark:hover:border-gray-500 transition-colors ${
+            isAvatar
+              ? "rounded-full w-44 h-44 sm:w-48 sm:h-48 mx-auto flex flex-col items-center justify-center p-3 gap-1"
+              : "rounded-lg p-6"
+          }`}
+        >
           <div className="space-y-2">
             <svg
-              className="mx-auto h-12 w-12 text-gray-400"
+              className={`mx-auto text-gray-400 ${isAvatar ? "h-10 w-10" : "h-12 w-12"}`}
               stroke="currentColor"
               fill="none"
               viewBox="0 0 48 48"
@@ -215,12 +225,22 @@ export function ImageUpload({
           </div>
         </div>
       ) : (
-        <div className="space-y-3">
-          <div className="relative rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+        <div className={`space-y-3 ${isAvatar ? "flex flex-col items-center" : ""}`}>
+          <div
+            className={`relative overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 ${
+              isAvatar
+                ? "rounded-full w-32 h-32 sm:w-36 sm:h-36 shadow-md ring-4 ring-white dark:ring-gray-900"
+                : "rounded-lg w-full"
+            }`}
+          >
             <img
               src={getImageUrl(value)}
               alt="Uploaded image"
-              className="w-full h-48 object-cover"
+              className={
+                isAvatar
+                  ? "w-full h-full object-cover"
+                  : "w-full h-48 object-cover"
+              }
             />
           </div>
 

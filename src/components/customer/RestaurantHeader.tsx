@@ -55,7 +55,7 @@ interface RestaurantHeaderProps {
 // Default theme for all restaurants
 const defaultTheme = {
   primaryColor: "#f6b23c",
-  secondaryColor: "#27ae1e",
+  secondaryColor: "#9d622a",
   primaryColorOpacity: 0.8,
   secondaryColorOpacity: 0.9,
 };

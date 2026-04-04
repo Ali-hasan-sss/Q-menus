@@ -116,6 +116,14 @@ export default function OrdersPage() {
   const [qrCodes, setQrCodes] = useState<
     Record<string, { id: string; isOccupied: boolean }>
   >({});
+  const [tableSessionToggleLoading, setTableSessionToggleLoading] = useState<
+    Record<string, boolean>
+  >({});
+  const tableSessionToggleInFlightRef = useRef<Set<string>>(new Set());
+  /** Loading UI for order modal: status select / complete / cancel */
+  const [orderModalStatusLoading, setOrderModalStatusLoading] = useState<
+    null | "select" | "complete" | "cancel"
+  >(null);
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [addItemTab, setAddItemTab] = useState<"menu" | "custom">("menu");
   const [newItemName, setNewItemName] = useState("");
@@ -689,6 +697,46 @@ export default function OrdersPage() {
     return null;
   };
 
+  /** Open/close QR table session; shows loading on switch & disables duplicate clicks */
+  const handleTableSessionToggle = useCallback(
+    async (
+      tableNumber: string,
+      qrCode: { id: string; isOccupied: boolean }
+    ): Promise<boolean> => {
+      if (!qrCode?.id) return false;
+      if (tableSessionToggleInFlightRef.current.has(tableNumber)) return false;
+      tableSessionToggleInFlightRef.current.add(tableNumber);
+      setTableSessionToggleLoading((prev) => ({ ...prev, [tableNumber]: true }));
+      try {
+        await toggleTableOccupied(qrCode.id);
+        setQrCodes((prev) => ({
+          ...prev,
+          [tableNumber]: {
+            ...prev[tableNumber],
+            id: qrCode.id,
+            isOccupied: !prev[tableNumber]?.isOccupied,
+          },
+        }));
+        return true;
+      } catch (err) {
+        console.error("Error toggling table session:", err);
+        showToast(
+          isRTL ? "فشل تحديث جلسة الطاولة" : "Failed to update table session",
+          "error"
+        );
+        return false;
+      } finally {
+        tableSessionToggleInFlightRef.current.delete(tableNumber);
+        setTableSessionToggleLoading((prev) => {
+          const next = { ...prev };
+          delete next[tableNumber];
+          return next;
+        });
+      }
+    },
+    [toggleTableOccupied, showToast, isRTL]
+  );
+
   const quickOrderHandlePlaceOrder = async () => {
     if (quickOrderItems.length === 0) {
       showToast(
@@ -716,24 +764,11 @@ export default function OrdersPage() {
       if (tableNumberForOrder) {
         const qrCode = qrCodes[tableNumberForOrder];
         if (qrCode?.id && !qrCode.isOccupied) {
-          try {
-            await toggleTableOccupied(qrCode.id);
-            setQrCodes((prev) => ({
-              ...prev,
-              [tableNumberForOrder]: {
-                ...prev[tableNumberForOrder],
-                id: qrCode.id,
-                isOccupied: true,
-              },
-            }));
-          } catch (err) {
-            console.error("Error opening table session:", err);
-            showToast(
-              isRTL ? "فشل في فتح جلسة الطاولة" : "Failed to start table session",
-              "error"
-            );
-            return;
-          }
+          const opened = await handleTableSessionToggle(
+            tableNumberForOrder,
+            qrCode
+          );
+          if (!opened) return;
         }
       }
 
@@ -1450,41 +1485,56 @@ export default function OrdersPage() {
     setQuickOrders([]);
     setSelectedQuickOrderIndex(0);
     setSelectedPaymentCurrency(null);
+    setOrderModalStatusLoading(null);
   };
 
-  const updateOrderStatus = async (orderId: string, newStatus: string) => {
-    await api.put(`/order/${orderId}/status`, { status: newStatus });
+  const updateOrderStatus = async (
+    orderId: string,
+    newStatus: string,
+    modalUi?: "select" | "complete" | "cancel"
+  ): Promise<boolean> => {
+    if (modalUi) setOrderModalStatusLoading(modalUi);
+    try {
+      await api.put(`/order/${orderId}/status`, { status: newStatus });
 
-    // Update orders without adding to modifiedOrderIds (restaurant self-update)
-    setOrders(
-      orders.map((order) =>
-        order.id === orderId ? { ...order, status: newStatus } : order
-      )
-    );
+      // Update orders without adding to modifiedOrderIds (restaurant self-update)
+      setOrders((prev) =>
+        prev.map((order) =>
+          order.id === orderId ? { ...order, status: newStatus } : order
+        )
+      );
 
-    if (deliveryOrders.length > 0) {
       setDeliveryOrders((prevOrders) =>
         prevOrders.map((order) =>
           order.id === orderId ? { ...order, status: newStatus } : order
         )
       );
-    }
 
-    if (quickOrders.length > 0) {
       setQuickOrders((prevOrders) =>
         prevOrders.map((order) =>
           order.id === orderId ? { ...order, status: newStatus } : order
         )
       );
-    }
 
-    if (selectedOrder?.id === orderId) {
       setSelectedOrder((prev) =>
-        prev ? { ...prev, status: newStatus } : null
+        prev && prev.id === orderId
+          ? { ...prev, status: newStatus }
+          : prev
       );
-    }
 
-    console.log("🎯 Order status updated by restaurant - no visual effects");
+      console.log("🎯 Order status updated by restaurant - no visual effects");
+      return true;
+    } catch (error: any) {
+      console.error("updateOrderStatus:", error);
+      showToast(
+        error.response?.data?.message ||
+          (isRTL ? "فشل تحديث حالة الطلب" : "Failed to update order status"),
+        "error"
+      );
+      return false;
+    } finally {
+      if (modalUi) setOrderModalStatusLoading(null);
+    }
   };
 
   // Function to get item name (custom or from menu)
@@ -2284,29 +2334,22 @@ export default function OrdersPage() {
                 {availableTables.map((tableNumber) => {
                   const qrCode = qrCodes[tableNumber];
                   const hasActiveSession = qrCode?.isOccupied ?? false;
+                  const sessionBusy = !!tableSessionToggleLoading[tableNumber];
                   const handleToggleSession = async (e: React.MouseEvent) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    if (qrCode) {
-                      try {
-                        await toggleTableOccupied(qrCode.id);
-                        setQrCodes((prev) => ({
-                          ...prev,
-                          [tableNumber]: {
-                            ...prev[tableNumber],
-                            id: qrCode.id,
-                            isOccupied: !prev[tableNumber]?.isOccupied,
-                          },
-                        }));
-                      } catch (err) {
-                        console.error("Error toggling table session:", err);
-                      }
+                    if (qrCode && !sessionBusy) {
+                      await handleTableSessionToggle(tableNumber, qrCode);
                     }
                   };
                   return (
                     <label
                       key={tableNumber}
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border cursor-pointer transition-colors ${
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border transition-colors ${
+                        sessionBusy
+                          ? "cursor-wait opacity-80 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800"
+                          : "cursor-pointer"
+                      } ${
                         hasActiveSession
                           ? "bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700 text-green-800 dark:text-green-200"
                           : "bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
@@ -2317,11 +2360,18 @@ export default function OrdersPage() {
                         checked={hasActiveSession}
                         onChange={() => {}}
                         onClick={handleToggleSession}
-                        className="rounded border-gray-300 dark:border-gray-600 text-green-600 focus:ring-green-500 h-4 w-4 cursor-pointer"
+                        disabled={sessionBusy || !qrCode}
+                        className="rounded border-gray-300 dark:border-gray-600 text-green-600 focus:ring-green-500 h-4 w-4 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                       />
                       <span className="text-sm font-medium select-none">
                         {isRTL ? `طاولة ${tableNumber}` : `Table ${tableNumber}`}
                       </span>
+                      {sessionBusy && (
+                        <span
+                          className="inline-block h-3.5 w-3.5 shrink-0 rounded-full border-2 border-green-600 border-t-transparent animate-spin"
+                          aria-hidden
+                        />
+                      )}
                     </label>
                   );
                 })}
@@ -2833,7 +2883,9 @@ export default function OrdersPage() {
                                 confirmText: isRTL ? "نعم، مكتمل" : "Yes, mark completed",
                                 cancelText: isRTL ? "إلغاء" : "Cancel",
                                 confirmVariant: "primary",
-                                onConfirm: () => updateOrderStatus(order.id, "COMPLETED"),
+                                onConfirm: async (): Promise<void> => {
+                                  await updateOrderStatus(order.id, "COMPLETED");
+                                },
                               });
                             }}
                             className="text-xs px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-md flex items-center gap-1"
@@ -2862,7 +2914,9 @@ export default function OrdersPage() {
                               confirmText: isRTL ? "نعم، إلغاء" : "Yes, cancel",
                               cancelText: isRTL ? "تراجع" : "Go back",
                               confirmVariant: "danger",
-                              onConfirm: () => updateOrderStatus(order.id, "CANCELLED"),
+                              onConfirm: async (): Promise<void> => {
+                                await updateOrderStatus(order.id, "CANCELLED");
+                              },
                             });
                           }}
                           className="text-xs px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-md flex items-center gap-1"
@@ -3272,22 +3326,11 @@ export default function OrdersPage() {
                 const isModified =
                   tableOrder && modifiedOrderIds.has(tableOrder.id);
 
+                const sessionBusy = !!tableSessionToggleLoading[tableNumber];
                 const handleToggleSession = async (e: React.MouseEvent) => {
                   e.stopPropagation();
-                  if (qrCode) {
-                    try {
-                      await toggleTableOccupied(qrCode.id);
-                      // Update local state
-                      setQrCodes((prev) => ({
-                        ...prev,
-                        [tableNumber]: {
-                          ...prev[tableNumber],
-                          isOccupied: !prev[tableNumber]?.isOccupied,
-                        },
-                      }));
-                    } catch (error) {
-                      console.error("Error toggling table session:", error);
-                    }
+                  if (qrCode && !sessionBusy) {
+                    await handleTableSessionToggle(tableNumber, qrCode);
                   }
                 };
 
@@ -3321,27 +3364,42 @@ export default function OrdersPage() {
                           className={`flex items-center gap-2 ${isRTL ? "flex-row-reverse" : ""}`}
                         >
                           <span className="text-xs text-gray-600 dark:text-gray-400">
-                            {isRTL ? "جلسة نشطة" : "Active Session"}
+                            {sessionBusy
+                              ? isRTL
+                                ? "جاري التحديث…"
+                                : "Updating…"
+                              : isRTL
+                                ? "جلسة نشطة"
+                                : "Active Session"}
                           </span>
                           <button
+                            type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleToggleSession(e);
                             }}
-                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 ${
+                            disabled={sessionBusy || !qrCode}
+                            aria-busy={sessionBusy}
+                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed ${
                               hasActiveSession
                                 ? "bg-green-600"
                                 : "bg-gray-200 dark:bg-gray-600"
                             }`}
                             dir="ltr"
                           >
-                            <span
-                              className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform shadow-sm ${
-                                hasActiveSession
-                                  ? "translate-x-5"
-                                  : "translate-x-1"
-                              }`}
-                            />
+                            {sessionBusy ? (
+                              <span className="absolute inset-0 flex items-center justify-center">
+                                <span className="h-3 w-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                              </span>
+                            ) : (
+                              <span
+                                className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform shadow-sm ${
+                                  hasActiveSession
+                                    ? "translate-x-5"
+                                    : "translate-x-1"
+                                }`}
+                              />
+                            )}
                           </button>
                         </div>
                       </div>
@@ -4250,23 +4308,32 @@ export default function OrdersPage() {
                 {/* Status row - separate row with all statuses */}
                 <div className="w-full">
                   <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-                    {isRTL ? "حالة الطلب" : "Order Status"}
+                    {orderModalStatusLoading === "select"
+                      ? isRTL
+                        ? "جاري تحديث الحالة…"
+                        : "Updating status…"
+                      : isRTL
+                        ? "حالة الطلب"
+                        : "Order Status"}
                   </label>
-                  <select
-                    value={selectedOrder.status}
-                    onChange={(e) => {
-                      updateOrderStatus(selectedOrder.id, e.target.value);
-                      setSelectedOrder({
-                        ...selectedOrder,
-                        status: e.target.value,
-                      });
-                    }}
-                    className="w-full md:max-w-xs px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-medium text-sm transition-colors hover:border-gray-400 dark:hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={
-                      selectedOrder.status === "CANCELLED" ||
-                      selectedOrder.status === "COMPLETED"
-                    }
-                  >
+                  <div className="relative w-full md:max-w-xs">
+                    <select
+                      value={selectedOrder.status}
+                      onChange={async (e) => {
+                        const newStatus = e.target.value;
+                        await updateOrderStatus(
+                          selectedOrder.id,
+                          newStatus,
+                          "select"
+                        );
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-medium text-sm transition-colors hover:border-gray-400 dark:hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed ltr:pr-9 rtl:pl-9"
+                      disabled={
+                        selectedOrder.status === "CANCELLED" ||
+                        selectedOrder.status === "COMPLETED" ||
+                        orderModalStatusLoading !== null
+                      }
+                    >
                     {getStatusOptions(
                       selectedOrder.status,
                       selectedOrder.orderType,
@@ -4276,7 +4343,14 @@ export default function OrdersPage() {
                         {option.label}
                       </option>
                     ))}
-                  </select>
+                    </select>
+                    {orderModalStatusLoading === "select" && (
+                      <span
+                        className={`pointer-events-none absolute top-1/2 -translate-y-1/2 h-4 w-4 shrink-0 rounded-full border-2 border-primary-600 border-t-transparent animate-spin ${isRTL ? "left-2.5" : "right-2.5"}`}
+                        aria-hidden
+                      />
+                    )}
+                  </div>
                 </div>
 
                 {/* Buttons: one row on laptop, two rows on mobile */}
@@ -4303,6 +4377,8 @@ export default function OrdersPage() {
                     selectedOrder.status !== "COMPLETED" && (
                       <>
                         <button
+                          type="button"
+                          disabled={orderModalStatusLoading !== null}
                           onClick={() => {
                             const order = selectedOrder;
                             const tableNum = order?.tableNumber;
@@ -4315,30 +4391,63 @@ export default function OrdersPage() {
                               cancelText: isRTL ? "إلغاء" : "Cancel",
                               confirmVariant: "primary",
                               onConfirm: async () => {
-                                try {
-                                  await updateOrderStatus(order!.id, "COMPLETED");
-                                  closeOrderModal();
-                                  if (orderTyp === "DINE_IN" && tableNum && tableNum !== "QUICK" && qrCodeToClose?.id && qrCodeToClose.isOccupied) {
+                                const ok = await updateOrderStatus(
+                                  order!.id,
+                                  "COMPLETED",
+                                  "complete"
+                                );
+                                if (!ok) return;
+                                closeOrderModal();
+                                if (
+                                  orderTyp === "DINE_IN" &&
+                                  tableNum &&
+                                  tableNum !== "QUICK" &&
+                                  qrCodeToClose?.id &&
+                                  qrCodeToClose.isOccupied
+                                ) {
+                                  try {
                                     await toggleTableOccupied(qrCodeToClose.id);
                                     setQrCodes((prev) => ({
                                       ...prev,
-                                      [tableNum]: { ...prev[tableNum], isOccupied: false },
+                                      [tableNum]: {
+                                        ...prev[tableNum],
+                                        isOccupied: false,
+                                      },
                                     }));
+                                  } catch {
+                                    showToast(
+                                      isRTL
+                                        ? "تم إكمال الطلب لكن فشل إغلاق جلسة الطاولة"
+                                        : "Order completed but failed to close table session",
+                                      "error"
+                                    );
                                   }
-                                } catch {
-                                  showToast(isRTL ? "فشل تحديث حالة الطلب" : "Failed to update order status", "error");
                                 }
                               },
                             });
                           }}
-                          className="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-all shadow-sm hover:shadow font-medium text-sm"
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-all shadow-sm hover:shadow font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-emerald-600"
                         >
-                          <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          <span className="whitespace-nowrap">{isRTL ? "مكتمل (مدفوع)" : "Completed (Paid)"}</span>
+                          {orderModalStatusLoading === "complete" ? (
+                            <span className="h-4 w-4 shrink-0 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                          ) : (
+                            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          )}
+                          <span className="whitespace-nowrap">
+                            {orderModalStatusLoading === "complete"
+                              ? isRTL
+                                ? "جاري التحديث…"
+                                : "Updating…"
+                              : isRTL
+                                ? "مكتمل (مدفوع)"
+                                : "Completed (Paid)"}
+                          </span>
                         </button>
                         <button
+                          type="button"
+                          disabled={orderModalStatusLoading !== null}
                           onClick={() => {
                             const order = selectedOrder;
                             const tableNum = order?.tableNumber;
@@ -4351,28 +4460,59 @@ export default function OrdersPage() {
                               cancelText: isRTL ? "تراجع" : "Go back",
                               confirmVariant: "danger",
                               onConfirm: async () => {
-                                try {
-                                  await updateOrderStatus(order!.id, "CANCELLED");
-                                  closeOrderModal();
-                                  if (orderTyp === "DINE_IN" && tableNum && tableNum !== "QUICK" && qrCodeToClose?.id && qrCodeToClose.isOccupied) {
+                                const ok = await updateOrderStatus(
+                                  order!.id,
+                                  "CANCELLED",
+                                  "cancel"
+                                );
+                                if (!ok) return;
+                                closeOrderModal();
+                                if (
+                                  orderTyp === "DINE_IN" &&
+                                  tableNum &&
+                                  tableNum !== "QUICK" &&
+                                  qrCodeToClose?.id &&
+                                  qrCodeToClose.isOccupied
+                                ) {
+                                  try {
                                     await toggleTableOccupied(qrCodeToClose.id);
                                     setQrCodes((prev) => ({
                                       ...prev,
-                                      [tableNum]: { ...prev[tableNum], isOccupied: false },
+                                      [tableNum]: {
+                                        ...prev[tableNum],
+                                        isOccupied: false,
+                                      },
                                     }));
+                                  } catch {
+                                    showToast(
+                                      isRTL
+                                        ? "تم إلغاء الطلب لكن فشل إغلاق جلسة الطاولة"
+                                        : "Order cancelled but failed to close table session",
+                                      "error"
+                                    );
                                   }
-                                } catch {
-                                  showToast(isRTL ? "فشل تحديث حالة الطلب" : "Failed to update order status", "error");
                                 }
                               },
                             });
                           }}
-                          className="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-all shadow-sm hover:shadow font-medium text-sm"
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-all shadow-sm hover:shadow font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-600"
                         >
-                          <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                          <span className="whitespace-nowrap">{isRTL ? "إلغاء الطلب" : "Cancel Order"}</span>
+                          {orderModalStatusLoading === "cancel" ? (
+                            <span className="h-4 w-4 shrink-0 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                          ) : (
+                            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          )}
+                          <span className="whitespace-nowrap">
+                            {orderModalStatusLoading === "cancel"
+                              ? isRTL
+                                ? "جاري التحديث…"
+                                : "Updating…"
+                              : isRTL
+                                ? "إلغاء الطلب"
+                                : "Cancel Order"}
+                          </span>
                         </button>
                       </>
                     )}
