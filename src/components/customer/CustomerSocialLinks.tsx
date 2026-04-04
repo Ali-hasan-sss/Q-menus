@@ -109,19 +109,22 @@ function WhatsAppIcon({ className }: { className?: string }) {
 }
 
 /**
- * Floating strip above the order bar: call, WhatsApp (optional), then social URLs.
- * Does not affect menu content layout.
+ * Contact + social icons.
+ * - floating: fixed above order bar (customer menu with cart).
+ * - inline: in document flow under header, above search (restaurant menu).
  */
 export function CustomerSocialLinks({
   links,
   phone,
   customerWhatsApp,
   isRTL,
+  variant = "floating",
 }: {
   links: SocialLinksPayload | Record<string, string> | null | undefined;
   phone?: string | null;
   customerWhatsApp?: string | null;
   isRTL: boolean;
+  variant?: "floating" | "inline";
 }) {
   const telHref = telHrefFromPhone(phone ?? null);
   const waHref = waHrefFromNumber(customerWhatsApp ?? null);
@@ -138,12 +141,23 @@ export function CustomerSocialLinks({
 
   if (!hasContact && !hasSocial) return null;
 
+  const isInline = variant === "inline";
+
   return (
     <nav
-      className="fixed left-1/2 -translate-x-1/2 z-[45] flex flex-nowrap items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-full bg-black/35 backdrop-blur-md border border-white/20 shadow-sm max-w-[min(100vw-1.5rem,28rem)] overflow-x-auto overscroll-x-contain"
-      style={{
-        bottom: "calc(5.75rem + env(safe-area-inset-bottom, 0px))",
-      }}
+      className={
+        isInline
+          ? "relative z-[35] flex flex-nowrap items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2 rounded-full bg-black/35 backdrop-blur-md border border-white/20 shadow-sm max-w-[min(100vw-2rem,28rem)] mx-auto overflow-x-auto overscroll-x-contain mb-3"
+          : "fixed left-1/2 -translate-x-1/2 z-[45] flex flex-nowrap items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-full bg-black/35 backdrop-blur-md border border-white/20 shadow-sm max-w-[min(100vw-1.5rem,28rem)] overflow-x-auto overscroll-x-contain"
+      }
+      style={
+        isInline
+          ? undefined
+          : {
+              bottom:
+                "calc(5.75rem + env(safe-area-inset-bottom, 0px))",
+            }
+      }
       aria-label={isRTL ? "التواصل مع المطعم" : "Contact restaurant"}
     >
       {telHref && (

@@ -1322,13 +1322,6 @@ export default function CustomerMenuPage() {
             onCurrencyChange={handleCurrencyChange}
           />
 
-          <CustomerSocialLinks
-            links={restaurant?.socialLinks}
-            phone={restaurant?.phone}
-            customerWhatsApp={restaurant?.customerWhatsApp}
-            isRTL={isRTL}
-          />
-
           <div className="max-w-7xl pt-[70px] sm:pt-[100px] mx-auto px-4 sm:px-6 lg:px-8 pb-24">
             {incompleteOrder && incompleteOrder.status !== "CANCELLED" && (
               <div className="">
@@ -1344,6 +1337,14 @@ export default function CustomerMenuPage() {
                 </button>
               </div>
             )}
+
+            <CustomerSocialLinks
+              variant="inline"
+              links={restaurant?.socialLinks}
+              phone={restaurant?.phone}
+              customerWhatsApp={restaurant?.customerWhatsApp}
+              isRTL={isRTL}
+            />
 
             {/* Categories View */}
             {!selectedCategory && (
